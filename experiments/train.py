@@ -75,16 +75,8 @@ def main(cfg: DictConfig):
                       nucs=args.nucs
                       )
 
-        #if pre-trained initialize matching layers
-        if cfg.train.warm_start:
-            print("warm starting")
-            m = torch.load(args.warm_start, map_location='cpu')
-            #remove keys not related to embeddings
-            for key in list(m.keys()):
-                if 'embedder' not in key:
-                    print("killing ", key)
-                    del m[key]
-            missing = model.load_state_dict(m, strict=False)
+        if cfg.model.use_pretrained:
+            model.from_pretrained(cfg.model.pretrained_path)
 
         model = model.to(device)
 
@@ -132,9 +124,6 @@ def main(cfg: DictConfig):
                           save_path=save_path,
                           writer=writer,
                           num_epochs=num_epochs,
-                          reconstruction_lam=reconstruction_lam,
-                          clf_lam=clf_lam,
-                          embed_only=cfg.train.embed_only,
                           early_stop_threshold=cfg.train.early_stop)
         
 if __name__ == "__main__":
