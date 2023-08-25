@@ -1,0 +1,37 @@
+name: 'default'
+  
+attributor:
+  in_dim: 32
+  out_dims: 166 
+  hidden_dims:
+    - 32 
+    - 32 
+
+encoder:
+  in_dim: 4
+  hidden_dims:
+    - 32
+    - 32
+  out_dim: 32
+
+train:
+  seed: 42
+  parallel: false
+  batch_size: 32
+  num_workers: 4
+  clf_lam: 1.0
+  reconstruction_lam: 1.0
+  kfold: 5
+  warm_start: true
+  pretrain_path: models/pretrained_${pretrain.simfunc}
+  num_epochs: 10
+  embed_only: false
+  early_stop: 10
+
+pretrain:
+  simfunc: 'R_1'
+
+data:
+  train_graphs: data/pockets_docked_train
+  test_graphs: data/pocketsa_docked_test
+  use_nucs: true

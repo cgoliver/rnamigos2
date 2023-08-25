@@ -1,0 +1,5 @@
+numpy
+rnaglib
+tensorboard
+dgl
+hydra-core
