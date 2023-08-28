@@ -1,6 +1,6 @@
 encoder:
   in_dim: 4
-  hidden_dim: 32
+  hidden_dim: 16 
   num_layers: 3
 
 decoder:
@@ -16,3 +16,4 @@ lig_encoder:
 
 pool: 'att'
 use_pretrained: false
+pretrained_path: pretrained/pretrained_model_graphlet.pth

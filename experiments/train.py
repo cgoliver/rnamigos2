@@ -10,9 +10,8 @@ from torch.utils.tensorboard import SummaryWriter
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
-from rnaglib.learning import models
-
 from rnamigos_dock.learning.loader import DockingDataset 
+from rnamigos_dock.learning import learn 
 from rnamigos_dock.learning.loader import Loader
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, Model
 from rnamigos_dock.learning.utils import mkdirs

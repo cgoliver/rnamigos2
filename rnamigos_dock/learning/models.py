@@ -192,4 +192,4 @@ class Model(nn.Module):
         return pred 
 
     def from_pretrained(self, model_path):
-        self.embedder.load_state_dict(torch.load(model_path)['state_dict'])
+        self.encoder.load_state_dict(torch.load(model_path))
