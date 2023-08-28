@@ -47,13 +47,13 @@ def main(cfg: DictConfig):
 
 
     dataset = DockingDataset(annotated_path=cfg.data.train_graphs,
-                              shuffle=cfg.train.shuffle,
-                              seed=cfg.train.seed,
-                              nuc_types=cfg.tokens.nuc_types,
-                              edge_types=cfg.tokens.edge_types,
-                              target=cfg.train.target,
-                              debug=cfg.debug
-                              )
+                             shuffle=cfg.train.shuffle,
+                             seed=cfg.train.seed,
+                             nuc_types=cfg.tokens.nuc_types,
+                             edge_types=cfg.tokens.edge_types,
+                             target=cfg.train.target,
+                             debug=cfg.debug
+                             )
 
     loader = Loader(dataset,
                     batch_size=cfg.train.batch_size, 
@@ -68,83 +68,82 @@ def main(cfg: DictConfig):
 
     print("Loading data...")
 
-    data = loader.get_data(k_fold=cfg.train.kfold)
+    train_loader, test_loader = loader.get_data()
 
     print("Loaded data")
 
-    for k, (train_loader, test_loader) in enumerate(data):
-        print("creating model")
-        rna_encoder = RNAEncoder(in_dim=cfg.model.encoder.in_dim,
-                                    hidden_dim=cfg.model.encoder.hidden_dim,
-                                    num_hidden_layers=cfg.model.encoder.num_layers,
-                                    )
+    print("creating model")
+    rna_encoder = RNAEncoder(in_dim=cfg.model.encoder.in_dim,
+                             hidden_dim=cfg.model.encoder.hidden_dim,
+                             num_hidden_layers=cfg.model.encoder.num_layers,
+                             )
 
-        lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
-                                    hidden_dim=cfg.model.lig_encoder.hidden_dim,
-                                    num_hidden_layers=cfg.model.lig_encoder.num_layers)
+    lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
+                                hidden_dim=cfg.model.lig_encoder.hidden_dim,
+                                num_hidden_layers=cfg.model.lig_encoder.num_layers)
 
-        decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
-                          out_dim=cfg.model.decoder.out_dim,
-                          hidden_dim=cfg.model.decoder.hidden_dim,
-                          num_layers=cfg.model.decoder.num_layers)
+    decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
+                      out_dim=cfg.model.decoder.out_dim,
+                      hidden_dim=cfg.model.decoder.hidden_dim,
+                      num_layers=cfg.model.decoder.num_layers)
 
-        model = Model(encoder=rna_encoder,
-                      decoder=decoder,
-                      lig_encoder=lig_encoder,
-                      pool=cfg.model.pool,
-                      )
+    model = Model(encoder=rna_encoder,
+                  decoder=decoder,
+                  lig_encoder=lig_encoder,
+                  pool=cfg.model.pool,
+                  )
 
-        if cfg.model.use_pretrained:
-            model.from_pretrained(cfg.model.pretrained_path)
+    if cfg.model.use_pretrained:
+        model.from_pretrained(cfg.model.pretrained_path)
 
-        model = model.to(device)
+    model = model.to(device)
 
-        print(f'Using {model.__class__} as model')
+    print(f'Using {model.__class__} as model')
 
-        '''
-        Optimizer instanciation
-        '''
+    '''
+    Optimizer instanciation
+    '''
 
-        # criterion = torch.nn.BCELoss()
-        criterion = torch.nn.L1Loss()
-        optimizer = optim.Adam(model.parameters())
+    # criterion = torch.nn.BCELoss()
+    criterion = torch.nn.L1Loss()
+    optimizer = optim.Adam(model.parameters())
 
-        '''
-        Experiment Setup
-        '''
-        
-        name = f"{cfg.name}_{k}"
-        print(name)
-        result_folder, save_path = mkdirs(name)
-        print(save_path)
-        writer = SummaryWriter(result_folder)
-        print(f'Saving result in {result_folder}/{name}')
+    '''
+    Experiment Setup
+    '''
+    
+    name = f"{cfg.name}"
+    print(name)
+    result_folder, save_path = mkdirs(name)
+    print(save_path)
+    writer = SummaryWriter(result_folder)
+    print(f'Saving result in {result_folder}/{name}')
 
 
-        
-        all_graphs = np.array(test_loader.dataset.dataset.all_graphs)
-        test_inds = test_loader.dataset.indices
-        train_inds = train_loader.dataset.indices
+    
+    all_graphs = np.array(test_loader.dataset.dataset.all_graphs)
+    test_inds = test_loader.dataset.indices
+    train_inds = train_loader.dataset.indices
 
-        pickle.dump(({'test': all_graphs[test_inds], 'train': all_graphs[train_inds]}),
-                        open(os.path.join(result_folder, f'splits_{k}.p'), 'wb'))
+    # pickle.dump(({'test': all_graphs[test_inds], 'train': all_graphs[train_inds]}),
+    #                open(os.path.join(result_folder, f'splits_{k}.p'), 'wb'))
 
-        '''
-        Run
-        '''
-        num_epochs = cfg.train.num_epochs
+    '''
+    Run
+    '''
+    num_epochs = cfg.train.num_epochs
 
-        print("training...")
-        learn.train_dock(model=model,
-                         criterion=criterion,
-                         optimizer=optimizer,
-                         device=cfg.device,
-                         train_loader=train_loader,
-                         test_loader=test_loader,
-                         save_path=save_path,
-                         writer=writer,
-                         num_epochs=num_epochs,
-                         early_stop_threshold=cfg.train.early_stop)
+    print("training...")
+    learn.train_dock(model=model,
+                     criterion=criterion,
+                     optimizer=optimizer,
+                     device=cfg.device,
+                     train_loader=train_loader,
+                     test_loader=test_loader,
+                     save_path=save_path,
+                     writer=writer,
+                     num_epochs=num_epochs,
+                     early_stop_threshold=cfg.train.early_stop)
         
 if __name__ == "__main__":
     main()

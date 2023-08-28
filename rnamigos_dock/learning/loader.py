@@ -12,7 +12,6 @@ import torch
 from torch.utils.data import Dataset, DataLoader, Subset
 from dgl.dataloading import GraphDataLoader
 import pandas as pd
-from rnamigos_dock.data_processor.node_sim import SimFunctionNode, k_block_list
 
 
 class DockingDataset(Dataset):
@@ -86,26 +85,6 @@ class DockingDataset(Dataset):
 
         return g_dgl, fp_nat, torch.tensor(target, dtype=torch.float), [idx]
 
-def collate_wrapper():
-    """
-        Wrapper for collate function so we can use different node similarities.
-    """
-    def collate_block(samples):
-        graphs, fp, inter_score_trans, sample_type, idx = map(list, zip(*samples))
-        fp = np.array(fp)
-        inter_score_trans = np.array(inter_score_trans)
-        if sample_type == 'TRAIN':
-            sample_type = np.array(1)
-        else:
-            sample_type = np.array(0)
-        #sample_type = np.array(sample_type)
-        
-        idx = np.array(idx)
-        batched_graph = dgl.batch(graphs)
-        return batched_graph, torch.Tensor([1 for _ in samples]).float(), torch.from_numpy(fp), torch.from_numpy(inter_score_trans).float(), torch.from_numpy(sample_type), torch.from_numpy(idx)
-    return collate_block
-
-
 class Loader():
     def __init__(self,
                  dataset,
@@ -176,46 +155,17 @@ class Loader():
             # return train_loader, valid_loader, test_loader
             yield train_loader, test_loader
 
-    def get_data(self, k_fold=0):
-        n = len(self.dataset)
-        indices = list(range(n))
-        """
-        train_indices = []
-        test_indices = []
-        for idx, item in enumerate(self.dataset):
-            if item[3] == 'TRAIN':
-                train_indices.append(idx)
-            else:
-                test_indices.append(idx)
-        """
+    def get_data(self):
+        train_size = int(0.8 * len(self.dataset))
+        test_size = len(self.dataset) - train_size
+        train_set, test_set = torch.utils.data.random_split(self.dataset, [train_size, test_size])
 
-        collate_block = collate_wrapper()
+        train_loader = GraphDataLoader(dataset=train_set, shuffle=self.shuffle, batch_size=self.batch_size,
+                                  num_workers=self.num_workers, collate_fn=None)
+        test_loader = GraphDataLoader(dataset=test_set, shuffle=self.shuffle, batch_size=self.batch_size,
+                             num_workers=self.num_workers, collate_fn=None)
 
-        if k_fold > 1:
-            from sklearn.model_selection import KFold
-            kf = KFold(n_splits=k_fold)
-            for train_indices, test_indices in kf.split(np.array(indices), np.array(indices)):
-                train_set = Subset(self.dataset, train_indices)
-                test_set = Subset(self.dataset, test_indices)
-
-                train_loader = GraphDataLoader(dataset=train_set, shuffle=True, batch_size=self.batch_size,
-                                          num_workers=self.num_workers, collate_fn=None)
-                test_loader = GraphDataLoader(dataset=test_set, shuffle=True, batch_size=self.batch_size,
-                                         num_workers=self.num_workers, collate_fn=None)
-
-                yield train_loader, test_loader
-
-        else:
-            split_train, split_valid = 0.8, 0.8
-            train_set = Subset(self.dataset, train_indices)
-            test_set = Subset(self.dataset, test_indices)
-
-            train_loader = GraphDataLoader(dataset=train_set, shuffle=True, batch_size=self.batch_size,
-                                      num_workers=self.num_workers, collate_fn=None)
-            test_loader = GraphDataLoader(dataset=test_set, shuffle=True, batch_size=self.batch_size,
-                                 num_workers=self.num_workers, collate_fn=None)
-
-            yield train_loader, test_loader
+        return train_loader, test_loader
 
 
 def describe_dataset(annotated_path='../data/annotated/pockets_docking_annotated'):
