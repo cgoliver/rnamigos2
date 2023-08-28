@@ -1,4 +1,4 @@
 defaults:
-  tokens: default 
-  paths: default
-  model: default
+  - tokens: default 
+  - paths: default
+  - model: default

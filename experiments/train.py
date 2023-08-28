@@ -10,10 +10,11 @@ from torch.utils.tensorboard import SummaryWriter
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
-import rnamigos_dock.learning.learn as learn
+from rnaglib.learning import models
+
 from rnamigos_dock.learning.loader import DockingDataset 
 from rnamigos_dock.learning.loader import Loader
-from rnamigos_dock.learning.models import RNAEncoder, LigandEncoder, Decoder, Model
+from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, Model
 from rnamigos_dock.learning.utils import mkdirs
 
 
@@ -72,11 +73,12 @@ def main(cfg: DictConfig):
 
     print("Loaded data")
 
+
     print("creating model")
-    rna_encoder = RNAEncoder(in_dim=cfg.model.encoder.in_dim,
-                             hidden_dim=cfg.model.encoder.hidden_dim,
-                             num_hidden_layers=cfg.model.encoder.num_layers,
-                             )
+    rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
+                           hidden_dim=cfg.model.encoder.hidden_dim,
+                           num_hidden_layers=cfg.model.encoder.num_layers,
+                           )
 
     lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
                                 hidden_dim=cfg.model.lig_encoder.hidden_dim,
@@ -91,6 +93,7 @@ def main(cfg: DictConfig):
                   decoder=decoder,
                   lig_encoder=lig_encoder,
                   pool=cfg.model.pool,
+                  pool_dim=cfg.model.encoder.hidden_dim
                   )
 
     if cfg.model.use_pretrained:

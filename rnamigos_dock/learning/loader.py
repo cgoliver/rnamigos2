@@ -68,6 +68,8 @@ class DockingDataset(Dataset):
                    (nx.get_edge_attributes(graph, 'label')).items()}
         nx.set_edge_attributes(graph, name='one_hot', values=one_hot)
 
+        print(graph.nodes(data=True))
+
         node_attrs = None
         one_hot_nucs  = {node: torch.tensor(self.nuc_map[label.upper()], dtype=torch.float32) for node, label in
                 (nx.get_node_attributes(graph, 'nt')).items()}

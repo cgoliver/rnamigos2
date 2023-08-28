@@ -21,6 +21,7 @@ def main(cfg: DictConfig):
     graph_representation = GraphRepresentation(framework='dgl')
     ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
     unsupervised_dataset = rna_dataset.RNADataset(nt_features=node_features,
+                                                  data_path='data/glib/data/annotated/NR_chops_annot',
                                                   representations=[ring_representation, graph_representation])
     train_loader = rna_loader.get_loader(dataset=unsupervised_dataset, split=False, num_workers=4)
 

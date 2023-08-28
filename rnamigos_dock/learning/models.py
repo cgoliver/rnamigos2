@@ -95,12 +95,12 @@ class LigandEncoder(nn.Module):
             h = layer(h)
         return h 
 
-class RNAEncoder(nn.Module):
+class Embedder(nn.Module):
     """
         Model for producing node embeddings.
     """
     def __init__(self, in_dim, hidden_dim, num_hidden_layers, num_rels=19, num_bases=-1):
-        super(RNAEncoder, self).__init__()
+        super(Embedder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
         self.num_hidden_layers = num_hidden_layers 
@@ -157,6 +157,7 @@ class Model(nn.Module):
                  decoder,
                  lig_encoder=None,
                  pool='att',
+                 pool_dim=32
                  ):
         """
 
@@ -172,7 +173,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         if pool == 'att':
-            pooling_gate_nn = nn.Linear(encoder.hidden_dim, 1)
+            pooling_gate_nn = nn.Linear(pool_dim, 1)
             self.pool = GlobalAttentionPooling(pooling_gate_nn)
         else:
             self.pool = SumPooling()
