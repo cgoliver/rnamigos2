@@ -13,7 +13,7 @@ import hydra
 import rnamigos_dock.learning.learn as learn
 from rnamigos_dock.learning.loader import DockingDataset 
 from rnamigos_dock.learning.loader import Loader
-from rnamigos_dock.learning.rgcn import RNAEncoder, LigandEncoder, Decoder, Model
+from rnamigos_dock.learning.models import RNAEncoder, LigandEncoder, Decoder, Model
 from rnamigos_dock.learning.utils import mkdirs
 
 
