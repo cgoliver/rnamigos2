@@ -1,0 +1,13 @@
+
+name: 'default'
+  
+encoder:
+  hidden_dims:
+    - 32
+    - 32
+
+train:
+  seed: 42
+  epochs: 100
+  simfunc: "R_1"
+  num_hops: 2

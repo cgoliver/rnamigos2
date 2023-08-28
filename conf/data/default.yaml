@@ -1,0 +1,2 @@
+train_graphs: data/pockets_docked_train
+test_graphs: data/pocketsa_docked_test

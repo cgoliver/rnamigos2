@@ -1,36 +1,39 @@
-import os, sys
-
 import torch
-import torch.optim as optim
+
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
-from rnaglib.learning import models, learn
-from rnaglib.data_loading import graphloader
 from rnaglib.kernels import node_sim
+from rnaglib.data_loading import rna_dataset, rna_loader
+from rnaglib.representations import GraphRepresentation, RingRepresentation
+from rnaglib.learning import models, learning_utils, learn
+
 
 @hydra.main(version_base=None, config_path="../conf", config_name="pretrain")
 def main(cfg: DictConfig):
-    node_sim_func = node_sim.SimFunctionNode(method=cfg.train.simfunc, depth=cfg.train.num_hops)
+    # Choose the data, features and targets to use
     node_features = ['nt_code']
-    unsupervised_dataset = loader.UnsupervisedDataset(node_simfunc=node_sim_func,
-                                                      node_features=node_features)
 
+    ###### Unsupervised phase : ######
+    # Choose the data and kernel to use for pretraining
+    print('Starting to pretrain the network')
+    node_simfunc = node_sim.SimFunctionNode(method='R_1', depth=2)
+    graph_representation = GraphRepresentation(framework='dgl')
+    ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
+    unsupervised_dataset = rna_dataset.RNADataset(nt_features=node_features,
+                                                  representations=[ring_representation, graph_representation])
+    train_loader = rna_loader.get_loader(dataset=unsupervised_dataset, split=False, num_workers=4)
+
+    # Then choose the embedder model and pre_train it, we dump a version of this pretrained model
     embedder_model = models.Embedder(infeatures_dim=unsupervised_dataset.input_dim,
-                                     dims=cfg.model.hidden_dims)
-
-    optimizer = optim.Adam(embedder_model.parameters())
-
+                                     dims=[64, 64])
+    optimizer = torch.optim.Adam(embedder_model.parameters())
     learn.pretrain_unsupervised(model=embedder_model,
                                 optimizer=optimizer,
                                 train_loader=train_loader,
-                                learning_routine=learn.LearningRoutine(num_epochs=cfg.train.epochs),
-                                rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": cfg.train.num_hops})
-    
-    torch.save(
-                {'args': args, 'state_dict': self.state_dict()},
-                osp.pah.join(cfg.paths.models, cfg.name)
-                )
-
+                                learning_routine=learning_utils.LearningRoutine(num_epochs=10),
+                                rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": 2})
+    torch.save(embedder_model.state_dict(), 'pretrained_model.pth')
+ 
 if __name__ == "__main__":
     main()

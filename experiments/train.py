@@ -11,14 +11,15 @@ from omegaconf import DictConfig, OmegaConf
 import hydra
 
 import rnamigos_dock.learning.learn as learn
+from rnamigos_dock.learning.loader import DockingDataset 
 from rnamigos_dock.learning.loader import Loader
-from rnamigos_dock.learning.rgcn import Model
+from rnamigos_dock.learning.rgcn import RNAEncoder, LigandEncoder, Decoder, Model
 from rnamigos_dock.learning.utils import mkdirs
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="learning")
+@hydra.main(version_base=None, config_path="../conf", config_name="train")
 def main(cfg: DictConfig):
-
+    print(OmegaConf.to_yaml(cfg))
     print('Done importing')
     if cfg.train.seed > 0:
         torch.manual_seed(cfg.train.seed)
@@ -45,11 +46,19 @@ def main(cfg: DictConfig):
     '''
 
 
-    loader = Loader(annotated_path=cfg.data.train_graphs,
+    dataset = DockingDataset(annotated_path=cfg.data.train_graphs,
+                              shuffle=cfg.train.shuffle,
+                              seed=cfg.train.seed,
+                              nuc_types=cfg.tokens.nuc_types,
+                              edge_types=cfg.tokens.edge_types,
+                              target=cfg.train.target,
+                              debug=cfg.debug
+                              )
+
+    loader = Loader(dataset,
                     batch_size=cfg.train.batch_size, 
                     num_workers=cfg.train.num_workers,
-                    sim_function=cfg.pretrain.simfunc,
-                    nucs=cfg.data.use_nucs)
+                    )
 
     print('Created data loader')
 
@@ -57,22 +66,32 @@ def main(cfg: DictConfig):
     Model loading
     '''
 
-    #increase output embeddings by 1 for nuc info
-    clf_lam = cfg.train.clf_lam
-    reconstruction_lam = cfg.train.reconstruction_lam
+    print("Loading data...")
 
     data = loader.get_data(k_fold=cfg.train.kfold)
-    attributor_dims_init = copy.deepcopy(attributor_dims)
+
+    print("Loaded data")
 
     for k, (train_loader, test_loader) in enumerate(data):
-        model = Model(dims, 
-                      device, 
-                      attributor_dims=attributor_dims,
-                      num_rels=loader.num_edge_types,
-                      num_bases=-1,
-                      pool=args.pool,
-                      pos_weight=args.pos_weight,
-                      nucs=args.nucs
+        print("creating model")
+        rna_encoder = RNAEncoder(in_dim=cfg.model.encoder.in_dim,
+                                    hidden_dim=cfg.model.encoder.hidden_dim,
+                                    num_hidden_layers=cfg.model.encoder.num_layers,
+                                    )
+
+        lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
+                                    hidden_dim=cfg.model.lig_encoder.hidden_dim,
+                                    num_hidden_layers=cfg.model.lig_encoder.num_layers)
+
+        decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
+                          out_dim=cfg.model.decoder.out_dim,
+                          hidden_dim=cfg.model.decoder.hidden_dim,
+                          num_layers=cfg.model.decoder.num_layers)
+
+        model = Model(encoder=rna_encoder,
+                      decoder=decoder,
+                      lig_encoder=lig_encoder,
+                      pool=cfg.model.pool,
                       )
 
         if cfg.model.use_pretrained:
@@ -86,8 +105,8 @@ def main(cfg: DictConfig):
         Optimizer instanciation
         '''
 
-        criterion = torch.nn.BCELoss()
-        #criterion = torch.nn.L1Loss()
+        # criterion = torch.nn.BCELoss()
+        criterion = torch.nn.L1Loss()
         optimizer = optim.Adam(model.parameters())
 
         '''
@@ -115,16 +134,17 @@ def main(cfg: DictConfig):
         '''
         num_epochs = cfg.train.num_epochs
 
-        learn.train_model(model=model,
-                          criterion=criterion,
-                          optimizer=optimizer,
-                          device=device,
-                          train_loader=train_loader,
-                          test_loader=test_loader,
-                          save_path=save_path,
-                          writer=writer,
-                          num_epochs=num_epochs,
-                          early_stop_threshold=cfg.train.early_stop)
+        print("training...")
+        learn.train_dock(model=model,
+                         criterion=criterion,
+                         optimizer=optimizer,
+                         device=cfg.device,
+                         train_loader=train_loader,
+                         test_loader=test_loader,
+                         save_path=save_path,
+                         writer=writer,
+                         num_epochs=num_epochs,
+                         early_stop_threshold=cfg.train.early_stop)
         
 if __name__ == "__main__":
     main()
