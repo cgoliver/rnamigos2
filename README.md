@@ -28,8 +28,16 @@ All configs are in the `conf/` folder.
 python experiments/train.py
 ```
 
+## Pre-train a model
+
+## Load a pretrained model
+
+## Compute Enrichment Factor
+
+```
+python experiments/eval.py
+
+```
 
 ## Generate figures from paper
-
-
 
