@@ -29,7 +29,16 @@ All configs are in the `conf/` folder.
 python experiments/train.py
 ```
 
+Pass the `--help` flag to get all the options.
+
 ## Pre-train a model
+
+```
+python experiments/pretrain.py
+
+```
+
+Pass the `--help` flag to get all the options.
 
 ## Load a pretrained model
 
