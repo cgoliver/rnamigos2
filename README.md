@@ -14,6 +14,7 @@ These are all tarballs that you should put in the `data/` folder at the resposit
 
 * [Docked pockets test set](https://drive.proton.me/urls/RSZ2V97TXG#z06rtSrHNGxU)
 * [Docked pockets train set](https://drive.proton.me/urls/929Z2M4YWC#pkwIdM4TZAqR)
+* [Pretraining data](https://drive.proton.me/urls/YKNV0M1WBR#s0E0cMSTvpsH)
 
 
 ## Configs
