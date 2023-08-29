@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 
 from omegaconf import DictConfig, OmegaConf
@@ -39,7 +41,8 @@ def main(cfg: DictConfig):
                                 learning_routine=learning_utils.LearningRoutine(num_epochs=10),
                                 rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": cfg.depth})
 
-    torch.save(model.state_dict(), 'pretrained_model.pth')
+    Path(cfg.paths.pretrain_save).mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), Path(cfg.paths.pretrain_save) / cfg.name / 'model.pth')
  
 if __name__ == "__main__":
     main()
