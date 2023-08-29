@@ -31,19 +31,14 @@ def main(cfg: DictConfig):
                      num_hidden_layers=cfg.model.encoder.num_layers,
                       )
 
-    # Then choose the embedder model and pre_train it, we dump a version of this pretrained model
-    # embedder_model = models.Embedder(infeatures_dim=unsupervised_dataset.input_dim,
-    #                                 dims=[64, 64])
-
-    embedder_model = models.Embedder(infeatures_dim=unsupervised_dataset.input_dim,
-                                     dims=[64, 64])
-    optimizer = torch.optim.Adam(embedder_model.parameters())
-    learn.pretrain_unsupervised(model=embedder_model,
+    optimizer = torch.optim.Adam(model.parameters())
+    learn.pretrain_unsupervised(model=model,
                                 optimizer=optimizer,
                                 train_loader=train_loader,
                                 learning_routine=learning_utils.LearningRoutine(num_epochs=10),
                                 rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": 2})
-    torch.save(embedder_model.state_dict(), 'pretrained_model.pth')
+
+    torch.save(model.state_dict(), 'pretrained_model.pth')
  
 if __name__ == "__main__":
     main()
