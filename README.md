@@ -13,7 +13,7 @@ These are all tarballs that you should put in the `data/` folder at the resposit
 1. These are networkx graphs, one for each pocket, annotated with the value for the intermolecular term (`INTER`) score from `RDOCK`.
 
 * [Docked pockets test set](https://drive.proton.me/urls/RSZ2V97TXG#z06rtSrHNGxU)
-* [Docked pockets train set](https://drive.proton.me/urls/RSZ2V97TXG#z06rtSrHNGxU)
+* [Docked pockets train set](https://drive.proton.me/urls/929Z2M4YWC#pkwIdM4TZAqR)
 
 
 ## Configs
