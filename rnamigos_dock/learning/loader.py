@@ -9,6 +9,7 @@ from tqdm import tqdm
 import dgl
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, Subset
 from dgl.dataloading import GraphDataLoader
 import pandas as pd
@@ -66,16 +67,16 @@ class DockingDataset(Dataset):
         graph = nx.to_directed(graph)
         one_hot = {edge: torch.tensor(self.edge_map[label.upper()]) for edge, label in
                    (nx.get_edge_attributes(graph, 'label')).items()}
-        nx.set_edge_attributes(graph, name='one_hot', values=one_hot)
+        nx.set_edge_attributes(graph, name='edge_type', values=one_hot)
 
         node_attrs = None
-        one_hot_nucs  = {node: torch.tensor(self.nuc_map[label.upper()], dtype=torch.float32) for node, label in
+        one_hot_nucs  = {node: F.one_hot(self.nuc_map[label.upper()], num_classes=len(self.nuc_map)) for node, label in
                 (nx.get_node_attributes(graph, 'nt')).items()}
 
-        nx.set_node_attributes(graph, name='one_hot', values=one_hot_nucs)
+        nx.set_node_attributes(graph, name='nt_features', values=one_hot_nucs)
 
         #g_dgl = dgl.DGLGraph()
-        g_dgl = dgl.from_networkx(nx_graph=graph, edge_attrs=['one_hot'], node_attrs=['one_hot'])
+        g_dgl = dgl.from_networkx(nx_graph=graph, edge_attrs=['edge_type'], node_attrs=['nt_features'])
         g_dgl.title = self.all_graphs[idx]
 
         if self.target == 'fp':

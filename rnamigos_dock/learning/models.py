@@ -113,7 +113,7 @@ class Embedder(nn.Module):
         layers = nn.ModuleList()
 
         # input feature is just node degree
-        i2h = self.build_hidden_layer(1, self.hidden_dim)
+        i2h = self.build_hidden_layer(self.in_dim, self.hidden_dim)
         layers.append(i2h)
 
         for i in range(self.num_hidden_layers - 1): 
@@ -142,9 +142,9 @@ class Embedder(nn.Module):
                             activation=None)
 
     def forward(self, g):
-        h = g.ndata['one_hot'].reshape(-1,1)
+        h = g.ndata['nt_features']
         for layer in self.layers:
-            h = layer(g, h, g.edata['one_hot'])
+            h = layer(g, h, g.edata['edge_type'])
         g.ndata['h'] = h
         embeddings = g.ndata.pop('h')
         return embeddings
