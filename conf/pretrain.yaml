@@ -4,6 +4,7 @@ defaults:
   - paths: default
   - model: default
 
+name: 'default' 
 seed: 42
 epochs: 100
 simfunc: "R_1"

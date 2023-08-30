@@ -38,11 +38,12 @@ def main(cfg: DictConfig):
     learn.pretrain_unsupervised(model=model,
                                 optimizer=optimizer,
                                 train_loader=train_loader,
-                                learning_routine=learning_utils.LearningRoutine(num_epochs=10),
+                                learning_routine=learning_utils.LearningRoutine(num_epochs=cfg.epochs),
                                 rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": cfg.depth})
 
-    Path(cfg.paths.pretrain_save).mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), Path(cfg.paths.pretrain_save) / cfg.name / 'model.pth')
+    model_dir = Path(cfg.paths.pretrain_save, cfg.name)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), Path(model_dir, 'model.pth'))
  
 if __name__ == "__main__":
     main()
