@@ -18,6 +18,14 @@ These are all tarballs that you should put in the `data/` folder at the resposit
 * [Binding scores](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
 
 
+## Generate actives and decoys list
+
+
+```
+python scripts/build_screen_data.py
+```
+
+
 ## Configs
 
 All configs are in the `conf/` folder.

@@ -1,12 +1,5 @@
-import argparse
 import os, sys
-import pickle
-import copy
-import numpy as np
 
-import torch
-import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
@@ -26,12 +19,6 @@ def main(cfg: DictConfig):
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #device = torch.device('cpu')
-    # This is to create an appropriate number of workers, but works too with cpu
-    if cfg.train.parallel:
-        used_gpus_count = torch.cuda.device_count()
-    else:
-        used_gpus_count = 1
 
     dataset = DockingDataset(annotated_path=cfg.data.test_graphs,
                              shuffle=False,
