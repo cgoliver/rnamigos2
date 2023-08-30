@@ -35,13 +35,17 @@ Pass the `--help` flag to get all the options.
 ## Pre-train a model
 
 ```
-python experiments/pretrain.py
+python experiments/pretrain.py name=default pretrained_path=pretrained
 
 ```
 
 Pass the `--help` flag to get all the options.
 
 ## Load a pretrained model
+
+```
+python experiments/train model.use_pretrained=true model.pretrained_path=pretrained/default/model.pth
+```
 
 ## Compute Enrichment Factor
 

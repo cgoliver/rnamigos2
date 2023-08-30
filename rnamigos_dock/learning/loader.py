@@ -14,6 +14,8 @@ from torch.utils.data import Dataset, DataLoader, Subset
 from dgl.dataloading import GraphDataLoader
 import pandas as pd
 
+from rnaglib.utils import NODE_FEATURE_MAP 
+
 
 class DockingDataset(Dataset):
     def __init__(self,
@@ -46,7 +48,6 @@ class DockingDataset(Dataset):
         #build edge map
         self.edge_map = {e: i for i, e in enumerate(sorted(edge_types))}
         self.num_edge_types = len(self.edge_map)
-        self.nuc_map = {n: i for i, n in enumerate(sorted(nuc_types))}
         self.target = target
 
         self.n = len(self.all_graphs)
@@ -70,7 +71,7 @@ class DockingDataset(Dataset):
         nx.set_edge_attributes(graph, name='edge_type', values=one_hot)
 
         node_attrs = None
-        one_hot_nucs  = {node: F.one_hot(self.nuc_map[label.upper()], num_classes=len(self.nuc_map)) for node, label in
+        one_hot_nucs  = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
                 (nx.get_node_attributes(graph, 'nt')).items()}
 
         nx.set_node_attributes(graph, name='nt_features', values=one_hot_nucs)

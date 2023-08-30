@@ -5,8 +5,6 @@ num_workers: 4
 clf_lam: 1.0
 reconstruction_lam: 1.0
 kfold: 5
-use_pretrained: true
-pretrained_path: none 
 num_epochs: 10
 embed_only: false
 early_stop: 10
