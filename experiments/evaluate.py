@@ -35,17 +35,11 @@ def main(cfg: DictConfig):
                                    edge_types=cfg.tokens.edge_types,
                                    )
 
-    print(dataset[1])
-
     print('Created data loader')
 
     '''
     Model loading
     '''
-
-    print("Loading data...")
-
-    train_loader, test_loader = loader.get_data()
 
     print("Loaded data")
 
@@ -74,8 +68,6 @@ def main(cfg: DictConfig):
         model.from_pretrained(cfg.model.pretrained_path)
 
     model = model.to(device)
-
-    # load model weights
 
     print(f'Using {model.__class__} as model')
 

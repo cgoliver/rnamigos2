@@ -1,4 +1,5 @@
 defaults:
   - data: default 
   - tokens: default
+  - model: default
 decoys: pdb

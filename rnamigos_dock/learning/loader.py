@@ -129,18 +129,27 @@ class VirtualScreenDataset(DockingDataset):
 
     def mol_encode(self, smiles_list):
         fps = []
-        for sm in smiles_list:
-            mol = Chem.MolFromSmiles(sm)
-            if mol is None:
-                continue 
-            if self.fp_type == 'MACCS':
-                fp_maccs = list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))
-            if self.fp_type == 'morgan':
-                fps.append(list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString())))
-        return np.array(fps)
+        ok_inds = []
+        for i, sm in enumerate(smiles_list):
+            try:
+                mol = Chem.MolFromSmiles(sm)
+                if self.fp_type == 'MACCS':
+                    # for some reason RDKit maccs is 167 bits
+                    fps.append(list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:])
+                if self.fp_type == 'morgan':
+                    fps.append(list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString())))
+                ok_inds.append(i)
+            except:
+                if self.fp_type == 'MACCS':
+                    fps.append([0] * 166)
+                if self.fp_type == 'morgan':
+                    fps.append([0] * 1024)
+                continue
+
+        return np.array(fps), ok_inds 
 
     def __len__(self):
-        pass
+        return len(self.all_graphs)
 
     def get_pocket_id(self, filename):
         # 1ARJ_#0.1_N_ARG_1_1PE_BIND.nx.p_annot.p
@@ -156,9 +165,9 @@ class VirtualScreenDataset(DockingDataset):
         is_active = np.zeros((len(actives_smiles) + len(decoys_smiles))) 
         is_active[:len(actives_smiles)] = 1.
 
-        all_fps = self.mol_encode(actives_smiles + decoys_smiles)
+        all_fps, ok_inds = self.mol_encode(actives_smiles + decoys_smiles)
 
-        return g_dgl, torch.tensor(all_fps), torch.tensor(is_active)
+        return g_dgl, torch.tensor(all_fps[ok_inds]), torch.tensor(is_active[ok_inds])
 
 class Loader():
     def __init__(self,
