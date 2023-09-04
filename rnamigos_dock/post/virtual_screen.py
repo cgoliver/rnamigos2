@@ -21,8 +21,8 @@ def run_virtual_screen(model, dataset, metric=mean_active_rank, **kwargs):
     :param metric: function that takes a list of prediction and an is_active indicator and returns a score 
     """
     efs = []
+    print(len(dataset))
     for pocket_graph, ligands, is_active in dataset:
         scores = [model(pocket_graph, ligand.unsqueeze(dim=0)) for ligand in ligands]
         efs.append(metric(scores, is_active, **kwargs))
-    print(efs)
     return efs

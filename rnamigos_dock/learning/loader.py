@@ -22,6 +22,8 @@ import pandas as pd
 
 from rnaglib.utils import NODE_FEATURE_MAP 
 
+RDLogger.DisableLog('rdApp.*') # disable warnings
+
 class DockingDataset(Dataset):
 
     def __init__(self,
@@ -130,7 +132,7 @@ class VirtualScreenDataset(DockingDataset):
     def mol_encode(self, smiles_list):
         fps = []
         ok_inds = []
-        for i, sm in enumerate(smiles_list):
+        for i, sm in tqdm(enumerate(smiles_list), total=len(smiles_list)):
             try:
                 mol = Chem.MolFromSmiles(sm)
                 if self.fp_type == 'MACCS':
