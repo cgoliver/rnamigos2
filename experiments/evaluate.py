@@ -2,10 +2,19 @@ import os, sys
 
 from omegaconf import DictConfig, OmegaConf
 import hydra
+import torch
 
-from rnamigos_dock.learning.loader import DockingDataset 
+import numpy as np
+from rdkit import Chem
+from rdkit import RDLogger
+from rdkit.Chem import MACCSkeys
+from rdkit.Chem import AllChem
+
+
+
+from rnamigos_dock.learning.loader import VirtualScreenDataset 
 from rnamigos_dock.learning.loader import Loader
-from rnamigos_dock.learning.models import RNAEncoder, LigandEncoder, Decoder, Model
+from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, Model
 from rnamigos_dock.learning.utils import mkdirs
 
 
@@ -20,18 +29,13 @@ def main(cfg: DictConfig):
     # torch.multiprocessing.set_sharing_strategy('file_system')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    dataset = DockingDataset(annotated_path=cfg.data.test_graphs,
-                             shuffle=False,
-                             nuc_types=cfg.tokens.nuc_types,
-                             edge_types=cfg.tokens.edge_types,
-                             target=cfg.train.target,
-                             debug=cfg.debug
-                             )
+    dataset = VirtualScreenDataset(cfg.data.test_graphs, 
+                                   cfg.data.ligand_db,
+                                   nuc_types=cfg.tokens.nuc_types,
+                                   edge_types=cfg.tokens.edge_types,
+                                   )
 
-    loader = Loader(dataset,
-                    batch_size=1, 
-                    num_workers=1,
-                    )
+    print(dataset[1])
 
     print('Created data loader')
 
@@ -46,7 +50,7 @@ def main(cfg: DictConfig):
     print("Loaded data")
 
     print("creating model")
-    rna_encoder = RNAEncoder(in_dim=cfg.model.encoder.in_dim,
+    rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
                              hidden_dim=cfg.model.encoder.hidden_dim,
                              num_hidden_layers=cfg.model.encoder.num_layers,
                              )

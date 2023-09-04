@@ -3,6 +3,12 @@ import sys
 import os
 from collections import Counter
 import itertools
+from pathlib import Path
+
+from rdkit import Chem
+from rdkit import RDLogger
+from rdkit.Chem import MACCSkeys
+from rdkit.Chem import AllChem
 
 import networkx as nx
 from tqdm import tqdm
@@ -16,8 +22,8 @@ import pandas as pd
 
 from rnaglib.utils import NODE_FEATURE_MAP 
 
-
 class DockingDataset(Dataset):
+
     def __init__(self,
                  annotated_path,
                  edge_types=None,
@@ -57,14 +63,10 @@ class DockingDataset(Dataset):
         return self.n
 
 
-    def __getitem__(self, idx):
-        """
-            Returns one training item at index `idx`.
-        """
-        _, graph, _, ring, fp_nat, fp, inter_score, inter_score_trans, score_native_ligand, label_native_lig, label_1std, label_2std, label_thr_min30, label_thr_min17, label_thr_min12, label_thr_min8, label_thr_0, sample_type, is_native  = pickle.load(open(os.path.join(self.path, self.all_graphs[idx]), 'rb'))
+    def load_rna_graph(self, idx, rna_only=True):
+        data = pickle.load(open(os.path.join(self.path, self.all_graphs[idx]), 'rb'))
 
-        #adding the self edges
-        # graph.add_edges_from([(n, n, {'label': 'X'}) for n in graph.nodes()])
+        graph = data[1]
         graph = nx.to_directed(graph)
         one_hot = {edge: torch.tensor(self.edge_map[label.upper()]) for edge, label in
                    (nx.get_edge_attributes(graph, 'label')).items()}
@@ -80,12 +82,83 @@ class DockingDataset(Dataset):
         g_dgl = dgl.from_networkx(nx_graph=graph, edge_attrs=['edge_type'], node_attrs=['nt_features'])
         g_dgl.title = self.all_graphs[idx]
 
+        if rna_only:
+            return g_dgl 
+        else:
+            fp_nat = data[4]
+            inter_score_trans = data[6]
+            return g_dgl, fp_nat, inter_score_trans
+
+    def __getitem__(self, idx):
+        """
+            Returns one training item at index `idx`.
+        """
+        g_dgl, fp_nat, inter_score_trans  = self.load_rna_graph(idx, rna_only=False)
+
         if self.target == 'fp':
             target = fp
         if self.target == 'dock':
             target = inter_score_trans
+        else:
+            target = torch.tensor(0, dtype=torch.float)
 
         return g_dgl, fp_nat, torch.tensor(target, dtype=torch.float), [idx]
+
+
+
+class VirtualScreenDataset(DockingDataset):
+    def __init__(self, 
+                 pockets_path, 
+                 ligands_path, 
+                 decoy_mode='pdb',
+                 fp_type='MACCS',
+                 edge_types=None,
+                 nuc_types=None,
+                 ):
+        super().__init__(pockets_path, edge_types=edge_types, nuc_types=nuc_types)
+        self.all_graphs = sorted(os.listdir(pockets_path))
+        self.pockets_path = pockets_path
+        self.ligands_path = ligands_path 
+        self.decoy_mode = decoy_mode
+        self.fp_type = fp_type
+        self.edge_map = {e: i for i, e in enumerate(sorted(edge_types))}
+        pass
+
+    def parse_smiles(self, smiles_path):
+        return list(open(smiles_path).readlines())
+
+    def mol_encode(self, smiles_list):
+        fps = []
+        for sm in smiles_list:
+            mol = Chem.MolFromSmiles(sm)
+            if mol is None:
+                continue 
+            if self.fp_type == 'MACCS':
+                fp_maccs = list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))
+            if self.fp_type == 'morgan':
+                fps.append(list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString())))
+        return np.array(fps)
+
+    def __len__(self):
+        pass
+
+    def get_pocket_id(self, filename):
+        # 1ARJ_#0.1_N_ARG_1_1PE_BIND.nx.p_annot.p
+        pieces = filename.split("_")
+        return "_".join([pieces[0], pieces[2], pieces[3], pieces[4]])
+
+    def __getitem__(self, idx):
+        g_dgl = self.load_rna_graph(idx, rna_only=True)
+        pocket_id = self.get_pocket_id(self.all_graphs[idx])
+        actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'actives.txt'))
+        decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'decoys.txt'))
+
+        is_active = np.zeros((len(actives_smiles) + len(decoys_smiles))) 
+        is_active[:len(actives_smiles)] = 1.
+
+        all_fps = self.mol_encode(actives_smiles + decoys_smiles)
+
+        return g_dgl, torch.tensor(all_fps), torch.tensor(is_active)
 
 class Loader():
     def __init__(self,
@@ -168,6 +241,7 @@ class Loader():
                              num_workers=self.num_workers, collate_fn=None)
 
         return train_loader, test_loader
+
 
 
 def describe_dataset(annotated_path='../data/annotated/pockets_docking_annotated'):
