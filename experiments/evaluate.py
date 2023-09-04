@@ -16,6 +16,9 @@ from rnamigos_dock.learning.loader import VirtualScreenDataset
 from rnamigos_dock.learning.loader import Loader
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, Model
 from rnamigos_dock.learning.utils import mkdirs
+from rnamigos_dock.post.virtual_screen import mean_active_rank 
+from rnamigos_dock.post.virtual_screen import enrichment_factor 
+from rnamigos_dock.post.virtual_screen import run_virtual_screen
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="evaluate")
@@ -75,7 +78,8 @@ def main(cfg: DictConfig):
     Experiment Setup
     '''
 
-    # compute EF
+    efs = run_virtual_screen(model, dataset, metric=mean_active_rank)
+    print(efs)
     
         
 if __name__ == "__main__":
