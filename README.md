@@ -43,7 +43,7 @@ Pass the `--help` flag to get all the options.
 ## Pre-train a model
 
 ```
-python experiments/pretrain.py name=default pretrained_path=pretrained
+python experiments/pretrain.py name=default 
 
 ```
 
