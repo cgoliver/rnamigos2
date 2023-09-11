@@ -59,6 +59,24 @@ Make sure to set the correct `train.loss` given the target you chose. Optioins:
 * `l2`: L1 loss
 * `bce`: Binary crossentropy
 
+Predict docking scores:
+
+```
+python experiemnts/train.py train.target='dock' train.loss='l2'
+```
+
+Predict whether or not a ligand is native
+
+```
+python experiemnts/train.py train.target='is_native' train.loss='bce'
+```
+
+Predict the native ligand directly
+
+```
+python experiemnts/train.py train.target='native_fp' train.loss='bce'
+```
+
 ## Pre-train a model
 
 ```
