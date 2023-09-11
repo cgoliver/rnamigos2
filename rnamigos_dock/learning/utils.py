@@ -18,14 +18,14 @@ def dgl_to_nx(g_dgl, edge_map):
     G = nx.to_undirected(G)
     return G
 
-def mkdirs(name, permissive=True):
+def mkdirs(name, prefix='', permissive=True):
     """
     Try to make the logs folder
     :param name:
     :param permissive: If True will overwrite existing files (good for debugging)
     :return:
     """
-    save_path = os.path.join('results', 'trained_models', name)
+    save_path = os.path.join('results', 'trained_models', prefix, name)
     try:
         os.makedirs(save_path)
     except FileExistsError:

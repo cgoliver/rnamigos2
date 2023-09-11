@@ -151,7 +151,7 @@ class Embedder(nn.Module):
 ###############################################################################
 # Define full R-GCN model
 # ~~~~~~~~~~~~~~~~~~~~~~~
-class Model(nn.Module):
+class RNAmigosModel(nn.Module):
     def __init__(self,
                  encoder,
                  decoder,

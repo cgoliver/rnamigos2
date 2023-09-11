@@ -13,7 +13,7 @@ import hydra
 from rnamigos_dock.learning.loader import DockingDataset 
 from rnamigos_dock.learning import learn 
 from rnamigos_dock.learning.loader import Loader
-from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, Model
+from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.learning.utils import mkdirs
 
 
@@ -88,12 +88,12 @@ def main(cfg: DictConfig):
                       hidden_dim=cfg.model.decoder.hidden_dim,
                       num_layers=cfg.model.decoder.num_layers)
 
-    model = Model(encoder=rna_encoder,
-                  decoder=decoder,
-                  lig_encoder=lig_encoder,
-                  pool=cfg.model.pool,
-                  pool_dim=cfg.model.encoder.hidden_dim
-                  )
+    model = RNAmigosModel(encoder=rna_encoder,
+                          decoder=decoder,
+                          lig_encoder=lig_encoder if cfg.train.target == 'dock' else None,
+                          pool=cfg.model.pool,
+                          pool_dim=cfg.model.encoder.hidden_dim
+                          )
 
     if cfg.model.use_pretrained:
         model.from_pretrained(cfg.model.pretrained_path)
@@ -106,8 +106,14 @@ def main(cfg: DictConfig):
     Optimizer instanciation
     '''
 
-    # criterion = torch.nn.BCELoss()
-    criterion = torch.nn.L1Loss()
+    if cfg.train.loss == 'l2':
+        criterion = torch.nn.L2Loss()
+    if cfg.train.loss == 'l1':
+        criterion = torch.nn.L1Loss()
+    if cfg.train.loss == 'bce':
+        criterion = torch.nn.BCELoss()
+
+
     optimizer = optim.Adam(model.parameters())
 
     '''
@@ -116,12 +122,10 @@ def main(cfg: DictConfig):
     
     name = f"{cfg.name}"
     print(name)
-    result_folder, save_path = mkdirs(name)
+    result_folder, save_path = mkdirs(name, prefix=cfg.train.target)
     print(save_path)
     writer = SummaryWriter(result_folder)
     print(f'Saving result in {result_folder}/{name}')
-
-
     
     all_graphs = np.array(test_loader.dataset.dataset.all_graphs)
     test_inds = test_loader.dataset.indices

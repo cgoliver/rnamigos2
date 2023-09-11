@@ -11,3 +11,4 @@ early_stop: 10
 use_nucs: true
 target: dock
 shuffle: true
+loss: 'l2'

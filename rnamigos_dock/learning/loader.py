@@ -87,26 +87,29 @@ class DockingDataset(Dataset):
         if rna_only:
             return g_dgl 
         else:
+            # _, graph, _, ring, fp_nat, fp, inter_score, inter_score_trans, score_native_ligand, label_native_lig, label_1std, label_2std, label_thr_min30, label_thr_min17, label_thr_min12, label_thr_min8, label_thr_0, sample_type, is_native
             fp_nat = data[4]
+            fp_docked  = data[5]
+            is_native = data[-1]
             inter_score_trans = data[6]
-            return g_dgl, fp_nat, inter_score_trans
+            return g_dgl, fp_nat, fp_docked, is_native, inter_score_trans
 
     def __getitem__(self, idx):
         """
             Returns one training item at index `idx`.
         """
-        g_dgl, fp_nat, inter_score_trans  = self.load_rna_graph(idx, rna_only=False)
+        g_dgl, fp_nat, fp_docked, is_native, inter_score_trans  = self.load_rna_graph(idx, rna_only=False)
 
-        if self.target == 'fp':
-            target = fp
+        if self.target == 'native_fp':
+            target = fp_nat
+        if self.target == 'is_native':
+            target = is_native
         if self.target == 'dock':
             target = inter_score_trans
         else:
             target = torch.tensor(0, dtype=torch.float)
 
-        return g_dgl, fp_nat, torch.tensor(target, dtype=torch.float), [idx]
-
-
+        return g_dgl, fp_docked, torch.tensor(target, dtype=torch.float), [idx]
 
 class VirtualScreenDataset(DockingDataset):
     def __init__(self, 

@@ -16,6 +16,7 @@ These are all tarballs that you should put in the `data/` folder at the resposit
 * [Docked pockets train set](https://drive.proton.me/urls/929Z2M4YWC#pkwIdM4TZAqR)
 * [Pretraining data](https://drive.proton.me/urls/YKNV0M1WBR#s0E0cMSTvpsH)
 * [Binding scores](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
+* [Decoy Library](https://drive.proton.me/urls/YGHQV867NG#RuVM8TLFOdKH)
 
 
 ## Generate actives and decoys list
@@ -24,6 +25,10 @@ These are all tarballs that you should put in the `data/` folder at the resposit
 ```
 python scripts/build_screen_data.py
 ```
+
+NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation. 
+The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
+To disable DecoyFinder decoys pass the ``-no-decoyfinder`` flag.
 
 
 ## Configs
