@@ -27,26 +27,52 @@ from rnaglib.utils import NODE_FEATURE_MAP
 RDLogger.DisableLog('rdApp.*')  # disable warnings
 
 
-def mol_encode(smiles_list, fp_type):
+def mol_encode_one(smiles, fp_type):
+    success = False
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if fp_type == 'MACCS':
+            # for some reason RDKit maccs is 167 bits
+            fp = list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:]
+        if fp_type == 'morgan':
+            fp = list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString()))
+        success = True
+    except:
+        if fp_type == 'MACCS':
+            fp = [0] * 166
+        if fp_type == 'morgan':
+            fp = [0] * 1024
+    return fp, success
+
+
+def mol_encode_list(smiles_list, fp_type, encoding_func=mol_encode_one):
     fps = []
     ok_inds = []
     for i, sm in tqdm(enumerate(smiles_list), total=len(smiles_list)):
-        try:
-            mol = Chem.MolFromSmiles(sm)
-            if fp_type == 'MACCS':
-                # for some reason RDKit maccs is 167 bits
-                fps.append(list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:])
-            if fp_type == 'morgan':
-                fps.append(list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString())))
+        fp, success = encoding_func(sm, fp_type=fp_type)
+        fps.append(fp)
+        if success:
             ok_inds.append(i)
-        except:
-            if fp_type == 'MACCS':
-                fps.append([0] * 166)
-            if fp_type == 'morgan':
-                fps.append([0] * 1024)
-            continue
-
     return np.array(fps), ok_inds
+
+
+class MolEncoder:
+    """
+    Stateful encoder for using cashed computations
+    """
+
+    def __init__(self, fp_type='MACCS'):
+        self.fp_type = fp_type
+        cashed_path = '../../data/maccs.p' if fp_type == 'MACCS' else '../../data/morgan.p'
+        self.cashed_fps = pickle.load(open(cashed_path, 'rb'))
+
+    def encode_mol(self, smiles):
+        if smiles in self.cashed_fps:
+            return self.cashed_fps[smiles]
+        return mol_encode_one(smiles, self.fp_type)
+
+    def encode_list(self, smiles_list):
+        return mol_encode_list(smiles_list, fp_type=self.fp_type, encoding_func=self.encode_mol)
 
 
 class DockingDataset(Dataset):
@@ -135,11 +161,24 @@ class DockingDataset(Dataset):
         return g_dgl, fp_docked, torch.tensor(target, dtype=torch.float), [idx]
 
 
+def get_systems(target='dock', split='train'):
+    if target == 'dock':
+        interactions_csv = '../../data/docking_data.csv'
+    elif target == 'fp':
+        interactions_csv = '../data/fp_data.csv'
+    elif target == 'binary':
+        interactions_csv = '../data/binary_data.csv'
+    else:
+        raise ValueError
+    systems = pd.read_csv(interactions_csv, index_col=0)
+    return systems
+
+
 class DockingDatasetVincent(Dataset):
 
     def __init__(self,
                  pockets_path,
-                 interactions_csv,
+                 target='dock',
                  shuffle=False,
                  seed=0,
                  debug=False
@@ -153,10 +192,12 @@ class DockingDatasetVincent(Dataset):
                 nucs (bool): whether to include nucleotide ID in node (default=False).
         """
         print(f">>> fetching data from {pockets_path}")
-        self.systems = pd.read_csv(interactions_csv, index_col=0)
+        self.systems = get_systems(target=target)
         if debug:
             self.all_graphs = self.systems[:100]
         self.pockets_path = pockets_path
+        self.target = target
+
         if seed:
             print(f">>> shuffling with random seed {seed}")
             np.random.seed(seed)
@@ -175,10 +216,12 @@ class DockingDatasetVincent(Dataset):
         """
             Returns one training item at index `idx`.
         """
-        pocket_id, ligand_smiles, score = self.systems.iloc[idx].values
+        row = self.systems.iloc[idx].values
+        pocket_id, ligand_smiles = row[0], row[1]
         pocket_graph = self.load_rna_graph(pocket_id)
-        ligand_fp = mol_encode(smiles_list=[ligand_smiles], fp_type=MACCSkeys)
-        return pocket_graph, ligand_fp, score
+        ligand_fp = mol_encode_one(smiles=ligand_smiles, fp_type='MACCS')
+        target = ligand_fp if self.target == 'fp' else row[3]
+        return pocket_graph, ligand_fp, target, [idx]
 
 
 class VirtualScreenDataset(DockingDataset):
@@ -219,7 +262,7 @@ class VirtualScreenDataset(DockingDataset):
         is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
         is_active[:len(actives_smiles)] = 1.
 
-        all_fps, ok_inds = mol_encode(actives_smiles + decoys_smiles, fp_type=self.fp_type)
+        all_fps, ok_inds = mol_encode_list(actives_smiles + decoys_smiles, fp_type=self.fp_type)
 
         return g_dgl, torch.tensor(all_fps[ok_inds]), torch.tensor(is_active[ok_inds])
 
@@ -351,16 +394,9 @@ class InferenceLoader(Loader):
 
 
 if __name__ == '__main__':
-    # interactions_csv = '../../data/rnamigos2_dataset_consolidated.csv'
-    # interactions_csv_small = '../../data/docking_data.csv'
-    # systems = pd.read_csv(interactions_csv)
-    # systems = systems[['PDB_ID_POCKET', 'LIGAND_SMILES', 'TOTAL']]
-    # systems.to_csv(interactions_csv_small)
-
-    interactions_csv = '../../data/docking_data.csv'
     pockets_path = '../../data/json_pockets'
     dataset = DockingDatasetVincent(pockets_path=pockets_path,
-                                    interactions_csv=interactions_csv)
+                                    target='dock')
     a = dataset[0]
     loader = Loader(dataset=dataset, shuffle=False, seed=99, batch_size=1, num_workers=1)
     data = loader.get_data(k_fold=1)
