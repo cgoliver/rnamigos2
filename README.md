@@ -48,15 +48,16 @@ python experiments/train.py
 Pass the `--help` flag to get all the options.
 
 We have 3 options for training modes (`train.target`):
-    * `dock`: predict the docking INTER score (regression)
-    * `is_native`: predict whether the given ligand is the native for the given pocket (binary classification)
-    * `native_fp`: given only a pocket, predict the native ligand's fingerprint. This is the RNAmigos1.0 setting (multi-label classification)` 
+
+* `dock`: predict the docking INTER score (regression)
+* `is_native`: predict whether the given ligand is the native for the given pocket (binary classification)
+* `native_fp`: given only a pocket, predict the native ligand's fingerprint. This is the RNAmigos1.0 setting (multi-label classification)` 
 
 Make sure to set the correct `train.loss` given the target you chose. Optioins:
 
-    * `l1`: L2 loss
-    * `l2`: L1 loss
-    * `bce`: Binary crossentropy
+* `l1`: L2 loss
+* `l2`: L1 loss
+* `bce`: Binary crossentropy
 
 ## Pre-train a model
 
