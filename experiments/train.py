@@ -90,7 +90,7 @@ def main(cfg: DictConfig):
 
     model = RNAmigosModel(encoder=rna_encoder,
                           decoder=decoder,
-                          lig_encoder=lig_encoder if cfg.train.target == 'dock' else None,
+                          lig_encoder=lig_encoder if cfg.train.target in ['dock', 'is_native'] else None,
                           pool=cfg.model.pool,
                           pool_dim=cfg.model.encoder.hidden_dim
                           )
