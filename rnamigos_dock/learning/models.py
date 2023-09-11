@@ -170,7 +170,7 @@ class RNAmigosModel(nn.Module):
         :param orth: the constant in front of dictionnary orthogonality loss
         :param attribute: Wether we want the network to use the attribution module
         """
-        super(Model, self).__init__()
+        super(RNAmigosModel, self).__init__()
 
         if pool == 'att':
             pooling_gate_nn = nn.Linear(pool_dim, 1)

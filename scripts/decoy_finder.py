@@ -709,7 +709,7 @@ def find_decoys(
         log += '"%s","%s","%s","%s","%s","%s","%s"\n' % tuple([str(f) for f in (active.title,  active.hba,  active.hbd,  active.clogp,  active.mw,  active.rot,  ligands_dict[active])])
     log += "\n"
 
-    print(log)
+    # print(log)
     # logfile = open('%s_log.csv' % outputfile,  'wb')
     # logfile.write(log)
     # logfile.close()

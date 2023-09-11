@@ -107,7 +107,7 @@ def main(cfg: DictConfig):
     '''
 
     if cfg.train.loss == 'l2':
-        criterion = torch.nn.L2Loss()
+        criterion = torch.nn.MSELoss()
     if cfg.train.loss == 'l1':
         criterion = torch.nn.L1Loss()
     if cfg.train.loss == 'bce':
