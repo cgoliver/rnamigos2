@@ -4,3 +4,4 @@ tensorboard
 dgl
 hydra-core
 loguru
+rdkit

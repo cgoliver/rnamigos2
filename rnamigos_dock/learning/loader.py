@@ -1,6 +1,7 @@
 import pickle
 import sys
 import os
+import time
 from collections import Counter
 import itertools
 from pathlib import Path
@@ -20,9 +21,33 @@ from torch.utils.data import Dataset, DataLoader, Subset
 from dgl.dataloading import GraphDataLoader
 import pandas as pd
 
-from rnaglib.utils import NODE_FEATURE_MAP 
+from rnaglib.utils import graph_io
+from rnaglib.utils import NODE_FEATURE_MAP
 
-RDLogger.DisableLog('rdApp.*') # disable warnings
+RDLogger.DisableLog('rdApp.*')  # disable warnings
+
+
+def mol_encode(smiles_list, fp_type):
+    fps = []
+    ok_inds = []
+    for i, sm in tqdm(enumerate(smiles_list), total=len(smiles_list)):
+        try:
+            mol = Chem.MolFromSmiles(sm)
+            if fp_type == 'MACCS':
+                # for some reason RDKit maccs is 167 bits
+                fps.append(list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:])
+            if fp_type == 'morgan':
+                fps.append(list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString())))
+            ok_inds.append(i)
+        except:
+            if fp_type == 'MACCS':
+                fps.append([0] * 166)
+            if fp_type == 'morgan':
+                fps.append([0] * 1024)
+            continue
+
+    return np.array(fps), ok_inds
+
 
 class DockingDataset(Dataset):
 
@@ -53,17 +78,15 @@ class DockingDataset(Dataset):
             np.random.seed(seed)
         if shuffle:
             np.random.shuffle(self.all_graphs)
-        #build edge map
+        # build edge map
         self.edge_map = {e: i for i, e in enumerate(sorted(edge_types))}
         self.num_edge_types = len(self.edge_map)
         self.target = target
 
         self.n = len(self.all_graphs)
 
-
     def __len__(self):
         return self.n
-
 
     def load_rna_graph(self, idx, rna_only=True):
         data = pickle.load(open(os.path.join(self.path, self.all_graphs[idx]), 'rb'))
@@ -75,21 +98,21 @@ class DockingDataset(Dataset):
         nx.set_edge_attributes(graph, name='edge_type', values=one_hot)
 
         node_attrs = None
-        one_hot_nucs  = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
-                (nx.get_node_attributes(graph, 'nt')).items()}
+        one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
+                        (nx.get_node_attributes(graph, 'nt')).items()}
 
         nx.set_node_attributes(graph, name='nt_features', values=one_hot_nucs)
 
-        #g_dgl = dgl.DGLGraph()
+        # g_dgl = dgl.DGLGraph()
         g_dgl = dgl.from_networkx(nx_graph=graph, edge_attrs=['edge_type'], node_attrs=['nt_features'])
         g_dgl.title = self.all_graphs[idx]
 
         if rna_only:
-            return g_dgl 
+            return g_dgl
         else:
             # _, graph, _, ring, fp_nat, fp, inter_score, inter_score_trans, score_native_ligand, label_native_lig, label_1std, label_2std, label_thr_min30, label_thr_min17, label_thr_min12, label_thr_min8, label_thr_0, sample_type, is_native
             fp_nat = data[4]
-            fp_docked  = data[5]
+            fp_docked = data[5]
             is_native = data[-1]
             inter_score_trans = data[6]
             return g_dgl, fp_nat, fp_docked, is_native, inter_score_trans
@@ -98,7 +121,7 @@ class DockingDataset(Dataset):
         """
             Returns one training item at index `idx`.
         """
-        g_dgl, fp_nat, fp_docked, is_native, inter_score_trans  = self.load_rna_graph(idx, rna_only=False)
+        g_dgl, fp_nat, fp_docked, is_native, inter_score_trans = self.load_rna_graph(idx, rna_only=False)
 
         if self.target == 'native_fp':
             target = fp_nat
@@ -111,10 +134,57 @@ class DockingDataset(Dataset):
 
         return g_dgl, fp_docked, torch.tensor(target, dtype=torch.float), [idx]
 
+
+class DockingDatasetVincent(Dataset):
+
+    def __init__(self,
+                 pockets_path,
+                 interactions_csv,
+                 shuffle=False,
+                 seed=0,
+                 debug=False
+                 ):
+        """
+            Setup for data loader.
+
+            Arguments:
+                pockets_path (str): path to annotated graphs (see `annotator.py`).
+                get_sim_mat (bool): whether to compute a node similarity matrix (deault=True).
+                nucs (bool): whether to include nucleotide ID in node (default=False).
+        """
+        print(f">>> fetching data from {pockets_path}")
+        self.systems = pd.read_csv(interactions_csv, index_col=0)
+        if debug:
+            self.all_graphs = self.systems[:100]
+        self.pockets_path = pockets_path
+        if seed:
+            print(f">>> shuffling with random seed {seed}")
+            np.random.seed(seed)
+        if shuffle:
+            np.random.shuffle(self.systems.values)
+
+    def __len__(self):
+        return len(self.systems)
+
+    def load_rna_graph(self, rna_name):
+        rna_path = os.path.join(self.pockets_path, f"{rna_name}.json")
+        pocket_graph = graph_io.load_json(rna_path)
+        return pocket_graph
+
+    def __getitem__(self, idx):
+        """
+            Returns one training item at index `idx`.
+        """
+        pocket_id, ligand_smiles, score = self.systems.iloc[idx].values
+        pocket_graph = self.load_rna_graph(pocket_id)
+        ligand_fp = mol_encode(smiles_list=[ligand_smiles], fp_type=MACCSkeys)
+        return pocket_graph, ligand_fp, score
+
+
 class VirtualScreenDataset(DockingDataset):
-    def __init__(self, 
-                 pockets_path, 
-                 ligands_path, 
+    def __init__(self,
+                 pockets_path,
+                 ligands_path,
                  decoy_mode='pdb',
                  fp_type='MACCS',
                  edge_types=None,
@@ -123,7 +193,7 @@ class VirtualScreenDataset(DockingDataset):
         super().__init__(pockets_path, edge_types=edge_types, nuc_types=nuc_types)
         self.all_graphs = sorted(os.listdir(pockets_path))
         self.pockets_path = pockets_path
-        self.ligands_path = ligands_path 
+        self.ligands_path = ligands_path
         self.decoy_mode = decoy_mode
         self.fp_type = fp_type
         self.edge_map = {e: i for i, e in enumerate(sorted(edge_types))}
@@ -131,27 +201,6 @@ class VirtualScreenDataset(DockingDataset):
 
     def parse_smiles(self, smiles_path):
         return list(open(smiles_path).readlines())
-
-    def mol_encode(self, smiles_list):
-        fps = []
-        ok_inds = []
-        for i, sm in tqdm(enumerate(smiles_list), total=len(smiles_list)):
-            try:
-                mol = Chem.MolFromSmiles(sm)
-                if self.fp_type == 'MACCS':
-                    # for some reason RDKit maccs is 167 bits
-                    fps.append(list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:])
-                if self.fp_type == 'morgan':
-                    fps.append(list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString())))
-                ok_inds.append(i)
-            except:
-                if self.fp_type == 'MACCS':
-                    fps.append([0] * 166)
-                if self.fp_type == 'morgan':
-                    fps.append([0] * 1024)
-                continue
-
-        return np.array(fps), ok_inds 
 
     def __len__(self):
         return len(self.all_graphs)
@@ -167,12 +216,13 @@ class VirtualScreenDataset(DockingDataset):
         actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'actives.txt'))
         decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'decoys.txt'))
 
-        is_active = np.zeros((len(actives_smiles) + len(decoys_smiles))) 
+        is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
         is_active[:len(actives_smiles)] = 1.
 
-        all_fps, ok_inds = self.mol_encode(actives_smiles + decoys_smiles)
+        all_fps, ok_inds = mol_encode(actives_smiles + decoys_smiles, fp_type=self.fp_type)
 
         return g_dgl, torch.tensor(all_fps[ok_inds]), torch.tensor(is_active[ok_inds])
+
 
 class Loader():
     def __init__(self,
@@ -200,7 +250,6 @@ class Loader():
         self.seed = seed
         self.shuffle = shuffle
 
-
     def get_data_strat(self, k_fold=0):
         n = len(self.dataset)
         indices = list(range(n))
@@ -213,33 +262,38 @@ class Loader():
         if k_fold > 1:
             from sklearn.model_selection import StratifiedKFold
             kf = StratifiedKFold(n_splits=k_fold)
-            #from sklearn.model_selection import KFold
-            #kf = KFold(n_splits=k_fold)
+            # from sklearn.model_selection import KFold
+            # kf = KFold(n_splits=k_fold)
             for train_indices, test_indices in kf.split(np.array(indices), np.array(labels)):
                 train_set = Subset(self.dataset, train_indices)
                 test_set = Subset(self.dataset, test_indices)
 
                 train_loader = GraphDataLoader(dataset=train_set, shuffle=True, batch_size=self.batch_size,
-                                          num_workers=self.num_workers, collate_fn=None)
+                                               num_workers=self.num_workers, collate_fn=None)
                 test_loader = GraphDataLoader(dataset=test_set, shuffle=True, batch_size=self.batch_size,
-                                         num_workers=self.num_workers, collate_fn=None)
+                                              num_workers=self.num_workers, collate_fn=None)
 
                 yield train_loader, test_loader
 
         else:
             from sklearn.model_selection import train_test_split
 
-            train_indices, test_indices, train_indices_labels, test_indices_labels = train_test_split(np.array(indices), np.array(labels), test_size=0.2,
-                                                           train_size=0.8, random_state=None,
-                                                           shuffle=True, stratify=np.array(labels))
+            train_indices, test_indices, train_indices_labels, test_indices_labels = train_test_split(np.array(indices),
+                                                                                                      np.array(labels),
+                                                                                                      test_size=0.2,
+                                                                                                      train_size=0.8,
+                                                                                                      random_state=None,
+                                                                                                      shuffle=True,
+                                                                                                      stratify=np.array(
+                                                                                                          labels))
 
             train_set = Subset(self.dataset, train_indices)
             test_set = Subset(self.dataset, test_indices)
 
             train_loader = GraphDataLoader(dataset=train_set, shuffle=True, batch_size=self.batch_size,
-                                      num_workers=self.num_workers, collate_fn=None)
+                                           num_workers=self.num_workers, collate_fn=None)
             test_loader = GraphDataLoader(dataset=test_set, shuffle=True, batch_size=self.batch_size,
-                                 num_workers=self.num_workers, collate_fn=None)
+                                          num_workers=self.num_workers, collate_fn=None)
 
             # return train_loader, valid_loader, test_loader
             yield train_loader, test_loader
@@ -250,12 +304,11 @@ class Loader():
         train_set, test_set = torch.utils.data.random_split(self.dataset, [train_size, test_size])
 
         train_loader = GraphDataLoader(dataset=train_set, shuffle=self.shuffle, batch_size=self.batch_size,
-                                  num_workers=self.num_workers, collate_fn=None)
+                                       num_workers=self.num_workers, collate_fn=None)
         test_loader = GraphDataLoader(dataset=test_set, shuffle=self.shuffle, batch_size=self.batch_size,
-                             num_workers=self.num_workers, collate_fn=None)
+                                      num_workers=self.num_workers, collate_fn=None)
 
         return train_loader, test_loader
-
 
 
 def describe_dataset(annotated_path='../data/annotated/pockets_docking_annotated'):
@@ -263,17 +316,17 @@ def describe_dataset(annotated_path='../data/annotated/pockets_docking_annotated
     path = annotated_path
     all_graphs = sorted(os.listdir(annotated_path))
     for g in tqdm(all_graphs):
-        #p = pickle.load(open(os.path.join(path, g), 'rb'))
-        _, graph, _, ring, fp_nat, _, fp, total_score, label_nat, label_1std, label_2std = pickle.load(open(os.path.join(path, g), 'rb'))
-        rdock_scores = rdock_scores.append({'POCKET_ID': g, 
-            'LABEL_NAT': str(label_nat), 
-            'LABEL_1STD': str(label_1std), 
-            'LABEL_2STD': str(label_2std), 
-            'TOTAL': str(total_score)}, ignore_index=True)
+        # p = pickle.load(open(os.path.join(path, g), 'rb'))
+        _, graph, _, ring, fp_nat, _, fp, total_score, label_nat, label_1std, label_2std = pickle.load(
+            open(os.path.join(path, g), 'rb'))
+        rdock_scores = rdock_scores.append({'POCKET_ID': g,
+                                            'LABEL_NAT': str(label_nat),
+                                            'LABEL_1STD': str(label_1std),
+                                            'LABEL_2STD': str(label_2std),
+                                            'TOTAL': str(total_score)}, ignore_index=True)
 
     pickle.dump(rdock_scores, open('dataset_labels_and_score.p', 'wb'))
     rdock_scores.to_csv('dataset_labels_and_score.csv')
-
 
 
 class InferenceLoader(Loader):
@@ -290,14 +343,25 @@ class InferenceLoader(Loader):
     def get_data(self):
         collate_block = collate_wrapper()
         train_loader = GraphDataLoader(dataset=self.dataset,
-                                  shuffle=False,
-                                  batch_size=self.batch_size,
-                                  num_workers=self.num_workers,
-                                  collate_fn=None)
+                                       shuffle=False,
+                                       batch_size=self.batch_size,
+                                       num_workers=self.num_workers,
+                                       collate_fn=None)
         return train_loader
 
 
 if __name__ == '__main__':
-    loader = Loader(shuffle=False,seed=99, batch_size=1, num_workers=1)
+    # interactions_csv = '../../data/rnamigos2_dataset_consolidated.csv'
+    # interactions_csv_small = '../../data/docking_data.csv'
+    # systems = pd.read_csv(interactions_csv)
+    # systems = systems[['PDB_ID_POCKET', 'LIGAND_SMILES', 'TOTAL']]
+    # systems.to_csv(interactions_csv_small)
+
+    interactions_csv = '../../data/docking_data.csv'
+    pockets_path = '../../data/json_pockets'
+    dataset = DockingDatasetVincent(pockets_path=pockets_path,
+                                    interactions_csv=interactions_csv)
+    a = dataset[0]
+    loader = Loader(dataset=dataset, shuffle=False, seed=99, batch_size=1, num_workers=1)
     data = loader.get_data(k_fold=1)
     pass

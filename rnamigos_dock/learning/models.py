@@ -9,9 +9,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 import dgl.function as fn
-from dgl.nn.pytorch.glob import SumPooling,GlobalAttentionPooling
+from dgl.nn.pytorch.glob import SumPooling, GlobalAttentionPooling
 from dgl import mean_nodes
 from dgl.nn.pytorch.conv import RelGraphConv
+
 
 class Decoder(nn.Module):
     """
@@ -20,12 +21,13 @@ class Decoder(nn.Module):
 
         Linear/ReLu layers with Sigmoid in output since fingerprints between 0 and 1.
     """
+
     def __init__(self, in_dim, out_dim, hidden_dim, num_layers):
         super(Decoder, self).__init__()
         # self.num_nodes = num_nodes
-        self.in_dim = in_dim 
-        self.out_dim = out_dim 
-        self.hidden_dim = hidden_dim 
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.hidden_dim = hidden_dim
         self.num_layers = num_layers
 
         # create layers
@@ -38,7 +40,7 @@ class Decoder(nn.Module):
         for _ in range(self.num_layers - 1):
             layers.append(nn.Linear(self.hidden_dim, self.hidden_dim))
             layers.append(nn.ReLU())
-        
+
         # hidden to output
         layers.append(nn.Linear(self.hidden_dim, self.out_dim))
         self.net = nn.Sequential(*layers)
@@ -51,11 +53,12 @@ class LigandEncoder(nn.Module):
     """
         Model for producing node embeddings.
     """
+
     def __init__(self, in_dim, hidden_dim, num_hidden_layers, num_rels=19, num_bases=-1):
         super(LigandEncoder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
-        self.num_hidden_layers = num_hidden_layers 
+        self.num_hidden_layers = num_hidden_layers
 
         self.layers = self.build_model()
 
@@ -66,7 +69,7 @@ class LigandEncoder(nn.Module):
         i2h = self.build_hidden_layer(self.in_dim, self.hidden_dim)
         layers.append(i2h)
 
-        for i in range(self.num_hidden_layers - 1): 
+        for i in range(self.num_hidden_layers - 1):
             h2h = self.build_hidden_layer(self.hidden_dim, self.hidden_dim)
             layers.append(torch.nn.ReLU())
             layers.append(h2h)
@@ -93,17 +96,19 @@ class LigandEncoder(nn.Module):
         h = fp.float()
         for layer in self.layers:
             h = layer(h)
-        return h 
+        return h
+
 
 class Embedder(nn.Module):
     """
         Model for producing node embeddings.
     """
+
     def __init__(self, in_dim, hidden_dim, num_hidden_layers, num_rels=19, num_bases=-1):
         super(Embedder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
-        self.num_hidden_layers = num_hidden_layers 
+        self.num_hidden_layers = num_hidden_layers
         self.num_rels = num_rels
         self.num_bases = num_bases
 
@@ -116,7 +121,7 @@ class Embedder(nn.Module):
         i2h = self.build_hidden_layer(self.in_dim, self.hidden_dim)
         layers.append(i2h)
 
-        for i in range(self.num_hidden_layers - 1): 
+        for i in range(self.num_hidden_layers - 1):
             h2h = self.build_hidden_layer(self.hidden_dim, self.hidden_dim)
             layers.append(h2h)
         # hidden to output
@@ -148,6 +153,8 @@ class Embedder(nn.Module):
         g.ndata['h'] = h
         embeddings = g.ndata.pop('h')
         return embeddings
+
+
 ###############################################################################
 # Define full R-GCN model
 # ~~~~~~~~~~~~~~~~~~~~~~~
@@ -178,8 +185,8 @@ class RNAmigosModel(nn.Module):
         else:
             self.pool = SumPooling()
 
-        self.encoder = encoder 
-        self.decoder = decoder 
+        self.encoder = encoder
+        self.decoder = decoder
         self.lig_encoder = lig_encoder
 
     def forward(self, g, lig_fp):
@@ -187,9 +194,9 @@ class RNAmigosModel(nn.Module):
         g_h = self.pool(g, embeddings)
         if not self.lig_encoder is None:
             lig_h = self.lig_encoder(lig_fp)
-            pred = torch.cat((g_h, lig_h), 1)
+            pred = torch.cat((g_h, lig_h), dim=1)
         pred = self.decoder(pred)
-        return pred 
+        return pred
 
     def from_pretrained(self, model_path):
         self.encoder.load_state_dict(torch.load(model_path))
