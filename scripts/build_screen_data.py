@@ -4,11 +4,14 @@ import tempfile
 
 from tqdm import tqdm
 import pandas as pd
-
+from loguru import logger
 from rdkit import Chem
+
+from decoy_finder import find_decoys
 
 
 def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv"):
+    logger.info(f"Getting decoys for {smiles}")
     with tempfile.TemporaryDirectory() as tdir:
         with open(Path(tdir, "input.txt"), 'w') as inp:
             inp.write(smiles)
@@ -16,7 +19,13 @@ def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv")
         for _ in find_decoys(query_files=[(Path(tdir, 'input.txt'))], db_files=[decoy_db], outputfile=str(out_path)):
             pass
         # parse output SDF.
-        return [Chem.MolToSmiles(mol) for mol in Chem.SDMolSupplier(str(out_path))]
+        try:
+            decoys = [Chem.MolToSmiles(mol) for mol in Chem.SDMolSupplier(str(out_path))]
+            logger.info(f"Found {len(decoys)} decoys.")
+            return decoys
+        except:
+            logger.info(f"Failed on {smiles}")
+            return []
 
 def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv', save_path='data/ligand_db', no_decoyfinder=True):
     """ Build active and decoy lists for every pocket in master dataset `rnamigos2_dataset_consolidated.csv`

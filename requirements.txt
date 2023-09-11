@@ -3,3 +3,4 @@ rnaglib
 tensorboard
 dgl
 hydra-core
+loguru

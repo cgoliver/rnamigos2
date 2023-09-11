@@ -20,7 +20,7 @@ import os, urllib.request, urllib.error, urllib.parse, tempfile, random,  sys,  
 #Decimal() can represent floating point data with higher precission than built-in float
 from decimal import Decimal
 
-DEBUG = 1
+DEBUG = 0
 if DEBUG:
     def _debug(s): print(s)
 else:
@@ -44,11 +44,17 @@ try:
     from openbabel import pybel
     m['pybel'] = pybel
     backend = 'pybel'
+    ob_log_handler = pybel.ob.OBMessageHandler()
+    ob_log_handler.SetOutputLevel(0)
+    pybel.ob.obErrorLog.SetOutputLevel(0)
 except ImportError:
     try:
         import pybel
         m['pybel'] = pybel
         backend = 'pybel'
+        ob_log_handler = pybel.ob.OBMessageHandler()
+        ob_log_handler.SetOutputLevel(0)
+        pybel.ob.obErrorLog.SetOutputLevel(0)
     except ImportError:
         pass
 try:
@@ -565,10 +571,8 @@ def find_decoys(
     _debug("Looking for decoys!")
 
     db_entry_gen = parse_db_files(db_files)
-    print("Parsed DB")
 
     if conn:
-        print("Querrying DB")
         try:
             db_entry_gen = itertools.chain(query_db(conn), db_entry_gen)
         except Exception as e:
@@ -576,9 +580,7 @@ def find_decoys(
 
     used_db_files = set()
 
-    print("Parsing query")
     ligands_dict = parse_query_files(query_files)
-    print("got query")
 
     nactive_ligands = len(ligands_dict)
 
