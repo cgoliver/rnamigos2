@@ -164,7 +164,18 @@ class DockingDataset(Dataset):
         return g_dgl, fp_docked, torch.tensor(target, dtype=torch.float), [idx]
 
 
-def get_systems(target='dock', split='train'):
+def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True):
+    """
+    
+    :param target: The systems to load 
+    :param split: None or one of 'train', 'val', 'test'
+    :param fp_split: For fp, and following RNAmigos1, there is a special splitting procedure that uses 10 fixed splits.
+    :param fp_split_train: For a given fp split, the test systems have a one label. Set this param to False to get test
+    systems. 
+    :return:
+    """
+    assert split in {None, 'train', 'val', 'test'}
+    assert split is None or fp_split.startswith("split_test_")
     if target == 'dock':
         interactions_csv = os.path.join(script_dir, '../../data/csvs/docking_data.csv')
     elif target == 'fp':
@@ -174,6 +185,10 @@ def get_systems(target='dock', split='train'):
     else:
         raise ValueError
     systems = pd.read_csv(interactions_csv, index_col=0)
+    if split is not None:
+        systems = systems.loc[systems['SPLIT'] == split]
+    if fp_split is not None:
+        systems = systems.loc[systems['SPLIT'] == (not fp_split_train)]
     return systems
 
 
@@ -251,6 +266,7 @@ class DockingDatasetVincent(Dataset):
         target = ligand_fp if self.target == 'fp' else row[2]
         # print("1 : ", time.perf_counter() - t0)
         return pocket_graph, ligand_fp, target, [idx]
+
 
 class VirtualScreenDataset(DockingDataset):
     def __init__(self,
