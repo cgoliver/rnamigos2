@@ -178,12 +178,12 @@ def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True):
     assert fp_split is None or fp_split.startswith("split_test_")
     if target == 'dock':
         interactions_csv = os.path.join(script_dir, '../../data/csvs/docking_data.csv')
-    elif target == 'fp':
+    elif target == 'native_fp':
         interactions_csv = os.path.join(script_dir, '../../data/csvs/fp_data.csv')
-    elif target == 'binary':
+    elif target == 'is_native':
         interactions_csv = os.path.join(script_dir, '../../data/csvs/binary_data.csv')
     else:
-        raise ValueError
+        raise ValueError("train.target should be in {dock, native_fp, is_native}, received : " + target)
     systems = pd.read_csv(interactions_csv, index_col=0)
     if split is not None:
         systems = systems.loc[systems['SPLIT'] == split]
@@ -264,7 +264,7 @@ class DockingDatasetVincent(Dataset):
         else:
             pocket_graph = self.load_rna_graph(pocket_id)
         ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
-        target = ligand_fp if self.target == 'fp' else row[2]
+        target = ligand_fp if self.target == 'native_fp' else row[2]
         # print("1 : ", time.perf_counter() - t0)
         return pocket_graph, ligand_fp, target, [idx]
 

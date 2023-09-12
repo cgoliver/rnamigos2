@@ -191,10 +191,10 @@ class RNAmigosModel(nn.Module):
 
     def forward(self, g, lig_fp):
         embeddings = self.encoder(g)
-        g_h = self.pool(g, embeddings)
+        pred = self.pool(g, embeddings)
         if not self.lig_encoder is None:
             lig_h = self.lig_encoder(lig_fp)
-            pred = torch.cat((g_h, lig_h), dim=1)
+            pred = torch.cat((pred, lig_h), dim=1)
         pred = self.decoder(pred)
         return pred
 

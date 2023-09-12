@@ -32,15 +32,17 @@ def main(cfg: DictConfig):
     '''
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # device = torch.device('cpu')
-    # This is to create an appropriate number of workers, but works too with cpu
-    if cfg.train.parallel:
-        used_gpus_count = torch.cuda.device_count()
+    if torch.cuda.is_available():
+        device = 'cuda'
+        # This is to create an appropriate number of workers, but works too with cpu
+        if cfg.train.parallel:
+            used_gpus_count = torch.cuda.device_count()
+        else:
+            used_gpus_count = 1
+        print(f'Using {used_gpus_count} GPUs')
     else:
-        used_gpus_count = 1
-
-    print(f'Using {used_gpus_count} GPUs')
+        device = 'cpu'
+        print("No GPU found, running on the CPU")
 
     '''
     Dataloader creation
@@ -132,7 +134,7 @@ def main(cfg: DictConfig):
     learn.train_dock(model=model,
                      criterion=criterion,
                      optimizer=optimizer,
-                     device=cfg.device,
+                     device=device,
                      train_loader=train_loader,
                      test_loader=test_loader,
                      save_path=save_path,

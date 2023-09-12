@@ -30,7 +30,6 @@ def send_graph_to_device(g, device):
     labels = g.edge_attr_schemes()
     for i, l in enumerate(labels.keys()):
         g.edata[l] = g.edata.pop(l).to(device, non_blocking=True)
-
     return g
 
 
@@ -56,7 +55,6 @@ def test(model, test_loader, criterion, device):
     """
     model.eval()
     test_loss = 0
-    all_graphs = test_loader.dataset.dataset.all_graphs
     test_size = len(test_loader)
     for batch_idx, (graph, docked_fp, target, idx) in enumerate(test_loader):
         # Get data on the devices
@@ -121,9 +119,9 @@ def train_dock(model,
             # Get data on the devices
             # convert ints to one hots
             graph = send_graph_to_device(graph, device)
+            docked_fp = docked_fp.to(device)
             target = target.to(device)
             pred = model(graph, docked_fp)
-
             loss = criterion(pred.squeeze(), target.float())
 
             # Backward
