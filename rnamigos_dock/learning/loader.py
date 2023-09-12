@@ -235,12 +235,12 @@ class DockingDatasetVincent(Dataset):
             Returns one training item at index `idx`.
         """
         # t0 = time.perf_counter()
-        # print("1 : ", time.perf_counter() - t0)
         row = self.systems.iloc[idx].values
         pocket_id, ligand_smiles = row[0], row[1]
         pocket_graph = self.load_rna_graph(pocket_id)
         ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
         target = ligand_fp if self.target == 'fp' else row[2]
+        # print("1 : ", time.perf_counter() - t0)
         return pocket_graph, ligand_fp, target, [idx]
 
 
