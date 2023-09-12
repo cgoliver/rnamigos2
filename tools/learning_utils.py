@@ -99,7 +99,7 @@ def load_data(annotated_path, meta, get_sim_mat=True):
     return train_loader, test_loader
 
 def predict(model, loader, max_graphs=10, device='cpu'):
-    all_graphs = loader.dataset.all_graphs
+    all_graphs = loader.dataset.all_interactions
     Z = []
     fps = []
     g_inds = []

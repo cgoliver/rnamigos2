@@ -1,24 +1,13 @@
-import os, sys
+import os
+import sys
 
-from omegaconf import DictConfig, OmegaConf
 import hydra
+from omegaconf import DictConfig, OmegaConf
 import torch
 
-import numpy as np
-from rdkit import Chem
-from rdkit import RDLogger
-from rdkit.Chem import MACCSkeys
-from rdkit.Chem import AllChem
-
-
-
-from rnamigos_dock.learning.loader import VirtualScreenDataset 
-from rnamigos_dock.learning.loader import Loader
-from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, Model
-from rnamigos_dock.learning.utils import mkdirs
-from rnamigos_dock.post.virtual_screen import mean_active_rank 
-from rnamigos_dock.post.virtual_screen import enrichment_factor 
-from rnamigos_dock.post.virtual_screen import run_virtual_screen
+from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
+from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
+from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="evaluate")
@@ -31,26 +20,22 @@ def main(cfg: DictConfig):
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    dataset = VirtualScreenDataset(cfg.data.test_graphs, 
-                                   cfg.data.ligand_db,
-                                   nuc_types=cfg.tokens.nuc_types,
+    test_systems = get_systems(target='is_native', split='TEST')
+    dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
+                                   ligands_path=cfg.data.ligand_db,
+                                   systems=test_systems,
                                    edge_types=cfg.tokens.edge_types,
-                                   )
+                                   decoy_mode='pdb',
+                                   fp_type='MACCS')
 
     print('Created data loader')
 
     '''
     Model loading
     '''
-
-    print("Loaded data")
-
-    print("creating model")
     rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
-                             hidden_dim=cfg.model.encoder.hidden_dim,
-                             num_hidden_layers=cfg.model.encoder.num_layers,
-                             )
+                           hidden_dim=cfg.model.encoder.hidden_dim,
+                           num_hidden_layers=cfg.model.encoder.num_layers)
 
     lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
                                 hidden_dim=cfg.model.lig_encoder.hidden_dim,
@@ -61,11 +46,10 @@ def main(cfg: DictConfig):
                       hidden_dim=cfg.model.decoder.hidden_dim,
                       num_layers=cfg.model.decoder.num_layers)
 
-    model = Model(encoder=rna_encoder,
-                  decoder=decoder,
-                  lig_encoder=lig_encoder,
-                  pool=cfg.model.pool,
-                  )
+    model = RNAmigosModel(encoder=rna_encoder,
+                          decoder=decoder,
+                          lig_encoder=lig_encoder,
+                          pool=cfg.model.pool)
 
     if cfg.model.use_pretrained:
         model.from_pretrained(cfg.model.pretrained_path)
@@ -80,7 +64,7 @@ def main(cfg: DictConfig):
 
     efs = run_virtual_screen(model, dataset, metric=mean_active_rank)
     print(efs)
-    
-        
+
+
 if __name__ == "__main__":
     main()

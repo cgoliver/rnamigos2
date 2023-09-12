@@ -166,7 +166,7 @@ for k, (train_loader, test_loader) in enumerate(data):
     pickle.dump(meta, open(os.path.join(result_folder,  'meta.p'), 'wb'))
 
 
-    all_graphs = np.array(test_loader.dataset.dataset.all_graphs)
+    all_graphs = np.array(test_loader.dataset.dataset.all_interactions)
     test_inds = test_loader.dataset.indices
     train_inds = train_loader.dataset.indices
 

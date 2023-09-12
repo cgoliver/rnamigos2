@@ -1,19 +1,14 @@
-import argparse
-import os, sys
-import pickle
-import copy
-import numpy as np
 from dgl.dataloading import GraphDataLoader
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-from omegaconf import DictConfig, OmegaConf
-import hydra
 
-from rnamigos_dock.learning.loader import DockingDataset, DockingDatasetVincent, get_systems
+from rnamigos_dock.learning.loader import DockingDataset, get_systems
 from rnamigos_dock.learning import learn
-from rnamigos_dock.learning.loader import Loader
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.learning.utils import mkdirs
 
@@ -61,8 +56,8 @@ def main(cfg: DictConfig):
                    'num_workers': cfg.train.num_workers,
                    # 'collate_fn': None
                    }
-    train_dataset = DockingDatasetVincent(systems=train_systems, **dataset_args)
-    test_dataset = DockingDatasetVincent(systems=test_systems, **dataset_args)
+    train_dataset = DockingDataset(systems=train_systems, **dataset_args)
+    test_dataset = DockingDataset(systems=test_systems, **dataset_args)
     train_loader = GraphDataLoader(dataset=train_dataset, **loader_args)
     test_loader = GraphDataLoader(dataset=test_dataset, **loader_args)
 
