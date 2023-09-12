@@ -43,8 +43,14 @@ def main(cfg: DictConfig):
     Dataloader creation
     '''
 
-    train_systems = get_systems(target=cfg.train.target, split='TRAIN')
-    test_systems = get_systems(target=cfg.train.target, split='TEST')
+    if cfg.train.target != 'native_fp':
+        train_systems = get_systems(target=cfg.train.target, split='TRAIN')
+        test_systems = get_systems(target=cfg.train.target, split='TEST')
+    else:
+        get_migos1_only = False
+        train_systems = get_systems(target=cfg.train.target, fp_split=0, get_migos1_only=get_migos1_only)
+        test_systems = get_systems(target=cfg.train.target, fp_split=0, fp_split_train=False,
+                                   get_migos1_only=get_migos1_only)
     dataset_args = {'pockets_path': cfg.data.pocket_graphs,
                     'target': cfg.train.target,
                     'shuffle': cfg.train.shuffle,

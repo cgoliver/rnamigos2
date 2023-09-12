@@ -70,9 +70,8 @@ class MolEncoder:
         return mol_encode_list(smiles_list, fp_type=self.fp_type, encoding_func=self.encode_mol)
 
 
-def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True):
+def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True, get_migos1_only=False):
     """
-    
     :param target: The systems to load 
     :param split: None or one of 'TRAIN', 'VALIDATION', 'TEST'
     :param fp_split: For fp, and following RNAmigos1, there is a special splitting procedure that uses 10 fixed splits.
@@ -94,6 +93,8 @@ def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True):
     if split is not None:
         systems = systems.loc[systems['SPLIT'] == split]
     if fp_split is not None:
+        if get_migos1_only:
+            systems = systems.loc[systems['IN_MIGOS_1'] == 1]
         systems = systems.loc[systems['SPLIT'] == (not fp_split_train)]
     return systems
 
