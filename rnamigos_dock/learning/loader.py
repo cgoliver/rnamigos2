@@ -66,12 +66,12 @@ class MolEncoder:
 
     def __init__(self, fp_type='MACCS'):
         self.fp_type = fp_type
-        cashed_path = '../../data/ligands/maccs.p' if fp_type == 'MACCS' else '../../data/ligands/morgan.p'
+        cashed_path = os.path.join(script_dir, f'../../data/ligands/{"maccs" if fp_type == "MACCS" else "morgan"}.p')
         self.cashed_fps = pickle.load(open(cashed_path, 'rb'))
 
     def encode_mol(self, smiles):
         if smiles in self.cashed_fps:
-            return self.cashed_fps[smiles]
+            return self.cashed_fps[smiles], True
         return mol_encode_one(smiles, self.fp_type)
 
     def encode_list(self, smiles_list):
@@ -205,6 +205,8 @@ class DockingDatasetVincent(Dataset):
         self.edge_map = {e: i for i, e in enumerate(sorted(edge_types))}
         self.num_edge_types = len(self.edge_map)
 
+        self.ligand_encoder = MolEncoder(fp_type='MACCS')
+
         if seed:
             print(f">>> shuffling with random seed {seed}")
             np.random.seed(seed)
@@ -233,14 +235,12 @@ class DockingDatasetVincent(Dataset):
             Returns one training item at index `idx`.
         """
         # t0 = time.perf_counter()
+        # print("1 : ", time.perf_counter() - t0)
         row = self.systems.iloc[idx].values
         pocket_id, ligand_smiles = row[0], row[1]
         pocket_graph = self.load_rna_graph(pocket_id)
-        # print("1 : ", time.perf_counter() - t0)
-        # t0 = time.perf_counter()
-        ligand_fp, success = mol_encode_one(smiles=ligand_smiles, fp_type='MACCS')
+        ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
         target = ligand_fp if self.target == 'fp' else row[2]
-        # print("2 : ", time.perf_counter() - t0)
         return pocket_graph, ligand_fp, target, [idx]
 
 
