@@ -26,6 +26,8 @@ from rnaglib.utils import NODE_FEATURE_MAP
 
 RDLogger.DisableLog('rdApp.*')  # disable warnings
 
+script_dir = os.path.dirname(__file__)
+
 
 def mol_encode_one(smiles, fp_type):
     success = False
@@ -163,11 +165,11 @@ class DockingDataset(Dataset):
 
 def get_systems(target='dock', split='train'):
     if target == 'dock':
-        interactions_csv = '../../data/docking_data.csv'
+        interactions_csv = os.path.join(script_dir, '../../data/docking_data.csv')
     elif target == 'fp':
-        interactions_csv = '../data/fp_data.csv'
+        interactions_csv = os.path.join(script_dir, '../../data/fp_data.csv')
     elif target == 'binary':
-        interactions_csv = '../data/binary_data.csv'
+        interactions_csv = os.path.join(script_dir, '../../data/binary_data.csv')
     else:
         raise ValueError
     systems = pd.read_csv(interactions_csv, index_col=0)
@@ -178,6 +180,7 @@ class DockingDatasetVincent(Dataset):
 
     def __init__(self,
                  pockets_path,
+                 edge_types=None,
                  target='dock',
                  shuffle=False,
                  seed=0,
@@ -198,6 +201,9 @@ class DockingDatasetVincent(Dataset):
         self.pockets_path = pockets_path
         self.target = target
 
+        self.edge_map = {e: i for i, e in enumerate(sorted(edge_types))}
+        self.num_edge_types = len(self.edge_map)
+
         if seed:
             print(f">>> shuffling with random seed {seed}")
             np.random.seed(seed)
@@ -210,7 +216,17 @@ class DockingDatasetVincent(Dataset):
     def load_rna_graph(self, rna_name):
         rna_path = os.path.join(self.pockets_path, f"{rna_name}.json")
         pocket_graph = graph_io.load_json(rna_path)
-        return pocket_graph
+        one_hot = {edge: torch.tensor(self.edge_map[label.upper()]) for edge, label in
+                   (nx.get_edge_attributes(pocket_graph, 'label')).items()}
+        nx.set_edge_attributes(pocket_graph, name='edge_type', values=one_hot)
+
+        one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
+                        (nx.get_node_attributes(pocket_graph, 'nt')).items()}
+        nx.set_node_attributes(pocket_graph, name='nt_features', values=one_hot_nucs)
+        pocket_graph_dgl = dgl.from_networkx(nx_graph=pocket_graph,
+                                             edge_attrs=['edge_type'],
+                                             node_attrs=['nt_features'])
+        return pocket_graph_dgl
 
     def __getitem__(self, idx):
         """
@@ -219,8 +235,8 @@ class DockingDatasetVincent(Dataset):
         row = self.systems.iloc[idx].values
         pocket_id, ligand_smiles = row[0], row[1]
         pocket_graph = self.load_rna_graph(pocket_id)
-        ligand_fp = mol_encode_one(smiles=ligand_smiles, fp_type='MACCS')
-        target = ligand_fp if self.target == 'fp' else row[3]
+        ligand_fp, success = mol_encode_one(smiles=ligand_smiles, fp_type='MACCS')
+        target = ligand_fp if self.target == 'fp' else row[2]
         return pocket_graph, ligand_fp, target, [idx]
 
 

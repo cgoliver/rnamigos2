@@ -10,8 +10,8 @@ from torch.utils.tensorboard import SummaryWriter
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
-from rnamigos_dock.learning.loader import DockingDataset 
-from rnamigos_dock.learning import learn 
+from rnamigos_dock.learning.loader import DockingDataset, DockingDatasetVincent
+from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.loader import Loader
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.learning.utils import mkdirs
@@ -32,7 +32,7 @@ def main(cfg: DictConfig):
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #device = torch.device('cpu')
+    # device = torch.device('cpu')
     # This is to create an appropriate number of workers, but works too with cpu
     if cfg.train.parallel:
         used_gpus_count = torch.cuda.device_count()
@@ -45,6 +45,13 @@ def main(cfg: DictConfig):
     Dataloader creation
     '''
 
+    # dataset = DockingDatasetVincent(pockets_path=cfg.data.pocket_graphs,
+    #                                 target=cfg.train.target,
+    #                                 shuffle=cfg.train.shuffle,
+    #                                 edge_types=cfg.tokens.edge_types,
+    #                                 seed=cfg.train.seed,
+    #                                 debug=cfg.debug
+    #                                 )
 
     dataset = DockingDataset(annotated_path=cfg.data.train_graphs,
                              shuffle=cfg.train.shuffle,
@@ -56,7 +63,7 @@ def main(cfg: DictConfig):
                              )
 
     loader = Loader(dataset,
-                    batch_size=cfg.train.batch_size, 
+                    batch_size=cfg.train.batch_size,
                     num_workers=cfg.train.num_workers,
                     )
 
@@ -71,7 +78,6 @@ def main(cfg: DictConfig):
     train_loader, test_loader = loader.get_data()
 
     print("Loaded data")
-
 
     print("creating model")
     rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
@@ -113,20 +119,19 @@ def main(cfg: DictConfig):
     if cfg.train.loss == 'bce':
         criterion = torch.nn.BCELoss()
 
-
     optimizer = optim.Adam(model.parameters())
 
     '''
     Experiment Setup
     '''
-    
+
     name = f"{cfg.name}"
     print(name)
     result_folder, save_path = mkdirs(name, prefix=cfg.train.target)
     print(save_path)
     writer = SummaryWriter(result_folder)
     print(f'Saving result in {result_folder}/{name}')
-    
+
     all_graphs = np.array(test_loader.dataset.dataset.all_graphs)
     test_inds = test_loader.dataset.indices
     train_inds = train_loader.dataset.indices
@@ -150,6 +155,7 @@ def main(cfg: DictConfig):
                      writer=writer,
                      num_epochs=num_epochs,
                      early_stop_threshold=cfg.train.early_stop)
-        
+
+
 if __name__ == "__main__":
     main()
