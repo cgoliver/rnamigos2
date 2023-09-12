@@ -99,15 +99,9 @@ def train_dock(model,
     :param embed_only: number of epochs before starting attributor training.
     :return:
     """
-    # print('---device------')
-    # print(device)
-    all_graphs = train_loader.dataset.dataset.all_graphs
-
     epochs_from_best = 0
-
     start_time = time.time()
     best_loss = sys.maxsize
-
     batch_size = train_loader.batch_size
     # if we delay attributor, start with attributor OFF
     # if <= -1, both always ON.
@@ -121,16 +115,11 @@ def train_dock(model,
 
         # switch off embedding grads, turn on attributor
         running_loss = 0.0
-
         time_epoch = time.perf_counter()
-
         num_batches = len(train_loader)
-
         for batch_idx, (graph, docked_fp, target, idx) in enumerate(train_loader):
-
             # Get data on the devices
             # convert ints to one hots
-
             graph = send_graph_to_device(graph, device)
             target = target.to(device)
             pred = model(graph, docked_fp)

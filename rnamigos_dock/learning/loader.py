@@ -168,14 +168,14 @@ def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True):
     """
     
     :param target: The systems to load 
-    :param split: None or one of 'train', 'val', 'test'
+    :param split: None or one of 'TRAIN', 'VALIDATION', 'TEST'
     :param fp_split: For fp, and following RNAmigos1, there is a special splitting procedure that uses 10 fixed splits.
     :param fp_split_train: For a given fp split, the test systems have a one label. Set this param to False to get test
     systems. 
     :return:
     """
-    assert split in {None, 'train', 'val', 'test'}
-    assert split is None or fp_split.startswith("split_test_")
+    assert split in {None, 'TRAIN', 'VALIDATION', 'TEST'}
+    assert fp_split is None or fp_split.startswith("split_test_")
     if target == 'dock':
         interactions_csv = os.path.join(script_dir, '../../data/csvs/docking_data.csv')
     elif target == 'fp':
@@ -196,6 +196,7 @@ class DockingDatasetVincent(Dataset):
 
     def __init__(self,
                  pockets_path,
+                 systems,
                  edge_types=None,
                  target='dock',
                  shuffle=False,
@@ -212,7 +213,7 @@ class DockingDatasetVincent(Dataset):
                 nucs (bool): whether to include nucleotide ID in node (default=False).
         """
         print(f">>> fetching data from {pockets_path}")
-        self.systems = get_systems(target=target)
+        self.systems = systems
         if debug:
             self.all_graphs = self.systems[:100]
         self.pockets_path = pockets_path
