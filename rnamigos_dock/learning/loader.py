@@ -185,7 +185,8 @@ class DockingDatasetVincent(Dataset):
                  target='dock',
                  shuffle=False,
                  seed=0,
-                 debug=False
+                 debug=False,
+                 cache_graphs=True
                  ):
         """
             Setup for data loader.
@@ -206,6 +207,11 @@ class DockingDatasetVincent(Dataset):
         self.num_edge_types = len(self.edge_map)
 
         self.ligand_encoder = MolEncoder(fp_type='MACCS')
+
+        self.cache_graphs = cache_graphs
+        if cache_graphs:
+            all_pockets = set(self.systems['PDB_ID_POCKET'].unique())
+            self.all_pockets = {pocket_id: self.load_rna_graph(pocket_id) for pocket_id in all_pockets}
 
         if seed:
             print(f">>> shuffling with random seed {seed}")
@@ -237,12 +243,14 @@ class DockingDatasetVincent(Dataset):
         # t0 = time.perf_counter()
         row = self.systems.iloc[idx].values
         pocket_id, ligand_smiles = row[0], row[1]
-        pocket_graph = self.load_rna_graph(pocket_id)
+        if self.cache_graphs:
+            pocket_graph = self.all_pockets[pocket_id]
+        else:
+            pocket_graph = self.load_rna_graph(pocket_id)
         ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
         target = ligand_fp if self.target == 'fp' else row[2]
         # print("1 : ", time.perf_counter() - t0)
         return pocket_graph, ligand_fp, target, [idx]
-
 
 class VirtualScreenDataset(DockingDataset):
     def __init__(self,
