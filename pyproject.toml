@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rnamigos2.0"
+authors = [
+    {name = "JG Carvajal & Carlos Oliver", email = "oliver@biochem.mpg.de"},
+]
+description = "RNAmigos 2.0"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+packages = ["rnamigos_dock"]
