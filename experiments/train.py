@@ -45,22 +45,22 @@ def main(cfg: DictConfig):
     Dataloader creation
     '''
 
-    # dataset = DockingDatasetVincent(pockets_path=cfg.data.pocket_graphs,
-    #                                 target=cfg.train.target,
-    #                                 shuffle=cfg.train.shuffle,
-    #                                 edge_types=cfg.tokens.edge_types,
-    #                                 seed=cfg.train.seed,
-    #                                 debug=cfg.debug
-    #                                 )
+    dataset = DockingDatasetVincent(pockets_path=cfg.data.pocket_graphs,
+                                    target=cfg.train.target,
+                                    shuffle=cfg.train.shuffle,
+                                    edge_types=cfg.tokens.edge_types,
+                                    seed=cfg.train.seed,
+                                    debug=cfg.debug
+                                    )
 
-    dataset = DockingDataset(annotated_path=cfg.data.train_graphs,
-                             shuffle=cfg.train.shuffle,
-                             seed=cfg.train.seed,
-                             nuc_types=cfg.tokens.nuc_types,
-                             edge_types=cfg.tokens.edge_types,
-                             target=cfg.train.target,
-                             debug=cfg.debug
-                             )
+    # dataset = DockingDataset(annotated_path=cfg.data.train_graphs,
+    #                          shuffle=cfg.train.shuffle,
+    #                          seed=cfg.train.seed,
+    #                          nuc_types=cfg.tokens.nuc_types,
+    #                          edge_types=cfg.tokens.edge_types,
+    #                          target=cfg.train.target,
+    #                          debug=cfg.debug
+    #                          )
 
     loader = Loader(dataset,
                     batch_size=cfg.train.batch_size,

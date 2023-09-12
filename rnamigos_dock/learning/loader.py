@@ -44,6 +44,7 @@ def mol_encode_one(smiles, fp_type):
             fp = [0] * 166
         if fp_type == 'morgan':
             fp = [0] * 1024
+    fp = np.asarray(fp)
     return fp, success
 
 
@@ -65,7 +66,7 @@ class MolEncoder:
 
     def __init__(self, fp_type='MACCS'):
         self.fp_type = fp_type
-        cashed_path = '../../data/maccs.p' if fp_type == 'MACCS' else '../../data/morgan.p'
+        cashed_path = '../../data/ligands/maccs.p' if fp_type == 'MACCS' else '../../data/ligands/morgan.p'
         self.cashed_fps = pickle.load(open(cashed_path, 'rb'))
 
     def encode_mol(self, smiles):
@@ -165,11 +166,11 @@ class DockingDataset(Dataset):
 
 def get_systems(target='dock', split='train'):
     if target == 'dock':
-        interactions_csv = os.path.join(script_dir, '../../data/docking_data.csv')
+        interactions_csv = os.path.join(script_dir, '../../data/csvs/docking_data.csv')
     elif target == 'fp':
-        interactions_csv = os.path.join(script_dir, '../../data/fp_data.csv')
+        interactions_csv = os.path.join(script_dir, '../../data/csvs/fp_data.csv')
     elif target == 'binary':
-        interactions_csv = os.path.join(script_dir, '../../data/binary_data.csv')
+        interactions_csv = os.path.join(script_dir, '../../data/csvs/binary_data.csv')
     else:
         raise ValueError
     systems = pd.read_csv(interactions_csv, index_col=0)
@@ -217,11 +218,10 @@ class DockingDatasetVincent(Dataset):
         rna_path = os.path.join(self.pockets_path, f"{rna_name}.json")
         pocket_graph = graph_io.load_json(rna_path)
         one_hot = {edge: torch.tensor(self.edge_map[label.upper()]) for edge, label in
-                   (nx.get_edge_attributes(pocket_graph, 'label')).items()}
+                   (nx.get_edge_attributes(pocket_graph, 'LW')).items()}
         nx.set_edge_attributes(pocket_graph, name='edge_type', values=one_hot)
-
         one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
-                        (nx.get_node_attributes(pocket_graph, 'nt')).items()}
+                        (nx.get_node_attributes(pocket_graph, 'nt_code')).items()}
         nx.set_node_attributes(pocket_graph, name='nt_features', values=one_hot_nucs)
         pocket_graph_dgl = dgl.from_networkx(nx_graph=pocket_graph,
                                              edge_attrs=['edge_type'],
@@ -232,11 +232,15 @@ class DockingDatasetVincent(Dataset):
         """
             Returns one training item at index `idx`.
         """
+        # t0 = time.perf_counter()
         row = self.systems.iloc[idx].values
         pocket_id, ligand_smiles = row[0], row[1]
         pocket_graph = self.load_rna_graph(pocket_id)
+        # print("1 : ", time.perf_counter() - t0)
+        # t0 = time.perf_counter()
         ligand_fp, success = mol_encode_one(smiles=ligand_smiles, fp_type='MACCS')
         target = ligand_fp if self.target == 'fp' else row[2]
+        # print("2 : ", time.perf_counter() - t0)
         return pocket_graph, ligand_fp, target, [idx]
 
 
