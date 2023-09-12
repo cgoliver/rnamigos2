@@ -1,5 +1,5 @@
 import argparse
-from pathlib import Path 
+from pathlib import Path
 import tempfile
 
 from tqdm import tqdm
@@ -27,7 +27,9 @@ def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv")
             logger.info(f"Failed on {smiles}")
             return []
 
-def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv', save_path='data/ligand_db', no_decoyfinder=True):
+
+def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv', save_path='data/ligand_db',
+                         no_decoyfinder=True):
     """ Build active and decoy lists for every pocket in master dataset `rnamigos2_dataset_consolidated.csv`
 
     Each pocket ID gets a folder:
@@ -62,7 +64,7 @@ def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv'
 
         with open(pdb_path / 'actives.txt', 'w') as ac:
             ac.write(pocket.LIGAND_SMILES)
-        with open(chembl_path/ 'actives.txt', 'w') as ac:
+        with open(chembl_path / 'actives.txt', 'w') as ac:
             ac.write(pocket.LIGAND_SMILES)
         with open(pdb_path / 'decoys.txt', 'w') as de:
             de.write("\n".join(pdb_ligands - set(pocket.LIGAND_SMILES)))
@@ -75,12 +77,15 @@ def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv'
             with open(decoyfinder_path / 'decoys.txt', 'w') as de:
                 de.write("\n".join(get_decoyfinder_decoys(pocket.LIGAND_SMILES)))
 
+
 pass
+
 
 def cline():
     parser = argparse.ArgumentParser()
     parser.add_argument('--no-decoyfinder', action='store_true', default=False)
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = cline()

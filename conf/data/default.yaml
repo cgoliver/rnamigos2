@@ -1,4 +1,3 @@
-train_graphs: data/pockets_docked_train
-test_graphs: data/pockets_docked_test
+pocket_graphs: data/json_pockets_load
 pretrain_graphs: data/pretrain_data/data/annotated/NR_chops_annot
 ligand_db: data/ligand_db
