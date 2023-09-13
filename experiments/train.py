@@ -48,8 +48,9 @@ def main(cfg: DictConfig):
         test_systems = get_systems(target=cfg.train.target, split='TEST')
     else:
         get_migos1_only = False
-        train_systems = get_systems(target=cfg.train.target, fp_split=0, get_migos1_only=get_migos1_only)
-        test_systems = get_systems(target=cfg.train.target, fp_split=0, fp_split_train=False,
+        fp_split = f"split_test_{0}"
+        train_systems = get_systems(target=cfg.train.target, fp_split=fp_split, get_migos1_only=get_migos1_only)
+        test_systems = get_systems(target=cfg.train.target, fp_split=fp_split, fp_split_train=False,
                                    get_migos1_only=get_migos1_only)
     dataset_args = {'pockets_path': cfg.data.pocket_graphs,
                     'target': cfg.train.target,
