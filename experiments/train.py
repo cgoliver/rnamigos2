@@ -43,7 +43,6 @@ def main(cfg: DictConfig):
     Dataloader creation
     '''
 
-    cfg.train.target = 'dock'
     use_rnamigos1_train = False
     use_rnamigos1_ligands = False
     rnamigos1_split = 0
@@ -72,9 +71,6 @@ def main(cfg: DictConfig):
     train_loader = GraphDataLoader(dataset=train_dataset, **loader_args)
     test_loader = GraphDataLoader(dataset=test_dataset, **loader_args)
 
-    print(len(train_dataset))
-    print(len(test_dataset))
-    exit()
     print('Created data loader')
 
     '''
