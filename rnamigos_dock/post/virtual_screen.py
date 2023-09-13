@@ -5,8 +5,28 @@ import torch
 
 
 def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
+    """ Compute the average rank of actives in the scored ligand set
+
+    Arguments
+    ----------
+    scores (list): list of scalar scores for each ligand in the library
+    is_active (list): binary vector with 1 if ligand is active or 0 else, one for each of the scores
+    lower_is_better (bool): True if a lower score means higher binding likelihood, False v.v.
+
+    Returns
+    ---------
+    int
+        Mean rank of the active ligand [0, 1], 1 is the best score.
+        
+
+    >>> mean_active_rank([-1, -5, 1], [0, 1, 0], lower_is_better=True)
+    >>> 1.0
+
+    """
     is_active_sorted = sorted(zip(scores, is_active), reverse=lower_is_better)
-    return 1 - (np.mean([rank for rank, (score, is_active) in enumerate(is_active_sorted) if is_active]) / len(scores))
+    return (np.mean([rank for rank, (score, is_active) in enumerate(is_active_sorted) if is_active]) + 1) / len(scores)
+
+
 
 
 def enrichment_factor(scores, is_active, lower_is_better=True, **kwargs):
