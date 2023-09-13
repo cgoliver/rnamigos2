@@ -24,7 +24,13 @@ def main(cfg: DictConfig):
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    test_systems = get_systems(target='is_native', split='TEST')
+    if cfg.train.target != 'native_fp':
+        test_systems = get_systems(target=cfg.train.target, split='TEST')
+    else:
+        get_migos1_only = False
+        fp_split = f"split_test_{0}"
+        test_systems = get_systems(target=cfg.train.target, fp_split=fp_split, fp_split_train=False,
+                                   get_migos1_only=get_migos1_only)
     dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
                                    ligands_path=cfg.data.ligand_db,
                                    systems=test_systems,
