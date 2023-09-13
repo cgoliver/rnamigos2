@@ -70,18 +70,54 @@ class MolEncoder:
         return mol_encode_list(smiles_list, fp_type=self.fp_type, encoding_func=self.encode_mol)
 
 
-def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True, get_migos1_only=False):
+def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
+                     use_rnamigos1_train=False, use_rnamigos1_ligands=False):
+    """
+
+    :param systems: a dataframe to filter
+    :param use_rnamigos1_train: if True, only pockets in the original data are used for training
+    :param rnamigos1_test_split: An integer between 0 and 10
+    :param return_test: If True return the test systems, else return the train set
+    :return:
+    """
+    interactions_csv_migos1 = os.path.join(script_dir, '../../data/csvs/rnamigos1_dataset.csv')
+    systems_migos_1 = pd.read_csv(interactions_csv_migos1)
+    train_split = set()
+    test_split = set()
+    rnamigos1_ligands = set()
+    for i, row in systems_migos_1.iterrows():
+        pocket_id = f"{row['pdbid'].upper()}_{row['chain']}_{row['ligand_id']}_{row['ligand_resnum']}"
+        rnamigos1_ligands.add(row['native_smiles'])
+        if row[-10 + rnamigos1_test_split]:
+            test_split.add(pocket_id)
+        else:
+            train_split.add(pocket_id)
+    if use_rnamigos1_ligands:
+        systems = systems.loc[systems['LIGAND_SMILES'].isin(rnamigos1_ligands)]
+    if return_test:
+        systems = systems.loc[systems['PDB_ID_POCKET'].isin(test_split)]
+    else:
+        if use_rnamigos1_train:
+            systems = systems.loc[systems['PDB_ID_POCKET'].isin(train_split)]
+        else:
+            systems = systems.loc[~systems['PDB_ID_POCKET'].isin(test_split)]
+    return systems
+
+
+def get_systems(target='dock', rnamigos1_split=None, return_test=False,
+                use_rnamigos1_train=False, use_rnamigos1_ligands=False):
     """
     :param target: The systems to load 
     :param split: None or one of 'TRAIN', 'VALIDATION', 'TEST'
-    :param get_migos1_only: Only use the systems present in RNAmigos1
-    :param fp_split: For fp, and following RNAmigos1, there is a special splitting procedure that uses 10 fixed splits.
-    :param fp_split_train: For a given fp split, the test systems have a one label. Set this param to False to get test
+    :param use_rnamigos1_train: Only use the systems present in RNAmigos1
+    :param rnamigos1_split: For fp, and following RNAmigos1, there is a special splitting procedure that uses 10 fixed
+     splits.
+    :param get_rnamigos1_train: For a given fp split, the test systems have a one label. Set this param to False to get test
     systems. 
     :return:
     """
-    assert split in {None, 'TRAIN', 'VALIDATION', 'TEST'}
-    assert fp_split is None or fp_split.startswith("split_test_")
+    # Can't split twice
+    assert rnamigos1_split is None or rnamigos1_split in {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
     if target == 'dock':
         interactions_csv = os.path.join(script_dir, '../../data/csvs/docking_data.csv')
     elif target == 'native_fp':
@@ -91,12 +127,14 @@ def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True, g
     else:
         raise ValueError("train.target should be in {dock, native_fp, is_native}, received : " + target)
     systems = pd.read_csv(interactions_csv, index_col=0)
-    if split is not None:
+    if rnamigos1_split is None:
+        split = 'TEST' if return_test else 'TRAIN'
         systems = systems.loc[systems['SPLIT'] == split]
-    if fp_split is not None:
-        if get_migos1_only:
-            systems = systems.loc[systems['IN_MIGOS_1'] == 1]
-        systems = systems.loc[systems[fp_split] == (not fp_split_train)]
+    else:
+        systems = rnamigos_1_split(systems,
+                                   rnamigos1_test_split=0,
+                                   return_test=return_test,
+                                   use_rnamigos1_train=use_rnamigos1_train)
     return systems
 
 

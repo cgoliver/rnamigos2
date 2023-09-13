@@ -43,15 +43,19 @@ def main(cfg: DictConfig):
     Dataloader creation
     '''
 
-    if cfg.train.target != 'native_fp':
-        train_systems = get_systems(target=cfg.train.target, split='TRAIN')
-        test_systems = get_systems(target=cfg.train.target, split='TEST')
-    else:
-        get_migos1_only = False
-        fp_split = f"split_test_{0}"
-        train_systems = get_systems(target=cfg.train.target, fp_split=fp_split, get_migos1_only=get_migos1_only)
-        test_systems = get_systems(target=cfg.train.target, fp_split=fp_split, fp_split_train=False,
-                                   get_migos1_only=get_migos1_only)
+    cfg.train.target = 'dock'
+    use_rnamigos1_train = False
+    use_rnamigos1_ligands = False
+    rnamigos1_split = 0
+    train_systems = get_systems(target=cfg.train.target,
+                                rnamigos1_split=rnamigos1_split,
+                                use_rnamigos1_train=use_rnamigos1_train,
+                                use_rnamigos1_ligands=use_rnamigos1_ligands)
+    test_systems = get_systems(target=cfg.train.target,
+                               rnamigos1_split=rnamigos1_split,
+                               use_rnamigos1_train=use_rnamigos1_train,
+                               use_rnamigos1_ligands=use_rnamigos1_ligands,
+                               return_test=True)
     dataset_args = {'pockets_path': cfg.data.pocket_graphs,
                     'target': cfg.train.target,
                     'shuffle': cfg.train.shuffle,
@@ -68,6 +72,9 @@ def main(cfg: DictConfig):
     train_loader = GraphDataLoader(dataset=train_dataset, **loader_args)
     test_loader = GraphDataLoader(dataset=test_dataset, **loader_args)
 
+    print(len(train_dataset))
+    print(len(test_dataset))
+    exit()
     print('Created data loader')
 
     '''
