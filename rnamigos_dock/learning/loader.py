@@ -96,7 +96,7 @@ def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True, g
     if fp_split is not None:
         if get_migos1_only:
             systems = systems.loc[systems['IN_MIGOS_1'] == 1]
-        systems = systems.loc[systems['SPLIT'] == (not fp_split_train)]
+        systems = systems.loc[systems[fp_split] == (not fp_split_train)]
     return systems
 
 
