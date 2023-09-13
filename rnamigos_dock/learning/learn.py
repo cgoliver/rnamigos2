@@ -176,12 +176,14 @@ def train_dock(model,
         if test_loss < best_loss:
             best_loss = test_loss
             epochs_from_best = 0
+            model.cpu()
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': criterion
             }, save_path)
+            model.to(device)
 
         # Early stopping
         else:

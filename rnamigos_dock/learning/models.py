@@ -216,4 +216,6 @@ class RNAmigosModel(nn.Module):
         return pred
 
     def from_pretrained(self, model_path):
-        self.encoder.load_state_dict(torch.load(model_path))
+        state_dict = torch.load(model_path)
+        # state_dict = torch.load(model_path, map_location=torch.device('cpu'))
+        self.load_state_dict(state_dict['model_state_dict'])

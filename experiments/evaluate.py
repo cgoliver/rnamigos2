@@ -62,8 +62,7 @@ def main(cfg: DictConfig):
                           lig_encoder=lig_encoder if cfg.train.target in ['dock', 'is_native'] else None,
                           pool=cfg.model.pool)
 
-    if cfg.model.use_pretrained:
-        model.from_pretrained(cfg.model.pretrained_path)
+    model.from_pretrained(cfg.model.pretrained_path)
 
     model = model.to(device)
 
