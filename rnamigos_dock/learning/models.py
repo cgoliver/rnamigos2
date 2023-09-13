@@ -189,6 +189,17 @@ class RNAmigosModel(nn.Module):
         self.decoder = decoder
         self.lig_encoder = lig_encoder
 
+    def predict_ligands(self, g, ligands):
+        with torch.no_grad():
+            embeddings = self.encoder(g)
+            graph_pred = self.pool(g, embeddings)
+            lig_h = self.lig_encoder(ligands)
+            graph_pred = graph_pred.expand(len(lig_h), -1)
+
+            pred = torch.cat((graph_pred, lig_h), dim=1)
+            pred = self.decoder(pred)
+            return pred
+
     def forward(self, g, lig_fp):
         embeddings = self.encoder(g)
         pred = self.pool(g, embeddings)

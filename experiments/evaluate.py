@@ -1,5 +1,9 @@
 import os
 import sys
+import time
+
+import numpy as np
+from dgl.dataloading import GraphDataLoader
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -27,6 +31,13 @@ def main(cfg: DictConfig):
                                    edge_types=cfg.tokens.edge_types,
                                    decoy_mode='pdb',
                                    fp_type='MACCS')
+    # Loader is asynchronous
+    loader_args = {'shuffle': False,
+                   'batch_size': 1,
+                   'num_workers': 4,
+                   'collate_fn': lambda x: x[0]
+                   }
+    dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
     print('Created data loader')
 
@@ -61,9 +72,12 @@ def main(cfg: DictConfig):
     '''
     Experiment Setup
     '''
-
-    efs = run_virtual_screen(model, dataset, metric=mean_active_rank)
+    import time
+    t0 = time.perf_counter()
+    efs = run_virtual_screen(model, dataloader, metric=mean_active_rank)
     print(efs)
+    print('Mean EF :', np.mean(efs))
+    print('Time :', time.perf_counter() - t0)
 
 
 if __name__ == "__main__":

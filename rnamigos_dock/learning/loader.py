@@ -14,7 +14,6 @@ from rdkit.Chem import MACCSkeys
 from rdkit.Chem import AllChem
 import torch
 from torch.utils.data import Dataset
-from tqdm import tqdm
 
 RDLogger.DisableLog('rdApp.*')  # disable warnings
 
@@ -23,18 +22,19 @@ script_dir = os.path.dirname(__file__)
 
 def mol_encode_one(smiles, fp_type):
     success = False
+    assert fp_type in {'MACCS', 'morgan'}
     try:
         mol = Chem.MolFromSmiles(smiles)
         if fp_type == 'MACCS':
             # for some reason RDKit maccs is 167 bits
             fp = list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:]
-        if fp_type == 'morgan':
+        else:
             fp = list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString()))
         success = True
     except:
         if fp_type == 'MACCS':
             fp = [0] * 166
-        if fp_type == 'morgan':
+        else:
             fp = [0] * 1024
     fp = np.asarray(fp)
     return fp, success
@@ -43,7 +43,7 @@ def mol_encode_one(smiles, fp_type):
 def mol_encode_list(smiles_list, fp_type, encoding_func=mol_encode_one):
     fps = []
     ok_inds = []
-    for i, sm in tqdm(enumerate(smiles_list), total=len(smiles_list)):
+    for i, sm in enumerate(smiles_list):
         fp, success = encoding_func(sm, fp_type=fp_type)
         fps.append(fp)
         if success:
@@ -74,6 +74,7 @@ def get_systems(target='dock', split=None, fp_split=None, fp_split_train=True, g
     """
     :param target: The systems to load 
     :param split: None or one of 'TRAIN', 'VALIDATION', 'TEST'
+    :param get_migos1_only: Only use the systems present in RNAmigos1
     :param fp_split: For fp, and following RNAmigos1, there is a special splitting procedure that uses 10 fixed splits.
     :param fp_split_train: For a given fp split, the test systems have a one label. Set this param to False to get test
     systems. 
@@ -195,32 +196,38 @@ class VirtualScreenDataset(DockingDataset):
         self.all_pockets_id = list(self.systems['PDB_ID_POCKET'].unique())
         pass
 
+    def __len__(self):
+        return len(self.all_pockets_id)
+
     def parse_smiles(self, smiles_path):
         return list(open(smiles_path).readlines())
 
     def __getitem__(self, idx):
-        pocket_id = self.all_pockets_id[idx]
-        if self.cache_graphs:
-            pocket_graph = self.all_pockets[pocket_id]
-        else:
-            pocket_graph = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
-                                          edge_map=self.edge_map)
-        actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'actives.txt'))
-        decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'decoys.txt'))
+        try:
+            pocket_id = self.all_pockets_id[idx]
+            if self.cache_graphs:
+                pocket_graph = self.all_pockets[pocket_id]
+            else:
+                pocket_graph = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
+                                              edge_map=self.edge_map)
+            actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'actives.txt'))
+            decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'decoys.txt'))
 
-        is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
-        is_active[:len(actives_smiles)] = 1.
+            is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
+            is_active[:len(actives_smiles)] = 1.
 
-        all_fps, ok_inds = self.ligand_encoder.encode_list(actives_smiles + decoys_smiles)
+            all_fps, ok_inds = self.ligand_encoder.encode_list(actives_smiles + decoys_smiles)
 
-        return pocket_graph, torch.tensor(all_fps[ok_inds]), torch.tensor(is_active[ok_inds])
+            return pocket_graph, torch.tensor(all_fps[ok_inds]), torch.tensor(is_active[ok_inds])
+        except FileNotFoundError:
+            return None, None, None
 
 
 if __name__ == '__main__':
     pockets_path = '../../data/json_pockets'
+    test_systems = get_systems(target='dock', split='TEST')
     dataset = DockingDataset(pockets_path=pockets_path,
+                             systems=test_systems,
                              target='dock')
     a = dataset[0]
-    loader = Loader(dataset=dataset, shuffle=False, seed=99, batch_size=1, num_workers=1)
-    data = loader.get_data(k_fold=1)
     pass
