@@ -58,6 +58,7 @@ def test(model, test_loader, criterion, device):
     test_size = len(test_loader)
     for batch_idx, (graph, docked_fp, target, idx) in enumerate(test_loader):
         # Get data on the devices
+        docked_fp = docked_fp.to(device)
         target = target.to(device)
         graph = send_graph_to_device(graph, device)
 
@@ -162,7 +163,6 @@ def train_dock(model,
 
         writer.add_scalar("Test loss during training", test_loss, epoch)
 
-        ne = epoch + 1
         """
         learning_curve_val_df = learning_curve_val_df.append({'EPOCH': str(ne), 
             'LOSS': str(train_loss), 
