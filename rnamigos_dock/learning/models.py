@@ -193,12 +193,18 @@ class RNAmigosModel(nn.Module):
         with torch.no_grad():
             embeddings = self.encoder(g)
             graph_pred = self.pool(g, embeddings)
-            lig_h = self.lig_encoder(ligands)
-            graph_pred = graph_pred.expand(len(lig_h), -1)
 
-            pred = torch.cat((graph_pred, lig_h), dim=1)
-            pred = self.decoder(pred)
-            return pred
+            # Batch ligands together, encode them
+            if not self.lig_encoder is None:
+                lig_h = self.lig_encoder(ligands)
+                graph_pred = graph_pred.expand(len(lig_h), -1)
+                pred = torch.cat((graph_pred, lig_h), dim=1)
+                pred = self.decoder(pred)
+                return pred
+            # Do FP prediction and use cdist
+            ligand_pred = self.decoder(graph_pred)
+            scores = - torch.cdist(ligand_pred, ligands.float())
+            return scores
 
     def forward(self, g, lig_fp):
         embeddings = self.encoder(g)
