@@ -134,7 +134,8 @@ def get_systems(target='dock', rnamigos1_split=None, return_test=False,
         systems = rnamigos_1_split(systems,
                                    rnamigos1_test_split=0,
                                    return_test=return_test,
-                                   use_rnamigos1_train=use_rnamigos1_train)
+                                   use_rnamigos1_train=use_rnamigos1_train,
+                                   use_rnamigos1_ligands=use_rnamigos1_ligands)
     return systems
 
 
