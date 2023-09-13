@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 
 from omegaconf import DictConfig, OmegaConf
@@ -12,17 +14,18 @@ from rnamigos_dock.learning.models import Embedder
 
 @hydra.main(version_base=None, config_path="../conf", config_name="pretrain")
 def main(cfg: DictConfig):
+    print(OmegaConf.to_yaml(cfg))
     # Choose the data, features and targets to use
     node_features = ['nt_code']
 
     ###### Unsupervised phase : ######
     # Choose the data and kernel to use for pretraining
     print('Starting to pretrain the network')
-    node_simfunc = node_sim.SimFunctionNode(method='R_1', depth=2)
+    node_simfunc = node_sim.SimFunctionNode(method=cfg.simfunc, depth=cfg.depth)
     graph_representation = GraphRepresentation(framework='dgl')
     ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
     unsupervised_dataset = rna_dataset.RNADataset(nt_features=node_features,
-                                                  data_path='data/glib/data/annotated/NR_chops_annot',
+                                                  data_path=cfg.data.pretrain_graphs,
                                                   representations=[ring_representation, graph_representation])
     train_loader = rna_loader.get_loader(dataset=unsupervised_dataset, split=False, num_workers=4)
 
@@ -35,10 +38,12 @@ def main(cfg: DictConfig):
     learn.pretrain_unsupervised(model=model,
                                 optimizer=optimizer,
                                 train_loader=train_loader,
-                                learning_routine=learning_utils.LearningRoutine(num_epochs=10),
-                                rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": 2})
+                                learning_routine=learning_utils.LearningRoutine(num_epochs=cfg.epochs),
+                                rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": cfg.depth})
 
-    torch.save(model.state_dict(), 'pretrained_model.pth')
+    model_dir = Path(cfg.paths.pretrain_save, cfg.name)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), Path(model_dir, 'model.pth'))
  
 if __name__ == "__main__":
     main()

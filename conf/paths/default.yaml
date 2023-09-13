@@ -1,1 +1,2 @@
 model_path: "models/"
+pretrain_save: "pretrained/"

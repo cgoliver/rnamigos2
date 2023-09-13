@@ -41,7 +41,7 @@ try:
 except:
     pass
 try:
-    import pybel
+    from openbabel import pybel
     m['pybel'] = pybel
     backend = 'pybel'
 except ImportError:

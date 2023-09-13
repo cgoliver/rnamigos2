@@ -3,9 +3,9 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "RNAmigos2.0"
+name = "rnamigos2.0"
 authors = [
-    {name = "JG Carvajal Patino & Carlos Oliver", email = "oliver@biochem.mpg.de"},
+    {name = "JG Carvajal & Carlos Oliver", email = "oliver@biochem.mpg.de"},
 ]
 description = "RNAmigos 2.0"
 readme = "README.md"

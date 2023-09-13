@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from rnamigos_dock.learning.utils import dgl_to_nx
 from rnamigos_dock.learning.decoy_utils import *
 
+
 def send_graph_to_device(g, device):
     """
     Send dgl graph to device
@@ -29,8 +30,8 @@ def send_graph_to_device(g, device):
     labels = g.edge_attr_schemes()
     for i, l in enumerate(labels.keys()):
         g.edata[l] = g.edata.pop(l).to(device, non_blocking=True)
-
     return g
+
 
 def print_gradients(model):
     """
@@ -41,6 +42,7 @@ def print_gradients(model):
         name, p = param
         print(name, p.grad)
     pass
+
 
 def test(model, test_loader, criterion, device):
     """
@@ -53,10 +55,10 @@ def test(model, test_loader, criterion, device):
     """
     model.eval()
     test_loss = 0
-    all_graphs = test_loader.dataset.dataset.all_graphs
     test_size = len(test_loader)
     for batch_idx, (graph, docked_fp, target, idx) in enumerate(test_loader):
         # Get data on the devices
+        docked_fp = docked_fp.to(device)
         target = target.to(device)
         graph = send_graph_to_device(graph, device)
 
@@ -67,6 +69,7 @@ def test(model, test_loader, criterion, device):
         test_loss += loss.item()
 
     return test_loss / test_size
+
 
 def train_dock(model,
                criterion,
@@ -95,18 +98,12 @@ def train_dock(model,
     :param embed_only: number of epochs before starting attributor training.
     :return:
     """
-    #print('---device------')
-    #print(device)
-    all_graphs = train_loader.dataset.dataset.all_graphs
-
     epochs_from_best = 0
-
     start_time = time.time()
     best_loss = sys.maxsize
-
     batch_size = train_loader.batch_size
-    #if we delay attributor, start with attributor OFF
-    #if <= -1, both always ON.
+    # if we delay attributor, start with attributor OFF
+    # if <= -1, both always ON.
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + 1, num_epochs))
@@ -115,22 +112,17 @@ def train_dock(model,
         # Training phase
         model.train()
 
-        #switch off embedding grads, turn on attributor
+        # switch off embedding grads, turn on attributor
         running_loss = 0.0
-
         time_epoch = time.perf_counter()
-
         num_batches = len(train_loader)
-
         for batch_idx, (graph, docked_fp, target, idx) in enumerate(train_loader):
-
             # Get data on the devices
-            #convert ints to one hots
-
+            # convert ints to one hots
             graph = send_graph_to_device(graph, device)
+            docked_fp = docked_fp.to(device)
             target = target.to(device)
-            pred  = model(graph, docked_fp)
-
+            pred = model(graph, docked_fp)
             loss = criterion(pred.squeeze(), target.float())
 
             # Backward
@@ -170,8 +162,7 @@ def train_dock(model,
         print(">> test loss ", test_loss)
 
         writer.add_scalar("Test loss during training", test_loss, epoch)
-        
-        ne = epoch + 1
+
         """
         learning_curve_val_df = learning_curve_val_df.append({'EPOCH': str(ne), 
             'LOSS': str(train_loss), 
@@ -185,12 +176,14 @@ def train_dock(model,
         if test_loss < best_loss:
             best_loss = test_loss
             epochs_from_best = 0
+            model.cpu()
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': criterion
             }, save_path)
+            model.to(device)
 
         # Early stopping
         else:
@@ -206,9 +199,8 @@ def train_dock(model,
             if time_elapsed * (1 + 1 / (epoch + 1)) > .95 * wall_time * 3600:
                 break
         del test_loss
-
-    
     return best_loss
+
 
 if __name__ == "__main__":
     pass

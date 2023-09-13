@@ -1,19 +1,17 @@
-import argparse
-import os, sys
-import pickle
-import copy
+import os
+import sys
+import time
+
 import numpy as np
+from dgl.dataloading import GraphDataLoader
 
-import torch
-import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
-from omegaconf import DictConfig, OmegaConf
 import hydra
+from omegaconf import DictConfig, OmegaConf
+import torch
 
-from rnamigos_dock.learning.loader import DockingDataset 
-from rnamigos_dock.learning.loader import Loader
-from rnamigos_dock.learning.models import RNAEncoder, LigandEncoder, Decoder, Model
-from rnamigos_dock.learning.utils import mkdirs
+from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
+from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
+from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="evaluate")
@@ -26,43 +24,35 @@ def main(cfg: DictConfig):
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #device = torch.device('cpu')
-    # This is to create an appropriate number of workers, but works too with cpu
-    if cfg.train.parallel:
-        used_gpus_count = torch.cuda.device_count()
+    if cfg.train.target != 'native_fp':
+        test_systems = get_systems(target=cfg.train.target, split='TEST')
     else:
-        used_gpus_count = 1
-
-    dataset = DockingDataset(annotated_path=cfg.data.test_graphs,
-                             shuffle=False,
-                             nuc_types=cfg.tokens.nuc_types,
-                             edge_types=cfg.tokens.edge_types,
-                             target=cfg.train.target,
-                             debug=cfg.debug
-                             )
-
-    loader = Loader(dataset,
-                    batch_size=1, 
-                    num_workers=1,
-                    )
+        get_migos1_only = False
+        fp_split = f"split_test_{0}"
+        test_systems = get_systems(target=cfg.train.target, fp_split=fp_split, fp_split_train=False,
+                                   get_migos1_only=get_migos1_only)
+    dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
+                                   ligands_path=cfg.data.ligand_db,
+                                   systems=test_systems,
+                                   edge_types=cfg.tokens.edge_types,
+                                   decoy_mode='pdb',
+                                   fp_type='MACCS')
+    # Loader is asynchronous
+    loader_args = {'shuffle': False,
+                   'batch_size': 1,
+                   'num_workers': 4,
+                   'collate_fn': lambda x: x[0]
+                   }
+    dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
     print('Created data loader')
 
     '''
     Model loading
     '''
-
-    print("Loading data...")
-
-    train_loader, test_loader = loader.get_data()
-
-    print("Loaded data")
-
-    print("creating model")
-    rna_encoder = RNAEncoder(in_dim=cfg.model.encoder.in_dim,
-                             hidden_dim=cfg.model.encoder.hidden_dim,
-                             num_hidden_layers=cfg.model.encoder.num_layers,
-                             )
+    rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
+                           hidden_dim=cfg.model.encoder.hidden_dim,
+                           num_hidden_layers=cfg.model.encoder.num_layers)
 
     lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
                                 hidden_dim=cfg.model.lig_encoder.hidden_dim,
@@ -73,27 +63,28 @@ def main(cfg: DictConfig):
                       hidden_dim=cfg.model.decoder.hidden_dim,
                       num_layers=cfg.model.decoder.num_layers)
 
-    model = Model(encoder=rna_encoder,
-                  decoder=decoder,
-                  lig_encoder=lig_encoder,
-                  pool=cfg.model.pool,
-                  )
+    model = RNAmigosModel(encoder=rna_encoder,
+                          decoder=decoder,
+                          lig_encoder=lig_encoder if cfg.train.target in ['dock', 'is_native'] else None,
+                          pool=cfg.model.pool)
 
-    if cfg.model.use_pretrained:
-        model.from_pretrained(cfg.model.pretrained_path)
+    model.from_pretrained(cfg.model.pretrained_path)
 
     model = model.to(device)
-
-    # load model weights
 
     print(f'Using {model.__class__} as model')
 
     '''
     Experiment Setup
     '''
+    import time
+    t0 = time.perf_counter()
+    lower_is_better = cfg.train.target in ['dock', 'native_fp']
+    efs = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
+    print(efs)
+    print('Mean EF :', np.mean(efs))
+    print('Time :', time.perf_counter() - t0)
 
-    # compute EF
-    
-        
+
 if __name__ == "__main__":
     main()

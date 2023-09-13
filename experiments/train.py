@@ -1,19 +1,15 @@
-import argparse
-import os, sys
-import pickle
-import copy
-import numpy as np
+from dgl.dataloading import GraphDataLoader
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-from omegaconf import DictConfig, OmegaConf
-import hydra
 
-from rnamigos_dock.learning.loader import DockingDataset 
-from rnamigos_dock.learning import learn 
-from rnamigos_dock.learning.loader import Loader
-from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, Model
+from rnamigos_dock.learning.loader import DockingDataset, get_systems
+from rnamigos_dock.learning import learn
+from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.learning.utils import mkdirs
 
 
@@ -31,47 +27,52 @@ def main(cfg: DictConfig):
     '''
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #device = torch.device('cpu')
-    # This is to create an appropriate number of workers, but works too with cpu
-    if cfg.train.parallel:
-        used_gpus_count = torch.cuda.device_count()
+    if torch.cuda.is_available():
+        device = 'cuda'
+        # This is to create an appropriate number of workers, but works too with cpu
+        if cfg.train.parallel:
+            used_gpus_count = torch.cuda.device_count()
+        else:
+            used_gpus_count = 1
+        print(f'Using {used_gpus_count} GPUs')
     else:
-        used_gpus_count = 1
-
-    print(f'Using {used_gpus_count} GPUs')
+        device = 'cpu'
+        print("No GPU found, running on the CPU")
 
     '''
     Dataloader creation
     '''
 
-
-    dataset = DockingDataset(annotated_path=cfg.data.train_graphs,
-                             shuffle=cfg.train.shuffle,
-                             seed=cfg.train.seed,
-                             nuc_types=cfg.tokens.nuc_types,
-                             edge_types=cfg.tokens.edge_types,
-                             target=cfg.train.target,
-                             debug=cfg.debug
-                             )
-
-    loader = Loader(dataset,
-                    batch_size=cfg.train.batch_size, 
-                    num_workers=cfg.train.num_workers,
-                    )
+    if cfg.train.target != 'native_fp':
+        train_systems = get_systems(target=cfg.train.target, split='TRAIN')
+        test_systems = get_systems(target=cfg.train.target, split='TEST')
+    else:
+        get_migos1_only = False
+        fp_split = f"split_test_{0}"
+        train_systems = get_systems(target=cfg.train.target, fp_split=fp_split, get_migos1_only=get_migos1_only)
+        test_systems = get_systems(target=cfg.train.target, fp_split=fp_split, fp_split_train=False,
+                                   get_migos1_only=get_migos1_only)
+    dataset_args = {'pockets_path': cfg.data.pocket_graphs,
+                    'target': cfg.train.target,
+                    'shuffle': cfg.train.shuffle,
+                    'edge_types': cfg.tokens.edge_types,
+                    'seed': cfg.train.seed,
+                    'debug': cfg.debug}
+    loader_args = {'shuffle': True,
+                   'batch_size': cfg.train.batch_size,
+                   'num_workers': cfg.train.num_workers,
+                   # 'collate_fn': None
+                   }
+    train_dataset = DockingDataset(systems=train_systems, **dataset_args)
+    test_dataset = DockingDataset(systems=test_systems, **dataset_args)
+    train_loader = GraphDataLoader(dataset=train_dataset, **loader_args)
+    test_loader = GraphDataLoader(dataset=test_dataset, **loader_args)
 
     print('Created data loader')
 
     '''
     Model loading
     '''
-
-    print("Loading data...")
-
-    train_loader, test_loader = loader.get_data()
-
-    print("Loaded data")
-
 
     print("creating model")
     rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
@@ -88,12 +89,12 @@ def main(cfg: DictConfig):
                       hidden_dim=cfg.model.decoder.hidden_dim,
                       num_layers=cfg.model.decoder.num_layers)
 
-    model = Model(encoder=rna_encoder,
-                  decoder=decoder,
-                  lig_encoder=lig_encoder,
-                  pool=cfg.model.pool,
-                  pool_dim=cfg.model.encoder.hidden_dim
-                  )
+    model = RNAmigosModel(encoder=rna_encoder,
+                          decoder=decoder,
+                          lig_encoder=lig_encoder if cfg.train.target in ['dock', 'is_native'] else None,
+                          pool=cfg.model.pool,
+                          pool_dim=cfg.model.encoder.hidden_dim
+                          )
 
     if cfg.model.use_pretrained:
         model.from_pretrained(cfg.model.pretrained_path)
@@ -106,29 +107,25 @@ def main(cfg: DictConfig):
     Optimizer instanciation
     '''
 
-    # criterion = torch.nn.BCELoss()
-    criterion = torch.nn.L1Loss()
+    if cfg.train.loss == 'l2':
+        criterion = torch.nn.MSELoss()
+    if cfg.train.loss == 'l1':
+        criterion = torch.nn.L1Loss()
+    if cfg.train.loss == 'bce':
+        criterion = torch.nn.BCELoss()
+
     optimizer = optim.Adam(model.parameters())
 
     '''
     Experiment Setup
     '''
-    
+
     name = f"{cfg.name}"
     print(name)
-    result_folder, save_path = mkdirs(name)
+    result_folder, save_path = mkdirs(name, prefix=cfg.train.target)
     print(save_path)
     writer = SummaryWriter(result_folder)
     print(f'Saving result in {result_folder}/{name}')
-
-
-    
-    all_graphs = np.array(test_loader.dataset.dataset.all_graphs)
-    test_inds = test_loader.dataset.indices
-    train_inds = train_loader.dataset.indices
-
-    # pickle.dump(({'test': all_graphs[test_inds], 'train': all_graphs[train_inds]}),
-    #                open(os.path.join(result_folder, f'splits_{k}.p'), 'wb'))
 
     '''
     Run
@@ -139,13 +136,14 @@ def main(cfg: DictConfig):
     learn.train_dock(model=model,
                      criterion=criterion,
                      optimizer=optimizer,
-                     device=cfg.device,
+                     device=device,
                      train_loader=train_loader,
                      test_loader=test_loader,
                      save_path=save_path,
                      writer=writer,
                      num_epochs=num_epochs,
                      early_stop_threshold=cfg.train.early_stop)
-        
+
+
 if __name__ == "__main__":
     main()

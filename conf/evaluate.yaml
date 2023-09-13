@@ -1,1 +1,6 @@
+defaults:
+  - data: default 
+  - tokens: default
+  - model: default
+  - train: default
 decoys: pdb

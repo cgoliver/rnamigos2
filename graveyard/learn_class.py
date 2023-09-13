@@ -94,7 +94,7 @@ def test(model, test_loader, device, fp_lam=1, rec_lam=1):
     """
     model.eval()
     test_loss,  motif_loss_tot, recons_loss_tot = (0,) * 3
-    all_graphs = test_loader.dataset.dataset.all_graphs
+    all_graphs = test_loader.dataset.dataset.all_interactions
     test_size = len(test_loader)
     for batch_idx, (graph, K, fp, label_native_lig, sample_type, idx) in enumerate(test_loader):
         # Get data on the devices
@@ -148,7 +148,7 @@ def train_model(model, criterion, optimizer, device, train_loader, test_loader, 
     """
 
     edge_map = train_loader.dataset.dataset.edge_map
-    all_graphs = train_loader.dataset.dataset.all_graphs
+    all_graphs = train_loader.dataset.dataset.all_interactions
 
     epochs_from_best = 0
 
