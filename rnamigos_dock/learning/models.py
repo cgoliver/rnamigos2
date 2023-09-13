@@ -203,8 +203,8 @@ class RNAmigosModel(nn.Module):
                 return pred
             # Do FP prediction and use cdist
             ligand_pred = self.decoder(graph_pred)
-            scores = - torch.cdist(ligand_pred, ligands.float())
-            return scores
+            distances = torch.cdist(ligand_pred, ligands.float())
+            return distances
 
     def forward(self, g, lig_fp):
         embeddings = self.encoder(g)

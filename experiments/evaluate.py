@@ -74,7 +74,8 @@ def main(cfg: DictConfig):
     '''
     import time
     t0 = time.perf_counter()
-    efs = run_virtual_screen(model, dataloader, metric=mean_active_rank)
+    lower_is_better = cfg.train.target in ['dock', 'native_fp']
+    efs = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
     print(efs)
     print('Mean EF :', np.mean(efs))
     print('Time :', time.perf_counter() - t0)
