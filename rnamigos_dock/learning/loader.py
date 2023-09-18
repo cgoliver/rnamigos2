@@ -8,6 +8,7 @@ import pickle
 from rdkit import Chem, RDLogger
 from rdkit.Chem import MACCSkeys
 from rdkit.Chem import AllChem
+from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
 import torch
 from torch.utils.data import Dataset
 
@@ -25,6 +26,8 @@ def mol_encode_one(smiles, fp_type):
         mol = Chem.MolFromSmiles(smiles)
         if fp_type == 'MACCS':
             # for some reason RDKit maccs is 167 bits
+            # see: https://github.com/rdkit/rdkit/blob/master/rdkit/Chem/MACCSkeys.py
+            # seems like the 0 position is never used
             fp = list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:]
         else:
             fp = list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString()))
@@ -142,7 +145,6 @@ class DockingDataset(Dataset):
     def __init__(self,
                  pockets_path,
                  systems,
-                 edge_types=None,
                  target='dock',
                  fp_type='MACCS',
                  shuffle=False,
@@ -166,9 +168,8 @@ class DockingDataset(Dataset):
         self.pockets_path = pockets_path
         self.target = target
 
-        self.edge_map = {e: i for i, e in enumerate(sorted(edge_types))}
-        self.num_edge_types = len(self.edge_map)
-        self.undirected = False
+        self.undirected = undirected
+        self.num_edge_types = len(EDGE_MAP_RGLIB)
 
         self.fp_type = fp_type
         self.ligand_encoder = MolEncoder(fp_type=fp_type)
@@ -177,9 +178,7 @@ class DockingDataset(Dataset):
         if cache_graphs:
             all_pockets = set(self.systems['PDB_ID_POCKET'].unique())
             self.all_pockets = {pocket_id: load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
-                                                          edge_map=self.edge_map,
                                                           undirected=self.undirected) for pocket_id in all_pockets}
-
         if seed:
             print(f">>> shuffling with random seed {seed}")
             np.random.seed(seed)
@@ -200,7 +199,7 @@ class DockingDataset(Dataset):
             pocket_graph = self.all_pockets[pocket_id]
         else:
             pocket_graph = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
-                                          edge_map=self.edge_map, undirected=self.undirected)
+                                          undirected=self.undirected)
         ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
         target = ligand_fp if self.target == 'native_fp' else row[2]
         # print("1 : ", time.perf_counter() - t0)
@@ -234,8 +233,8 @@ class VirtualScreenDataset(DockingDataset):
             if self.cache_graphs:
                 pocket_graph = self.all_pockets[pocket_id]
             else:
-                pocket_graph = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
-                                              edge_map=self.edge_map)
+                pocket_graph = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"))
+
             actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'actives.txt'))
             decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'decoys.txt'))
 
