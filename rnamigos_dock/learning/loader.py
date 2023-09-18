@@ -1,14 +1,10 @@
 import os
 import sys
 
-import dgl
-import networkx as nx
 import numpy as np
 from pathlib import Path
 import pandas as pd
 import pickle
-from rnaglib.utils import graph_io
-from rnaglib.utils import NODE_FEATURE_MAP
 from rdkit import Chem, RDLogger
 from rdkit.Chem import MACCSkeys
 from rdkit.Chem import AllChem
@@ -18,6 +14,8 @@ from torch.utils.data import Dataset
 RDLogger.DisableLog('rdApp.*')  # disable warnings
 
 script_dir = os.path.dirname(__file__)
+
+from tools.graph_utils import load_rna_graph
 
 
 def mol_encode_one(smiles, fp_type):
@@ -139,20 +137,6 @@ def get_systems(target='dock', rnamigos1_split=None, return_test=False,
     return systems
 
 
-def load_rna_graph(rna_path, edge_map):
-    pocket_graph = graph_io.load_json(rna_path)
-    one_hot = {edge: torch.tensor(edge_map[label.upper()]) for edge, label in
-               (nx.get_edge_attributes(pocket_graph, 'LW')).items()}
-    nx.set_edge_attributes(pocket_graph, name='edge_type', values=one_hot)
-    one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
-                    (nx.get_node_attributes(pocket_graph, 'nt_code')).items()}
-    nx.set_node_attributes(pocket_graph, name='nt_features', values=one_hot_nucs)
-    pocket_graph_dgl = dgl.from_networkx(nx_graph=pocket_graph,
-                                         edge_attrs=['edge_type'],
-                                         node_attrs=['nt_features'])
-    return pocket_graph_dgl
-
-
 class DockingDataset(Dataset):
 
     def __init__(self,
@@ -164,7 +148,8 @@ class DockingDataset(Dataset):
                  shuffle=False,
                  seed=0,
                  debug=False,
-                 cache_graphs=True
+                 cache_graphs=True,
+                 undirected=False
                  ):
         """
             Setup for data loader.
@@ -183,6 +168,7 @@ class DockingDataset(Dataset):
 
         self.edge_map = {e: i for i, e in enumerate(sorted(edge_types))}
         self.num_edge_types = len(self.edge_map)
+        self.undirected = False
 
         self.fp_type = fp_type
         self.ligand_encoder = MolEncoder(fp_type=fp_type)
@@ -191,7 +177,8 @@ class DockingDataset(Dataset):
         if cache_graphs:
             all_pockets = set(self.systems['PDB_ID_POCKET'].unique())
             self.all_pockets = {pocket_id: load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
-                                                          edge_map=self.edge_map) for pocket_id in all_pockets}
+                                                          edge_map=self.edge_map,
+                                                          undirected=self.undirected) for pocket_id in all_pockets}
 
         if seed:
             print(f">>> shuffling with random seed {seed}")
@@ -213,7 +200,7 @@ class DockingDataset(Dataset):
             pocket_graph = self.all_pockets[pocket_id]
         else:
             pocket_graph = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
-                                          edge_map=self.edge_map)
+                                          edge_map=self.edge_map, undirected=self.undirected)
         ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
         target = ligand_fp if self.target == 'native_fp' else row[2]
         # print("1 : ", time.perf_counter() - t0)

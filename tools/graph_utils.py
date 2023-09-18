@@ -1,10 +1,14 @@
-import pickle
-import os
-import itertools
-from tqdm import tqdm
-import networkx as nx
-import torch
 import dgl
+import itertools
+import networkx as nx
+import numpy as np
+import os
+import pickle
+from tqdm import tqdm
+import torch
+
+from rnaglib.utils import graph_io
+from rnaglib.utils import NODE_FEATURE_MAP
 
 
 def get_edge_map(graphs_dir):
@@ -18,29 +22,6 @@ def get_edge_map(graphs_dir):
     return {label: i for i, label in enumerate(sorted(edge_labels))}
 
 
-def nx_to_dgl_jacques(graph, edge_map):
-    """
-        Returns one training item at index `idx`.
-    """
-    #adding the self edges
-    # graph.add_edges_from([(n, n, {'label': 'X'}) for n in graph.nodes()])
-    graph = nx.to_undirected(graph)
-    one_hot = {edge: torch.tensor(edge_map[label]) for edge, label in
-               (nx.get_edge_attributes(graph, 'label')).items()}
-    nx.set_edge_attributes(graph, name='one_hot', values=one_hot)
-
-    g_dgl = dgl.DGLGraph()
-    # g_dgl.from_networkx(nx_graph=graph, edge_attrs=['one_hot'], node_attrs=['one_hot'])
-    g_dgl.from_networkx(nx_graph=graph, edge_attrs=['one_hot'], node_attrs=['angles', 'identity'])
-
-    #JACQUES
-    # Init node embeddings with nodes features
-    floatid = g_dgl.ndata['identity'].float()
-    g_dgl.ndata['h'] = torch.cat([g_dgl.ndata['angles'], floatid], dim = 1)
-
-    print("HII")
-    return graph, g_dgl
-
 def nx_to_dgl_(graph, edge_map, embed_dim):
     """
         Networkx graph to DGL.
@@ -51,12 +32,10 @@ def nx_to_dgl_(graph, edge_map, embed_dim):
     graph, _, ring = pickle.load(open(graph, 'rb'))
     one_hot = {edge: edge_map[label] for edge, label in (nx.get_edge_attributes(graph, 'label')).items()}
     nx.set_edge_attributes(graph, name='one_hot', values=one_hot)
-    one_hot = {edge: torch.tensor(edge_map[label]) for edge, label in (nx.get_edge_attributes(graph, 'label')).items()}
     g_dgl = dgl.DGLGraph()
     g_dgl.from_networkx(nx_graph=graph, edge_attrs=['one_hot'])
     n_nodes = len(g_dgl.nodes())
     g_dgl.ndata['h'] = torch.ones((n_nodes, embed_dim))
-
     return graph, g_dgl
 
 
@@ -65,6 +44,41 @@ def dgl_to_nx(graph, edge_map):
     edge_map_r = {v: k for k, v in edge_map.items()}
     nx.set_edge_attributes(g, {(n1, n2): edge_map_r[d['one_hot'].item()] for n1, n2, d in g.edges(data=True)}, 'label')
     return g
+
+
+# Adapted from rglib
+def to_undirected(edge_map, graph=None):
+    """
+    Make edge labels symmetric for a graph.
+    :param graph: Nx graph
+    :return: Same graph but edges are now symmetric and calling undirected is straightforward.
+    """
+    remap = {}
+    for old_label in edge_map.keys():
+        new_label = old_label[0] + "".join(sorted(old_label[1:]))
+        remap[old_label] = new_label
+    new_map = {label: i for i, label in enumerate(sorted(set(remap.values())))}
+    undirected_edge_map = {old_label: new_map[remap[old_label]] for old_label in edge_map.keys()}
+    if graph is not None:
+        graph = graph.to_undirected()
+        return graph, undirected_edge_map
+    return undirected_edge_map
+
+
+def load_rna_graph(rna_path, edge_map, undirected=True):
+    pocket_graph = graph_io.load_json(rna_path)
+    if undirected:
+        pocket_graph, edge_map = to_undirected(pocket_graph, edge_map)
+    one_hot = {edge: torch.tensor(edge_map[label.upper()]) for edge, label in
+               (nx.get_edge_attributes(pocket_graph, 'LW')).items()}
+    nx.set_edge_attributes(pocket_graph, name='edge_type', values=one_hot)
+    one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
+                    (nx.get_node_attributes(pocket_graph, 'nt_code')).items()}
+    nx.set_node_attributes(pocket_graph, name='nt_features', values=one_hot_nucs)
+    pocket_graph_dgl = dgl.from_networkx(nx_graph=pocket_graph,
+                                         edge_attrs=['edge_type'],
+                                         node_attrs=['nt_features'])
+    return pocket_graph_dgl
 
 
 def bfs_expand(G, initial_nodes, depth=2):
@@ -119,7 +133,7 @@ def graph_ablations(G, mode):
     if mode == 'label-shuffle':
         # assign a random label from the same graph to each edge.
         labels = [d['label'] for _, _, d in G.edges(data=True)]
-        shuffle(labels)
+        np.shuffle(labels)
         for n1, n2, d in G.edges(data=True):
             H.add_edge(n1, n2, label=labels.pop())
         return H

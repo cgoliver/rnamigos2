@@ -60,7 +60,8 @@ def main(cfg: DictConfig):
                     'shuffle': cfg.train.shuffle,
                     'edge_types': cfg.tokens.edge_types,
                     'seed': cfg.train.seed,
-                    'debug': cfg.debug}
+                    'debug': cfg.debug,
+                    'undirected' : cfg.data.undirected}
     loader_args = {'shuffle': True,
                    'batch_size': cfg.train.batch_size,
                    'num_workers': cfg.train.num_workers,
