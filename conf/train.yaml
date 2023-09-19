@@ -6,6 +6,6 @@ defaults:
   - data: default
   - model: default
 
-debug: true
+debug: False
 name: 'default'
 device: 'cpu'

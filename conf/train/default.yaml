@@ -9,6 +9,9 @@ num_epochs: 10
 embed_only: false
 early_stop: 10
 use_nucs: true
-target: dock
+target: dock # dock or native_fp or is_native
 shuffle: true
 loss: 'l2'
+use_rnamigos1_train: False
+use_rnamigos1_ligands: False
+rnamigos1_split: 0

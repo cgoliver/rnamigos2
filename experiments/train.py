@@ -43,17 +43,14 @@ def main(cfg: DictConfig):
     Dataloader creation
     '''
 
-    use_rnamigos1_train = False
-    use_rnamigos1_ligands = False
-    rnamigos1_split = 0
     train_systems = get_systems(target=cfg.train.target,
-                                rnamigos1_split=rnamigos1_split,
-                                use_rnamigos1_train=use_rnamigos1_train,
-                                use_rnamigos1_ligands=use_rnamigos1_ligands)
+                                rnamigos1_split=cfg.train.rnamigos1_split,
+                                use_rnamigos1_train=cfg.train.use_rnamigos1_train,
+                                use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands)
     test_systems = get_systems(target=cfg.train.target,
-                               rnamigos1_split=rnamigos1_split,
-                               use_rnamigos1_train=use_rnamigos1_train,
-                               use_rnamigos1_ligands=use_rnamigos1_ligands,
+                               rnamigos1_split=cfg.train.rnamigos1_split,
+                               use_rnamigos1_train=cfg.train.use_rnamigos1_train,
+                               use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
                                return_test=True)
     dataset_args = {'pockets_path': cfg.data.pocket_graphs,
                     'target': cfg.train.target,
