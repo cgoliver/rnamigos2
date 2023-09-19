@@ -60,7 +60,7 @@ def main(cfg: DictConfig):
     model_dir = Path(cfg.paths.pretrain_save, cfg.name)
     model_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), Path(model_dir, 'model.pth'))
-    OmegaConf.save(cfg, "config.yaml")
+    OmegaConf.save(cfg, Path(model_dir, "config.yaml"))
 
 
 if __name__ == "__main__":
