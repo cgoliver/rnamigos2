@@ -130,6 +130,7 @@ def main(cfg: DictConfig):
     print(save_path)
     writer = SummaryWriter(result_folder)
     print(f'Saving result in {result_folder}/{name}')
+    OmegaConf.save(cfg, Path(result_folder, "config.yaml"))
 
     '''
     Run
@@ -147,6 +148,7 @@ def main(cfg: DictConfig):
                      writer=writer,
                      num_epochs=num_epochs,
                      early_stop_threshold=cfg.train.early_stop)
+    
 
 
 if __name__ == "__main__":
