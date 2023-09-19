@@ -20,28 +20,6 @@ systems = systems.rename({'TYPE': 'SPLIT'}, axis='columns')
 # Get PDB, SMILES for fp predictions
 natives = systems.loc[systems['IS_NATIVE'] == 'YES']
 systems_fp = natives[['PDB_ID_POCKET', 'LIGAND_SMILES', 'SPLIT']]
-
-# PARSE RNAMIGOS_1 systems to get consistent splits
-systems_migos_1 = pd.read_csv(interactions_csv_migos1)
-old_splits = {}
-for i, row in systems_migos_1.iterrows():
-    row_id = f"{row['pdbid'].upper()}_{row['chain']}_{row['ligand_id']}_{row['ligand_resnum']}"
-    row_splits = row.values[-10:]
-    old_splits[row_id] = row_splits
-
-migos_1_splits = []
-for i, row in systems_fp.iterrows():
-    pocket_id = row['PDB_ID_POCKET']
-    if pocket_id in old_splits:
-        migos_1_splits.append([1] + list(old_splits[pocket_id]))
-    else:
-        migos_1_splits.append(np.zeros((11,)))
-migos_1_splits = np.asarray(migos_1_splits)
-columns = ['IN_MIGOS_1'] + [f'split_test_{i}' for i in range(10)]
-new_block = pd.DataFrame(migos_1_splits,
-                         index=systems_fp.index,
-                         columns=columns)
-systems_fp = pd.concat([systems_fp, new_block], axis=1)
 systems_fp.to_csv(interactions_csv_fp)
 
 # Get PDB, SMILES, SCORE

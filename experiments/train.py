@@ -1,19 +1,14 @@
-import argparse
-import os, sys
-import pickle
-import copy
-import numpy as np
 from dgl.dataloading import GraphDataLoader
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-from omegaconf import DictConfig, OmegaConf
-import hydra
 
-from rnamigos_dock.learning.loader import DockingDataset, DockingDatasetVincent, get_systems
+from rnamigos_dock.learning.loader import DockingDataset, get_systems
 from rnamigos_dock.learning import learn
-from rnamigos_dock.learning.loader import Loader
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.learning.utils import mkdirs
 
@@ -32,35 +27,48 @@ def main(cfg: DictConfig):
     '''
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # device = torch.device('cpu')
-    # This is to create an appropriate number of workers, but works too with cpu
-    if cfg.train.parallel:
-        used_gpus_count = torch.cuda.device_count()
+    if torch.cuda.is_available():
+        device = 'cuda'
+        # This is to create an appropriate number of workers, but works too with cpu
+        if cfg.train.parallel:
+            used_gpus_count = torch.cuda.device_count()
+        else:
+            used_gpus_count = 1
+        print(f'Using {used_gpus_count} GPUs')
     else:
-        used_gpus_count = 1
-
-    print(f'Using {used_gpus_count} GPUs')
+        device = 'cpu'
+        print("No GPU found, running on the CPU")
 
     '''
     Dataloader creation
     '''
 
-    train_systems = get_systems(target=cfg.train.target, split='TRAIN')
-    test_systems = get_systems(target=cfg.train.target, split='TEST')
+    use_rnamigos1_train = False
+    use_rnamigos1_ligands = False
+    rnamigos1_split = 0
+    train_systems = get_systems(target=cfg.train.target,
+                                rnamigos1_split=rnamigos1_split,
+                                use_rnamigos1_train=use_rnamigos1_train,
+                                use_rnamigos1_ligands=use_rnamigos1_ligands)
+    test_systems = get_systems(target=cfg.train.target,
+                               rnamigos1_split=rnamigos1_split,
+                               use_rnamigos1_train=use_rnamigos1_train,
+                               use_rnamigos1_ligands=use_rnamigos1_ligands,
+                               return_test=True)
     dataset_args = {'pockets_path': cfg.data.pocket_graphs,
                     'target': cfg.train.target,
                     'shuffle': cfg.train.shuffle,
                     'edge_types': cfg.tokens.edge_types,
                     'seed': cfg.train.seed,
-                    'debug': cfg.debug}
+                    'debug': cfg.debug,
+                    'undirected' : cfg.data.undirected}
     loader_args = {'shuffle': True,
                    'batch_size': cfg.train.batch_size,
                    'num_workers': cfg.train.num_workers,
                    # 'collate_fn': None
                    }
-    train_dataset = DockingDatasetVincent(systems=train_systems, **dataset_args)
-    test_dataset = DockingDatasetVincent(systems=test_systems, **dataset_args)
+    train_dataset = DockingDataset(systems=train_systems, **dataset_args)
+    test_dataset = DockingDataset(systems=test_systems, **dataset_args)
     train_loader = GraphDataLoader(dataset=train_dataset, **loader_args)
     test_loader = GraphDataLoader(dataset=test_dataset, **loader_args)
 
@@ -132,7 +140,7 @@ def main(cfg: DictConfig):
     learn.train_dock(model=model,
                      criterion=criterion,
                      optimizer=optimizer,
-                     device=cfg.device,
+                     device=device,
                      train_loader=train_loader,
                      test_loader=test_loader,
                      save_path=save_path,

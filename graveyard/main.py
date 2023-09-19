@@ -111,7 +111,7 @@ def main(cfg: DictConfig):
 
 
         
-        all_graphs = np.array(test_loader.dataset.dataset.all_graphs)
+        all_graphs = np.array(test_loader.dataset.dataset.all_interactions)
         test_inds = test_loader.dataset.indices
         train_inds = train_loader.dataset.indices
 

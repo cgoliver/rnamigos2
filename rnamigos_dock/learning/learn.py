@@ -30,7 +30,6 @@ def send_graph_to_device(g, device):
     labels = g.edge_attr_schemes()
     for i, l in enumerate(labels.keys()):
         g.edata[l] = g.edata.pop(l).to(device, non_blocking=True)
-
     return g
 
 
@@ -56,10 +55,10 @@ def test(model, test_loader, criterion, device):
     """
     model.eval()
     test_loss = 0
-    all_graphs = test_loader.dataset.dataset.all_graphs
     test_size = len(test_loader)
     for batch_idx, (graph, docked_fp, target, idx) in enumerate(test_loader):
         # Get data on the devices
+        docked_fp = docked_fp.to(device)
         target = target.to(device)
         graph = send_graph_to_device(graph, device)
 
@@ -121,9 +120,9 @@ def train_dock(model,
             # Get data on the devices
             # convert ints to one hots
             graph = send_graph_to_device(graph, device)
+            docked_fp = docked_fp.to(device)
             target = target.to(device)
             pred = model(graph, docked_fp)
-
             loss = criterion(pred.squeeze(), target.float())
 
             # Backward
@@ -164,7 +163,6 @@ def train_dock(model,
 
         writer.add_scalar("Test loss during training", test_loss, epoch)
 
-        ne = epoch + 1
         """
         learning_curve_val_df = learning_curve_val_df.append({'EPOCH': str(ne), 
             'LOSS': str(train_loss), 
@@ -178,12 +176,14 @@ def train_dock(model,
         if test_loss < best_loss:
             best_loss = test_loss
             epochs_from_best = 0
+            model.cpu()
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': criterion
             }, save_path)
+            model.to(device)
 
         # Early stopping
         else:

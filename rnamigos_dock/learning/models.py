@@ -189,14 +189,33 @@ class RNAmigosModel(nn.Module):
         self.decoder = decoder
         self.lig_encoder = lig_encoder
 
+    def predict_ligands(self, g, ligands):
+        with torch.no_grad():
+            embeddings = self.encoder(g)
+            graph_pred = self.pool(g, embeddings)
+
+            # Batch ligands together, encode them
+            if not self.lig_encoder is None:
+                lig_h = self.lig_encoder(ligands)
+                graph_pred = graph_pred.expand(len(lig_h), -1)
+                pred = torch.cat((graph_pred, lig_h), dim=1)
+                pred = self.decoder(pred)
+                return pred
+            # Do FP prediction and use cdist
+            ligand_pred = self.decoder(graph_pred)
+            distances = torch.cdist(ligand_pred, ligands.float())
+            return distances
+
     def forward(self, g, lig_fp):
         embeddings = self.encoder(g)
-        g_h = self.pool(g, embeddings)
+        pred = self.pool(g, embeddings)
         if not self.lig_encoder is None:
             lig_h = self.lig_encoder(lig_fp)
-            pred = torch.cat((g_h, lig_h), dim=1)
+            pred = torch.cat((pred, lig_h), dim=1)
         pred = self.decoder(pred)
         return pred
 
     def from_pretrained(self, model_path):
-        self.encoder.load_state_dict(torch.load(model_path))
+        state_dict = torch.load(model_path)
+        # state_dict = torch.load(model_path, map_location=torch.device('cpu'))
+        self.load_state_dict(state_dict['model_state_dict'])
