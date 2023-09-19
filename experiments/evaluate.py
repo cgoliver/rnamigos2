@@ -36,7 +36,6 @@ def main(cfg: DictConfig):
     dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
                                    ligands_path=cfg.data.ligand_db,
                                    systems=test_systems,
-                                   edge_types=cfg.tokens.edge_types,
                                    decoy_mode='pdb',
                                    fp_type='MACCS')
     # Loader is asynchronous

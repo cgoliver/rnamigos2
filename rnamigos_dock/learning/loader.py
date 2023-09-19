@@ -10,13 +10,13 @@ from rdkit.Chem import MACCSkeys
 from rdkit.Chem import AllChem
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Sampler
 
 RDLogger.DisableLog('rdApp.*')  # disable warnings
 
 script_dir = os.path.dirname(__file__)
 
-from tools.graph_utils import load_rna_graph
+from rnamigos_dock.tools.graph_utils import load_rna_graph
 
 
 def mol_encode_one(smiles, fp_type):
@@ -206,6 +206,26 @@ class DockingDataset(Dataset):
         return pocket_graph, ligand_fp, target, [idx]
 
 
+class NativeSampler(Sampler):
+    def __init__(self, systems_dataframe):
+        super().__init__()
+        positive = (systems_dataframe['IS_NATIVE'] == 1).values
+        self.positive_rows = np.where(positive)[0]
+        self.negative_rows = np.where(1 - positive)[0]
+        self.num_pos = len(self.positive_rows)
+
+    def __iter__(self):
+        selected_neg_rows = np.random.choice(self.negative_rows,
+                                             self.num_pos,
+                                             replace=False)
+        systems = np.concatenate((selected_neg_rows, self.positive_rows))
+        np.random.shuffle(systems)
+        yield from systems
+
+    def __len__(self) -> int:
+        return self.num_pos * 2
+
+
 class VirtualScreenDataset(DockingDataset):
     def __init__(self,
                  pockets_path,
@@ -213,9 +233,8 @@ class VirtualScreenDataset(DockingDataset):
                  systems,
                  decoy_mode='pdb',
                  fp_type='MACCS',
-                 edge_types=None,
                  ):
-        super().__init__(pockets_path, systems=systems, edge_types=edge_types, fp_type=fp_type, shuffle=False)
+        super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False)
         self.ligands_path = ligands_path
         self.decoy_mode = decoy_mode
         self.all_pockets_id = list(self.systems['PDB_ID_POCKET'].unique())
@@ -250,7 +269,7 @@ class VirtualScreenDataset(DockingDataset):
 
 if __name__ == '__main__':
     pockets_path = '../../data/json_pockets'
-    test_systems = get_systems(target='dock', split='TEST')
+    test_systems = get_systems(target='dock', return_test=True)
     dataset = DockingDataset(pockets_path=pockets_path,
                              systems=test_systems,
                              target='dock')
