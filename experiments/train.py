@@ -7,7 +7,7 @@ import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-from rnamigos_dock.learning.loader import DockingDataset, get_systems
+from rnamigos_dock.learning.loader import DockingDataset, get_systems, NativeSampler
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.learning.utils import mkdirs
@@ -58,19 +58,20 @@ def main(cfg: DictConfig):
     dataset_args = {'pockets_path': cfg.data.pocket_graphs,
                     'target': cfg.train.target,
                     'shuffle': cfg.train.shuffle,
-                    'edge_types': cfg.tokens.edge_types,
                     'seed': cfg.train.seed,
                     'debug': cfg.debug,
-                    'undirected' : cfg.data.undirected}
-    loader_args = {'shuffle': True,
-                   'batch_size': cfg.train.batch_size,
-                   'num_workers': cfg.train.num_workers,
-                   # 'collate_fn': None
-                   }
+                    'undirected': cfg.data.undirected}
     train_dataset = DockingDataset(systems=train_systems, **dataset_args)
     test_dataset = DockingDataset(systems=test_systems, **dataset_args)
-    train_loader = GraphDataLoader(dataset=train_dataset, **loader_args)
-    test_loader = GraphDataLoader(dataset=test_dataset, **loader_args)
+
+    train_sampler = NativeSampler(train_systems) if cfg.train.target == 'is_native' else None
+    test_sampler = NativeSampler(test_systems) if cfg.train.target == 'is_native' else None
+    loader_args = {'shuffle': train_sampler is None,
+                   'batch_size': cfg.train.batch_size,
+                   'num_workers': cfg.train.num_workers,
+                   }
+    train_loader = GraphDataLoader(dataset=train_dataset, sampler=train_sampler, **loader_args)
+    test_loader = GraphDataLoader(dataset=test_dataset, sampler=test_sampler, **loader_args)
 
     print('Created data loader')
 

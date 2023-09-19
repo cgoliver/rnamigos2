@@ -11,7 +11,7 @@ from rnaglib.representations import GraphRepresentation, RingRepresentation
 from rnaglib.learning import models, learning_utils, learn
 
 from rnamigos_dock.learning.models import Embedder
-from rnamigos_dock.tools import to_undirected
+from rnamigos_dock.tools.graph_utils import to_undirected
 
 
 class PossiblyUndirectedGraphRepresentation(GraphRepresentation):

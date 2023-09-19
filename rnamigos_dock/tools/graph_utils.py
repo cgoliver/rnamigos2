@@ -9,6 +9,7 @@ import torch
 
 from rnaglib.utils import graph_io
 from rnaglib.utils import NODE_FEATURE_MAP
+from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
 
 
 def get_edge_map(graphs_dir):
@@ -65,10 +66,11 @@ def to_undirected(edge_map, graph=None):
     return undirected_edge_map
 
 
-def load_rna_graph(rna_path, edge_map, undirected=True):
+def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True):
     pocket_graph = graph_io.load_json(rna_path)
     if undirected:
         pocket_graph, edge_map = to_undirected(pocket_graph, edge_map)
+    edge_map = {key.upper(): value for key, value in edge_map.items()}
     one_hot = {edge: torch.tensor(edge_map[label.upper()]) for edge, label in
                (nx.get_edge_attributes(pocket_graph, 'LW')).items()}
     nx.set_edge_attributes(pocket_graph, name='edge_type', values=one_hot)
