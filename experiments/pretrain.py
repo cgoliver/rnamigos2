@@ -25,7 +25,7 @@ class PossiblyUndirectedGraphRepresentation(GraphRepresentation):
         # Get Edge Labels
         if self.undirected:
             graph = graph.to_undirected()
-        super().to_nx(graph, features_dict)
+        return super().to_nx(graph, features_dict)
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="pretrain")
