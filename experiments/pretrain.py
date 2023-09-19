@@ -39,7 +39,8 @@ def main(cfg: DictConfig):
                                 optimizer=optimizer,
                                 train_loader=train_loader,
                                 learning_routine=learning_utils.LearningRoutine(num_epochs=cfg.epochs),
-                                rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": cfg.depth})
+                                rec_params={"similarity": True, "normalize": False, "use_graph": True, "hops": cfg.depth},
+                                device=cfg.device)
 
     model_dir = Path(cfg.paths.pretrain_save, cfg.name)
     model_dir.mkdir(parents=True, exist_ok=True)
