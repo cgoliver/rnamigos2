@@ -48,11 +48,11 @@ def dgl_to_nx(graph, edge_map):
 
 
 # Adapted from rglib
-def to_undirected(edge_map, graph=None):
+def to_undirected(edge_map):
     """
     Make edge labels symmetric for a graph.
     :param graph: Nx graph
-    :return: Same graph but edges are now symmetric and calling undirected is straightforward.
+    :return: Same graph but edges are now symmetric
     """
     remap = {}
     for old_label in edge_map.keys():
@@ -60,17 +60,13 @@ def to_undirected(edge_map, graph=None):
         remap[old_label] = new_label
     new_map = {label: i for i, label in enumerate(sorted(set(remap.values())))}
     undirected_edge_map = {old_label: new_map[remap[old_label]] for old_label in edge_map.keys()}
-    if graph is not None:
-        graph = graph.to_undirected()
-        graph = graph.to_directed()
-        return graph, undirected_edge_map
     return undirected_edge_map
 
 
 def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True):
     pocket_graph = graph_io.load_json(rna_path)
-    if undirected:
-        pocket_graph, edge_map = to_undirected(edge_map, graph=pocket_graph)
+    # possibly undirected, just update the edge map to keep a DiGraph
+    edge_map = to_undirected(edge_map) if undirected else edge_map
     edge_map = {key.upper(): value for key, value in edge_map.items()}
     one_hot = {edge: torch.tensor(edge_map[label.upper()]) for edge, label in
                (nx.get_edge_attributes(pocket_graph, 'LW')).items()}

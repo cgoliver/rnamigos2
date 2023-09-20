@@ -9,23 +9,10 @@ from rnaglib.kernels import node_sim
 from rnaglib.data_loading import rna_dataset, rna_loader
 from rnaglib.representations import GraphRepresentation, RingRepresentation
 from rnaglib.learning import models, learning_utils, learn
+from rnaglib.config.graph_keys import GRAPH_KEYS, TOOL
 
 from rnamigos_dock.learning.models import Embedder
 from rnamigos_dock.tools.graph_utils import to_undirected
-
-
-class PossiblyUndirectedGraphRepresentation(GraphRepresentation):
-    def __init__(self, undirected=False, **kwargs):
-        super().__init__(**kwargs)
-        self.undirected = undirected
-        if undirected:
-            self.edge_map = to_undirected(self.edge_map)
-
-    def to_nx(self, graph, features_dict):
-        # Get Edge Labels
-        if self.undirected:
-            graph = graph.to_undirected()
-        return super().to_nx(graph, features_dict)
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="pretrain")
@@ -38,7 +25,9 @@ def main(cfg: DictConfig):
     # Choose the data and kernel to use for pretraining
     print('Starting to pretrain the network')
     node_simfunc = node_sim.SimFunctionNode(method=cfg.simfunc, depth=cfg.depth)
-    graph_representation = PossiblyUndirectedGraphRepresentation(framework='dgl', undirected=cfg.data.undirected)
+    edge_map = GRAPH_KEYS['edge_map'][TOOL]
+    edge_map = to_undirected(edge_map) if cfg.data.undirected else edge_map
+    graph_representation = GraphRepresentation(framework='dgl',edge_map=edge_map)
     ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
     unsupervised_dataset = rna_dataset.RNADataset(nt_features=node_features,
                                                   data_path=cfg.data.pretrain_graphs,
