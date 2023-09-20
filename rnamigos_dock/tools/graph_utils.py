@@ -69,7 +69,7 @@ def to_undirected(edge_map, graph=None):
 def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True):
     pocket_graph = graph_io.load_json(rna_path)
     if undirected:
-        pocket_graph, edge_map = to_undirected(pocket_graph, edge_map)
+        pocket_graph, edge_map = to_undirected(edge_map, graph=pocket_graph)
     edge_map = {key.upper(): value for key, value in edge_map.items()}
     one_hot = {edge: torch.tensor(edge_map[label.upper()]) for edge, label in
                (nx.get_edge_attributes(pocket_graph, 'LW')).items()}

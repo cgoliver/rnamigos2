@@ -1,7 +1,6 @@
 numpy
-rnaglib
+git+https://github.com/cgoliver/rnaglib
 tensorboard
-dgl
 hydra-core
 loguru
 rdkit
