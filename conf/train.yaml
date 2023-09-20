@@ -9,3 +9,4 @@ defaults:
 debug: False
 name: 'default'
 device: 'cpu'
+verbose: False

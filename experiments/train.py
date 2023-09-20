@@ -1,3 +1,4 @@
+from pathlib import Path
 from dgl.dataloading import GraphDataLoader
 
 import hydra
@@ -99,7 +100,7 @@ def main(cfg: DictConfig):
                           )
 
     if cfg.model.use_pretrained:
-        model.from_pretrained(cfg.model.pretrained_path)
+        model.from_pretrained(cfg.model.pretrained_path, verbose=cfg.verbose)
 
     model = model.to(device)
 

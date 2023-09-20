@@ -3,7 +3,7 @@ Script for RGCN model.
 
 """
 
-from functools import partial
+from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -215,7 +215,15 @@ class RNAmigosModel(nn.Module):
         pred = self.decoder(pred)
         return pred
 
-    def from_pretrained(self, model_path):
+    def from_pretrained(self, model_path, verbose=False):
         state_dict = torch.load(model_path)
-        # state_dict = torch.load(model_path, map_location=torch.device('cpu'))
-        self.load_state_dict(state_dict['model_state_dict'])
+        if verbose:
+            for n, p in self.named_parameters():
+                try:
+                    self.state_dict()[n][:] = p
+                except KeyError:
+                    continue
+                else:
+                    logger.info(f"Loaded parameter {n} from pretrained model")
+        else:
+            self.load_state_dict(state_dict, strict=False)
