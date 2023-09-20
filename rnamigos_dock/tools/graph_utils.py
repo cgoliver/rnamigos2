@@ -62,6 +62,7 @@ def to_undirected(edge_map, graph=None):
     undirected_edge_map = {old_label: new_map[remap[old_label]] for old_label in edge_map.keys()}
     if graph is not None:
         graph = graph.to_undirected()
+        graph = graph.to_directed()
         return graph, undirected_edge_map
     return undirected_edge_map
 
