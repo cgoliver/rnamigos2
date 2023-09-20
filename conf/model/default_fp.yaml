@@ -13,6 +13,7 @@ decoder:
   out_dim: 166
   hidden_dim: 64
   num_layers: 3
+  activation: null
 
 pool: 'att'
 use_pretrained: false

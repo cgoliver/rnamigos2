@@ -3,6 +3,7 @@
 import sys
 import time
 
+from loguru import logger
 import dgl
 import torch
 import torch.nn.functional as F
@@ -65,7 +66,10 @@ def test(model, test_loader, criterion, device):
         # Do the computations for the forward pass
         with torch.no_grad():
             pred = model(graph, docked_fp)
-            loss = criterion(target, pred)
+            if criterion.__repr__() == 'BCELoss()':
+                loss = criterion(pred.squeeze(), target.squeeze(dim=0).float())
+            else:
+                loss = criterion(pred.squeeze(), target.float())
         test_loss += loss.item()
 
     return test_loss / test_size
@@ -123,7 +127,10 @@ def train_dock(model,
             docked_fp = docked_fp.to(device)
             target = target.to(device)
             pred = model(graph, docked_fp)
-            loss = criterion(pred.squeeze(), target.float())
+            if criterion.__repr__() == 'BCELoss()':
+                loss = criterion(pred.squeeze(), target.squeeze(dim=0).float())
+            else:
+                loss = criterion(pred.squeeze(), target.float())
 
             # Backward
             loss.backward()

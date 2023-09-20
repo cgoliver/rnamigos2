@@ -22,13 +22,14 @@ class Decoder(nn.Module):
         Linear/ReLu layers with Sigmoid in output since fingerprints between 0 and 1.
     """
 
-    def __init__(self, in_dim, out_dim, hidden_dim, num_layers):
+    def __init__(self, in_dim, out_dim, hidden_dim, num_layers, activation=None):
         super(Decoder, self).__init__()
         # self.num_nodes = num_nodes
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.activation = activation 
 
         # create layers
         self.build_model()
@@ -43,6 +44,11 @@ class Decoder(nn.Module):
 
         # hidden to output
         layers.append(nn.Linear(self.hidden_dim, self.out_dim))
+        if self.activation == 'sigmoid':
+            print("SIGMOID")
+            layers.append(nn.Sigmoid())
+        if self.activation == 'softmax':
+            layers.append(nn.Softmax())
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):

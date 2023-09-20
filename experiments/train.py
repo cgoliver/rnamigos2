@@ -90,7 +90,8 @@ def main(cfg: DictConfig):
     decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
                       out_dim=cfg.model.decoder.out_dim,
                       hidden_dim=cfg.model.decoder.hidden_dim,
-                      num_layers=cfg.model.decoder.num_layers)
+                      num_layers=cfg.model.decoder.num_layers,
+                      activation=cfg.model.decoder.activation)
 
     model = RNAmigosModel(encoder=rna_encoder,
                           decoder=decoder,
