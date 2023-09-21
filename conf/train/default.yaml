@@ -5,7 +5,7 @@ num_workers: 4
 clf_lam: 1.0
 reconstruction_lam: 1.0
 kfold: 5
-num_epochs: 10
+num_epochs: 100
 embed_only: false
 early_stop: 10
 use_nucs: true

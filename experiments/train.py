@@ -3,14 +3,19 @@ from dgl.dataloading import GraphDataLoader
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
+from loguru import logger
 
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
+import numpy as np
+import pandas as pd
 
 from rnamigos_dock.learning.loader import DockingDataset, get_systems, NativeSampler
+from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
+from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 from rnamigos_dock.learning.utils import mkdirs
 
 
@@ -144,12 +149,42 @@ def main(cfg: DictConfig):
                      device=device,
                      train_loader=train_loader,
                      test_loader=test_loader,
-                     save_path=save_path,
+                     save_path=Path(result_folder, 'model.pth'),
                      writer=writer,
                      num_epochs=num_epochs,
                      early_stop_threshold=cfg.train.early_stop)
     
 
+
+    use_rnamigos1_ligands = False
+    test_systems = get_systems(target=cfg.train.target,
+                               rnamigos1_split=cfg.train.rnamigos1_split,
+                               use_rnamigos1_train=cfg.train.use_rnamigos1_train,
+                               use_rnamigos1_ligands=use_rnamigos1_ligands,
+                               return_test=True)
+
+    logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
+    logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")
+
+    dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
+                                   ligands_path=cfg.data.ligand_db,
+                                   systems=test_systems,
+                                   decoy_mode='pdb',
+                                   fp_type='MACCS')
+    # Loader is asynchronous
+    loader_args = {'shuffle': False,
+                   'batch_size': 1,
+                   'num_workers': 4,
+                   'collate_fn': lambda x: x[0]
+                   }
+    dataloader = GraphDataLoader(dataset=dataset, **loader_args)
+
+    lower_is_better = cfg.train.target in ['dock', 'native_fp']
+    efs,inds = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
+
+    df = pd.DataFrame({'ef': efs, 'inds': inds})
+    df.to_csv(Path(result_folder, 'ef.csv'))
+    logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
 
 if __name__ == "__main__":
     main()
