@@ -98,6 +98,11 @@ def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
     if return_test:
         systems = systems.loc[systems['PDB_ID_POCKET'].isin(test_split)]
     else:
+        # SOME LIGANDS DON'T EXIST ANYMORE (filtered out)
+        # in_set = set(systems['PDB_ID_POCKET'].unique())
+        # neither = {elt for elt in train_split if elt not in in_set}
+        # >>> '5U3G_B_GAI_125', '6S0X_A_ERY_3001', '5J5B_DB_EDO_210', '5T83_A_GAI_116',
+        # len(neither) = 283
         if use_rnamigos1_train:
             systems = systems.loc[systems['PDB_ID_POCKET'].isin(train_split)]
         else:
@@ -208,7 +213,7 @@ class DockingDataset(Dataset):
 
 class NativeSampler(Sampler):
     def __init__(self, systems_dataframe):
-        super().__init__()
+        # super().__init__(data_source=None)
         positive = (systems_dataframe['IS_NATIVE'] == 1).values
         self.positive_rows = np.where(positive)[0]
         self.negative_rows = np.where(1 - positive)[0]
