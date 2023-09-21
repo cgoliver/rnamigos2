@@ -13,7 +13,7 @@ decoder:
   out_dim: 1 
   hidden_dim: 32
   num_layers: 3
-  activation: null 
+  activation: sigmoid 
 
 pool: 'att'
 use_pretrained: false
