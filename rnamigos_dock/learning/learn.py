@@ -141,7 +141,7 @@ def train_dock(model,
             batch_loss = loss.item()
             running_loss += batch_loss
 
-            if batch_idx % 20 == 0:
+            if batch_idx % 200 == 0:
                 time_elapsed = time.time() - start_time
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}  Time: {:.2f}'.format(
                     epoch + 1,

@@ -15,3 +15,4 @@ loss: 'l2'
 use_rnamigos1_train: False
 use_rnamigos1_ligands: False
 rnamigos1_split: 0
+learning_rate: 1e-3

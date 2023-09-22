@@ -123,7 +123,7 @@ def main(cfg: DictConfig):
     if cfg.train.loss == 'bce':
         criterion = torch.nn.BCELoss()
 
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
 
     '''
     Experiment Setup
