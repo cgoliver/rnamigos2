@@ -1,4 +1,5 @@
-pocket_graphs: data/json_pockets_load
+#pocket_graphs: data/json_pockets_load
+pocket_graphs: data/json_pockets_expanded
 pretrain_graphs: data/pretrain_data/data/annotated/NR_chops_annot
 ligand_db: data/ligand_db
 rnamigos1_test: False

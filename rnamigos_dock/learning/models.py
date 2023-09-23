@@ -29,7 +29,7 @@ class Decoder(nn.Module):
         self.out_dim = out_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
-        self.activation = activation 
+        self.activation = activation
 
         # create layers
         self.build_model()
@@ -157,8 +157,19 @@ class Embedder(nn.Module):
         for layer in self.layers:
             h = layer(g, h, g.edata['edge_type'])
         g.ndata['h'] = h
-        embeddings = g.ndata.pop('h')
-        return embeddings
+
+        # This tedious step is necessary, otherwise subgraphing looses track of the batch
+        graphs = dgl.unbatch(g)
+        all_subgraphs = []
+        all_embs = []
+        for graph in graphs:
+            subgraph = dgl.node_subgraph(graph, graph.ndata['in_pocket'])
+            embeddings = subgraph.ndata.pop('h')
+            all_subgraphs.append(subgraph)
+            all_embs.append(embeddings)
+        subgraph = dgl.batch(all_subgraphs)
+        embeddings = torch.cat(all_embs, dim=0)
+        return subgraph, embeddings
 
 
 ###############################################################################
@@ -197,7 +208,7 @@ class RNAmigosModel(nn.Module):
 
     def predict_ligands(self, g, ligands):
         with torch.no_grad():
-            embeddings = self.encoder(g)
+            g, embeddings = self.encoder(g)
             graph_pred = self.pool(g, embeddings)
 
             # Batch ligands together, encode them
@@ -213,7 +224,7 @@ class RNAmigosModel(nn.Module):
             return distances
 
     def forward(self, g, lig_fp):
-        embeddings = self.encoder(g)
+        g, embeddings = self.encoder(g)
         pred = self.pool(g, embeddings)
         if not self.lig_encoder is None:
             lig_h = self.lig_encoder(lig_fp)

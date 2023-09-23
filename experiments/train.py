@@ -153,8 +153,6 @@ def main(cfg: DictConfig):
                      writer=writer,
                      num_epochs=num_epochs,
                      early_stop_threshold=cfg.train.early_stop)
-    
-
 
     use_rnamigos1_ligands = False
     test_systems = get_systems(target=cfg.train.target,
@@ -180,11 +178,12 @@ def main(cfg: DictConfig):
     dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
     lower_is_better = cfg.train.target in ['dock', 'native_fp']
-    efs,inds = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
+    efs, inds = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
 
     df = pd.DataFrame({'ef': efs, 'inds': inds})
     df.to_csv(Path(result_folder, 'ef.csv'))
     logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
+
 
 if __name__ == "__main__":
     main()

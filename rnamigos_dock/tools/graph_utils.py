@@ -73,10 +73,14 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True):
     nx.set_edge_attributes(pocket_graph, name='edge_type', values=one_hot)
     one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
                     (nx.get_node_attributes(pocket_graph, 'nt_code')).items()}
+    pocket_nodes = {node: label for node, label in (nx.get_node_attributes(pocket_graph, 'in_pocket')).items()}
+    pocket_nodes = {node: True if node not in pocket_nodes else pocket_nodes[node] for node in pocket_graph.nodes()}
     nx.set_node_attributes(pocket_graph, name='nt_features', values=one_hot_nucs)
+    nx.set_node_attributes(pocket_graph, name='in_pocket', values=pocket_nodes)
     pocket_graph_dgl = dgl.from_networkx(nx_graph=pocket_graph,
                                          edge_attrs=['edge_type'],
-                                         node_attrs=['nt_features'])
+                                         node_attrs=['nt_features', 'in_pocket'],
+                                         )
     return pocket_graph_dgl
 
 
