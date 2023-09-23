@@ -37,14 +37,11 @@ def main(cfg: DictConfig):
         try:
             gpu_number = int(cfg.device)
         except:
-            gpu_number = 0
-        device = f'cuda:{gpu_number}'
-        # This is to create an appropriate number of workers, but works too with cpu
-        if cfg.train.parallel:
-            used_gpus_count = torch.cuda.device_count()
-        else:
-            used_gpus_count = 1
-        print(f'Using {used_gpus_count} GPUs')
+            if cfg.device != 'cpu':
+                gpu_number = 0
+                device = f'cuda:{gpu_number}'
+            else:
+                device = 'cpu'
     else:
         device = 'cpu'
         print("No GPU found, running on the CPU")
