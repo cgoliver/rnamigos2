@@ -6,14 +6,14 @@
 #SBATCH --gres=gpu:1
 #SBATCH --time=03:00:00
 #SBATCH --array=0-9
-#SBATCH --output riso-%a.out
+#SBATCH --output long-%a.out
 
 
 cd ..
 source .venv/bin/activate
 
 # rnamigos1 no pretrain
-# python experiments/train.py model.encoder.hidden_dim=16 model.decoder.in_dim=16  model.decoder.out_dim=166 data.undirected=False train.target=native_fp train.use_rnamigos1_train=True name=retrain_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
+# python experiments/train.py model.encoder.hidden_dim=16 model.decoder.in_dim=16  model.decoder.out_dim=166 data.undirected=True train.target=native_fp train.use_rnamigos1_train=True name=retrain_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
 
 # add r_1 pretrain undirected
 # python experiments/train.py model.encoder.hidden_dim=16 model.decoder.in_dim=16  model.decoder.out_dim=166 data.undirected=True train.target=native_fp train.use_rnamigos1_train=True model.use_pretrained=True model.pretrained_path=pretrained/R_1_16_undirected/model.pth name=retrain_r1_undirected_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
@@ -36,9 +36,9 @@ source .venv/bin/activate
 # python experiments/train.py model.encoder.hidden_dim=16 model.decoder.in_dim=16 model.decoder.out_dim=166 train.target=native_fp train.loss=l2 model.use_pretrained=True model.pretrained_path=pretrained/R_iso_16/model.pth name=pre_riso_small_l2_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
 
 # + Big model
-python experiments/train.py model.encoder.hidden_dim=64 model.decoder.in_dim=64 model.decoder.out_dim=166 train.target=native_fp train.loss=l2 model.use_pretrained=True model.encoder.hidden_dim=64 model.pretrained_path=pretrained/R_iso_64/model.pth train.early_stop=50 train.learning_rate=1e-4 name=pre_riso_big_slow_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
+python experiments/train.py model.encoder.hidden_dim=64 model.decoder.in_dim=64 model.decoder.out_dim=166 train.target=native_fp train.loss=l2 model.use_pretrained=True model.encoder.hidden_dim=64 model.pretrained_path=pretrained/R_iso_64/model.pth train.num_epochs=1000 train.early_stop=500 train.learning_rate=1e-6 name=pre_riso_big_slowslowlong_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
 
-python experiments/train.py model.encoder.hidden_dim=64 model.decoder.in_dim=64 model.decoder.out_dim=166 train.target=native_fp train.loss=l2 model.use_pretrained=True model.decoder.num_layers=1 model.encoder.hidden_dim=64 model.pretrained_path=pretrained/R_iso_64/model.pth train.early_stop=50 train.learning_rate=1e-4 name=pre_riso_big_slow_shallowhead_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
+# python experiments/train.py model.encoder.hidden_dim=64 model.decoder.in_dim=64 model.decoder.out_dim=166 train.target=native_fp train.loss=l2 model.use_pretrained=True model.decoder.num_layers=1 model.encoder.hidden_dim=64 model.pretrained_path=pretrained/R_iso_64/model.pth train.early_stop=50 train.learning_rate=1e-4 name=pre_riso_big_slow_shallowhead_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
 
 # add predict native training
 # python experiments/train.py model.encoder.hidden_dim=64 model.decoder.in_dim=96 model.decoder.out_dim=1 train.target=is_native train.loss=bce model.use_pretrained=True model.encoder.hidden_dim=64 model.pretrained_path=pretrained/R_iso_64/model.pth name=train_native_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}

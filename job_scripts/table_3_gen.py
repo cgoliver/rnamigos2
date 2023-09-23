@@ -27,7 +27,7 @@ if __name__ == "__main__":
                                     }
                                    )
                 except FileNotFoundError:
-                    print("missing ", split) 
+                    print("missing ", target, run, split) 
 
     df = pd.DataFrame(results)
     split_meaned = df.groupby('run').mean().reset_index().drop_duplicates(subset='run').drop(['split'], axis=1).sort_values(by='MAR_mean')
