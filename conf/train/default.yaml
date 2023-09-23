@@ -1,7 +1,7 @@
 seed: 42
 parallel: false
 batch_size: 32
-num_workers: 4
+num_workers: 0
 clf_lam: 1.0
 reconstruction_lam: 1.0
 kfold: 5

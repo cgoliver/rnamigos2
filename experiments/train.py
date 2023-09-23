@@ -34,14 +34,14 @@ def main(cfg: DictConfig):
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
     if torch.cuda.is_available():
-        try:
-            gpu_number = int(cfg.device)
-        except:
-            if cfg.device != 'cpu':
+        if cfg.device != 'cpu':
+            try:
+                gpu_number = int(cfg.device)
+            except:
                 gpu_number = 0
-                device = f'cuda:{gpu_number}'
-            else:
-                device = 'cpu'
+            device = f'cuda:{gpu_number}'
+        else:
+            device = 'cpu'
     else:
         device = 'cpu'
         print("No GPU found, running on the CPU")
