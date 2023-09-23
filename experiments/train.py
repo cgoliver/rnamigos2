@@ -34,7 +34,11 @@ def main(cfg: DictConfig):
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
     if torch.cuda.is_available():
-        device = 'cuda'
+        try:
+            gpu_number = int(cfg.device)
+        except:
+            gpu_number = 0
+        device = f'cuda:{gpu_number}'
         # This is to create an appropriate number of workers, but works too with cpu
         if cfg.train.parallel:
             used_gpus_count = torch.cuda.device_count()
