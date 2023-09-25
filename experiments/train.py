@@ -87,17 +87,23 @@ def main(cfg: DictConfig):
     rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
                            hidden_dim=cfg.model.encoder.hidden_dim,
                            num_hidden_layers=cfg.model.encoder.num_layers,
+                           batch_norm=cfg.model.batch_norm,
+                           dropout=cfg.model.dropout
                            )
 
     lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
                                 hidden_dim=cfg.model.lig_encoder.hidden_dim,
-                                num_hidden_layers=cfg.model.lig_encoder.num_layers)
+                                num_hidden_layers=cfg.model.lig_encoder.num_layers,
+                                batch_norm=cfg.model.batch_norm,
+                                dropout=cfg.model.dropout)
 
     decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
                       out_dim=cfg.model.decoder.out_dim,
                       hidden_dim=cfg.model.decoder.hidden_dim,
                       num_layers=cfg.model.decoder.num_layers,
-                      activation=cfg.model.decoder.activation)
+                      activation=cfg.model.decoder.activation,
+                      batch_norm=cfg.model.batch_norm,
+                      dropout=cfg.model.dropout)
 
     model = RNAmigosModel(encoder=rna_encoder,
                           decoder=decoder,
