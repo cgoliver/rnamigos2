@@ -75,7 +75,7 @@ class LigandEncoder(nn.Module):
         Model for producing node embeddings.
     """
 
-    def __init__(self, in_dim, hidden_dim, num_hidden_layers, batch_norm=True, dropout=0.2, num_rels=19, num_bases=-1):
+    def __init__(self, in_dim, hidden_dim, num_hidden_layers, batch_norm=True, dropout=0.2, num_rels=19):
         super(LigandEncoder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim

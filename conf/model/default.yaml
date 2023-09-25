@@ -2,6 +2,7 @@ encoder:
   in_dim: 4
   hidden_dim: 32 
   num_layers: 3
+  num_bases: -1
 
 lig_encoder:
   in_dim: 166

@@ -88,7 +88,8 @@ def main(cfg: DictConfig):
                            hidden_dim=cfg.model.encoder.hidden_dim,
                            num_hidden_layers=cfg.model.encoder.num_layers,
                            batch_norm=cfg.model.batch_norm,
-                           dropout=cfg.model.dropout
+                           dropout=cfg.model.dropout,
+                           num_bases=cfg.model.encoder.num_bases
                            )
 
     lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
