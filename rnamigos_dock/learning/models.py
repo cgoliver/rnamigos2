@@ -29,7 +29,6 @@ class Decoder(nn.Module):
         self.out_dim = out_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
-        self.activation = activation
         self.batch_norm = batch_norm
         self.dropout = dropout
 
@@ -46,10 +45,9 @@ class Decoder(nn.Module):
         batch_norms = nn.ModuleList()
         layers.append(nn.Linear(self.in_dim, self.hidden_dim))
         batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
-        for _ in range(self.num_layers - 1):
+        for _ in range(self.num_layers - 2):
             layers.append(nn.Linear(self.hidden_dim, self.hidden_dim))
             batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
-            layers.append(nn.Dropout(p=0.2))
 
         # hidden to output
         layers.append(nn.Linear(self.hidden_dim, self.out_dim))
@@ -67,7 +65,7 @@ class Decoder(nn.Module):
             else:
                 output = F.dropout(F.relu(output), self.dropout, training=self.training)
 
-        return output 
+        return self.activation(output)
 
 
 class LigandEncoder(nn.Module):

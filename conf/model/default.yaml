@@ -17,7 +17,7 @@ decoder:
   activation: sigmoid 
 
 pool: 'att'
-droput: 0.2
+dropout: 0.2
 batch_norm: true
 use_pretrained: false
 pretrained_path: pretrained/pretrained_model_graphlet.pth
