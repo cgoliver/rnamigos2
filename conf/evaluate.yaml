@@ -4,3 +4,4 @@ defaults:
   - model: default
   - train: default
 decoys: pdb
+saved_model_dir: . 

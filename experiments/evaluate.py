@@ -1,9 +1,11 @@
 import os
 import sys
 import time
+from pathlib import Path
 
 import numpy as np
 from dgl.dataloading import GraphDataLoader
+from yaml import safe_load 
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -22,6 +24,9 @@ def main(cfg: DictConfig):
     Hardware settings
     '''
 
+    with open(Path(cfg.saved_model_dir, 'config.yaml'), 'r') as f:
+        params = safe_load(f)
+
     # torch.multiprocessing.set_sharing_strategy('file_system')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -29,15 +34,18 @@ def main(cfg: DictConfig):
     use_rnamigos1_ligands = False
     rnamigos1_split = 0
     test_systems = get_systems(target=cfg.train.target,
-                               rnamigos1_split=rnamigos1_split,
-                               use_rnamigos1_train=use_rnamigos1_train,
-                               use_rnamigos1_ligands=use_rnamigos1_ligands,
+                               rnamigos1_split=cfg.train.rnamigos1_split,
+                               use_rnamigos1_train=cfg.train.use_rnamigos1_train,
+                               use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
                                return_test=True)
+
     dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
                                    ligands_path=cfg.data.ligand_db,
                                    systems=test_systems,
                                    decoy_mode='pdb',
                                    fp_type='MACCS')
+
+
     # Loader is asynchronous
     loader_args = {'shuffle': False,
                    'batch_size': 1,
@@ -51,25 +59,38 @@ def main(cfg: DictConfig):
     '''
     Model loading
     '''
-    rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
-                           hidden_dim=cfg.model.encoder.hidden_dim,
-                           num_hidden_layers=cfg.model.encoder.num_layers)
+    
+    rna_encoder = Embedder(in_dim=params['model']['encoder']['in_dim'],
+                           hidden_dim=params['model']['encoder']['hidden_dim'],
+                           num_hidden_layers=params['model']['encoder']['num_layers'],
+                           batch_norm=params['model']['batch_norm'],
+                           dropout=params['model']['dropout'],
+                           num_bases=params['model']['encoder']['num_bases']
+                           )
 
-    lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
-                                hidden_dim=cfg.model.lig_encoder.hidden_dim,
-                                num_hidden_layers=cfg.model.lig_encoder.num_layers)
+    lig_encoder = LigandEncoder(in_dim=params['model']['lig_encoder']['in_dim'],
+                                hidden_dim=params['model']['lig_encoder']['hidden_dim'],
+                                num_hidden_layers=params['model']['lig_encoder']['num_layers'],
+                                batch_norm=params['model']['batch_norm'],
+                                dropout=params['model']['dropout'])
 
-    decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
-                      out_dim=cfg.model.decoder.out_dim,
-                      hidden_dim=cfg.model.decoder.hidden_dim,
-                      num_layers=cfg.model.decoder.num_layers)
+    decoder = Decoder(dropout=params['model']['dropout'],
+                      batch_norm=params['model']['batch_norm'],
+                      **params['model']['decoder']
+                      )
 
     model = RNAmigosModel(encoder=rna_encoder,
                           decoder=decoder,
-                          lig_encoder=lig_encoder if cfg.train.target in ['dock', 'is_native'] else None,
-                          pool=cfg.model.pool)
+                          lig_encoder=lig_encoder if params['train']['target'] in ['dock', 'is_native'] else None,
+                          pool=params['model']['pool'],
+                          pool_dim=params['model']['encoder']['hidden_dim']
+                          )
 
-    model.from_pretrained(cfg.model.pretrained_path)
+
+    print(params)
+    state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'))['model_state_dict']
+    model.load_state_dict(state_dict)
+    model.eval()
 
     model = model.to(device)
 
@@ -80,8 +101,8 @@ def main(cfg: DictConfig):
     '''
     import time
     t0 = time.perf_counter()
-    lower_is_better = cfg.train.target in ['dock', 'native_fp']
-    efs = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
+    lower_is_better = params['train']['target'] in ['dock', 'native_fp']
+    efs, inds = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
     print(efs)
     print('Mean EF :', np.mean(efs))
     print('Time :', time.perf_counter() - t0)

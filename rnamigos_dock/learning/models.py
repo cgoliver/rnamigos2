@@ -280,4 +280,4 @@ class RNAmigosModel(nn.Module):
                 else:
                     logger.info(f"Loaded parameter {n} from pretrained model")
         else:
-            self.load_state_dict(state_dict, strict=False)
+            telf.load_state_dict(state_dict, strict=False)
