@@ -21,7 +21,7 @@ do
 		do
 			for pre in true false;
 			do
-				for bases in -1 4 8;
+				for bases in none 4 8;
 				do
 
 					CMDARRAY+=("python experiments/train.py model.encoder.hidden_dim=64 

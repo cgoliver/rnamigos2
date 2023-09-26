@@ -59,7 +59,8 @@ class Decoder(nn.Module):
         output = x
         for layer in range(self.num_layers):
             output = self.layers[layer](output)
-            output = self.batch_norms[layer](output)
+            if self.batch_norm:
+                output = self.batch_norms[layer](output)
             if layer == self.num_layers - 1:
                 output = F.dropout(output, self.dropout, training=self.training)
             else:
@@ -120,7 +121,8 @@ class LigandEncoder(nn.Module):
         h = fp.float()
         for i, layer in enumerate(self.layers):
             h = layer(h)
-            h = self.batch_norms[i](h)
+            if self.batch_norm:
+                h = self.batch_norms[i](h)
 
             if i < self.num_hidden_layers:
                 h = F.dropout(h, self.dropout, training=self.training)
@@ -150,6 +152,8 @@ class Embedder(nn.Module):
         layers = nn.ModuleList()
         batch_norms = nn.ModuleList()
 
+        print(f"Num rgcn bases: {self.num_bases}")
+
         # input feature is just node degree
         i2h = self.build_hidden_layer(self.in_dim, self.hidden_dim)
         layers.append(i2h)
@@ -174,19 +178,22 @@ class Embedder(nn.Module):
 
     def build_hidden_layer(self, in_dim, out_dim):
         return RelGraphConv(in_dim, out_dim, self.num_rels,
+                            regularizer='basis' if self.num_rels > 0 else None,
                             num_bases=self.num_bases,
-                            activation=F.relu)
+                            activation=None)
 
     # No activation for the last layer
     def build_output_layer(self, in_dim, out_dim):
         return RelGraphConv(in_dim, out_dim, self.num_rels, num_bases=self.num_bases,
+                            regularizer='basis' if self.num_rels > 0 else None,
                             activation=None)
 
     def forward(self, g):
         h = g.ndata['nt_features']
         for i, layer in enumerate(self.layers):
             h = layer(g, h, g.edata['edge_type'])
-            h = self.batch_norms[i](h)
+            if self.batch_norm:
+                h = self.batch_norms[i](h)
 
             if i < self.num_hidden_layers:
                 h = F.dropout(h, self.dropout, training=self.training)
@@ -269,15 +276,13 @@ class RNAmigosModel(nn.Module):
         pred = self.decoder(pred)
         return pred
 
-    def from_pretrained(self, model_path, verbose=False):
+    def from_pretrained(self, model_path, verbose=True):
         state_dict = torch.load(model_path)
-        if verbose:
-            for n, p in self.named_parameters():
-                try:
-                    self.state_dict()[n][:] = p
-                except KeyError:
-                    continue
-                else:
-                    logger.info(f"Loaded parameter {n} from pretrained model")
-        else:
-            telf.load_state_dict(state_dict, strict=False)
+        for n, p in state_dict.items():
+            try:
+                new_name = 'encoder.' + n
+                self.state_dict()[new_name] = p
+            except KeyError:
+                logger.info(f"Parameter {new_name} not in model")
+            else:
+                logger.info(f"Loaded parameter {new_name} from pretrained model")

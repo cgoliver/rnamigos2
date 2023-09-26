@@ -113,7 +113,9 @@ def main(cfg: DictConfig):
                           pool_dim=cfg.model.encoder.hidden_dim
                           )
 
+    print(model)
     if cfg.model.use_pretrained:
+        print(">>> Using pretrained weights")
         model.from_pretrained(cfg.model.pretrained_path, verbose=cfg.verbose)
 
     model = model.to(device)
