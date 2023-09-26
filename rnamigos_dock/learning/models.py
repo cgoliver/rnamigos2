@@ -22,37 +22,50 @@ class Decoder(nn.Module):
         Linear/ReLu layers with Sigmoid in output since fingerprints between 0 and 1.
     """
 
-    def __init__(self, in_dim, out_dim, hidden_dim, num_layers, activation=None):
+    def __init__(self, in_dim, out_dim, hidden_dim, num_layers, dropout=0.2, batch_norm=True, activation=None):
         super(Decoder, self).__init__()
         # self.num_nodes = num_nodes
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
-        self.activation = activation
+        self.batch_norm = batch_norm
+        self.dropout = dropout
 
+        if activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
+        if activation == 'softmax':
+            self.activation = nn.Softmax()
+        
         # create layers
-        self.build_model()
+        self.layers, self.batch_norms = self.build_model()
 
     def build_model(self):
-        layers = []
+        layers = nn.ModuleList()
+        batch_norms = nn.ModuleList()
         layers.append(nn.Linear(self.in_dim, self.hidden_dim))
-        layers.append(nn.ReLU())
-        for _ in range(self.num_layers - 1):
+        batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
+        for _ in range(self.num_layers - 2):
             layers.append(nn.Linear(self.hidden_dim, self.hidden_dim))
-            layers.append(nn.ReLU())
+            batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
 
         # hidden to output
         layers.append(nn.Linear(self.hidden_dim, self.out_dim))
-        if self.activation == 'sigmoid':
-            print("SIGMOID")
-            layers.append(nn.Sigmoid())
-        if self.activation == 'softmax':
-            layers.append(nn.Softmax())
-        self.net = nn.Sequential(*layers)
+        batch_norms.append(nn.BatchNorm1d(self.out_dim))
+
+        return layers, batch_norms
 
     def forward(self, x):
-        return self.net(x)
+        output = x
+        for layer in range(self.num_layers):
+            output = self.layers[layer](output)
+            output = self.batch_norms[layer](output)
+            if layer == self.num_layers - 1:
+                output = F.dropout(output, self.dropout, training=self.training)
+            else:
+                output = F.dropout(F.relu(output), self.dropout, training=self.training)
+
+        return self.activation(output)
 
 
 class LigandEncoder(nn.Module):
@@ -60,29 +73,34 @@ class LigandEncoder(nn.Module):
         Model for producing node embeddings.
     """
 
-    def __init__(self, in_dim, hidden_dim, num_hidden_layers, num_rels=19, num_bases=-1):
+    def __init__(self, in_dim, hidden_dim, num_hidden_layers, batch_norm=True, dropout=0.2, num_rels=19):
         super(LigandEncoder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
         self.num_hidden_layers = num_hidden_layers
+        self.dropout = dropout
+        self.batch_norm = batch_norm
 
-        self.layers = self.build_model()
+        self.layers, self.batch_norms  = self.build_model()
 
     def build_model(self):
         layers = nn.ModuleList()
+        batch_norms = nn.ModuleList()
 
         # input feature is just node degree
         i2h = self.build_hidden_layer(self.in_dim, self.hidden_dim)
         layers.append(i2h)
+        batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
 
         for i in range(self.num_hidden_layers - 1):
             h2h = self.build_hidden_layer(self.hidden_dim, self.hidden_dim)
-            layers.append(torch.nn.ReLU())
             layers.append(h2h)
+            batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
         # hidden to output
         h2o = self.build_output_layer(self.hidden_dim, self.hidden_dim)
         layers.append(h2o)
-        return layers
+        batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
+        return layers, batch_norms
 
     @property
     def current_device(self):
@@ -100,8 +118,14 @@ class LigandEncoder(nn.Module):
 
     def forward(self, fp):
         h = fp.float()
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             h = layer(h)
+            h = self.batch_norms[i](h)
+
+            if i < self.num_hidden_layers:
+                h = F.dropout(h, self.dropout, training=self.training)
+            else:
+                h = F.dropout(F.relu(h), self.dropout, training=self.training)
         return h
 
 
@@ -110,30 +134,36 @@ class Embedder(nn.Module):
         Model for producing node embeddings.
     """
 
-    def __init__(self, in_dim, hidden_dim, num_hidden_layers, num_rels=20, num_bases=-1):
+    def __init__(self, in_dim, hidden_dim, num_hidden_layers, batch_norm=True, num_rels=20, dropout=0.2, num_bases=-1):
         super(Embedder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
         self.num_hidden_layers = num_hidden_layers
         self.num_rels = num_rels
         self.num_bases = num_bases
+        self.batch_norm = batch_norm
+        self.dropout = dropout
 
-        self.layers = self.build_model()
+        self.layers, self.batch_norms = self.build_model()
 
     def build_model(self):
         layers = nn.ModuleList()
+        batch_norms = nn.ModuleList()
 
         # input feature is just node degree
         i2h = self.build_hidden_layer(self.in_dim, self.hidden_dim)
         layers.append(i2h)
+        batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
 
         for i in range(self.num_hidden_layers - 1):
             h2h = self.build_hidden_layer(self.hidden_dim, self.hidden_dim)
             layers.append(h2h)
+            batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
         # hidden to output
         h2o = self.build_output_layer(self.hidden_dim, self.hidden_dim)
+        batch_norms.append(nn.BatchNorm1d(self.hidden_dim))
         layers.append(h2o)
-        return layers
+        return layers, batch_norms
 
     @property
     def current_device(self):
@@ -154,8 +184,15 @@ class Embedder(nn.Module):
 
     def forward(self, g):
         h = g.ndata['nt_features']
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             h = layer(g, h, g.edata['edge_type'])
+            h = self.batch_norms[i](h)
+
+            if i < self.num_hidden_layers:
+                h = F.dropout(h, self.dropout, training=self.training)
+            else:
+                h = F.dropout(F.relu(h), self.dropout, training=self.training)
+
         g.ndata['h'] = h
 
         # This tedious step is necessary, otherwise subgraphing looses track of the batch
