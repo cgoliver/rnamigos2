@@ -63,7 +63,7 @@ def to_undirected(edge_map):
     return undirected_edge_map
 
 
-def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True):
+def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings=False):
     pocket_graph = graph_io.load_json(rna_path)
     # possibly undirected, just update the edge map to keep a DiGraph
     edge_map = to_undirected(edge_map) if undirected else edge_map
@@ -81,7 +81,12 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True):
                                          edge_attrs=['edge_type'],
                                          node_attrs=['nt_features', 'in_pocket'],
                                          )
-    return pocket_graph_dgl
+    rings = []
+    if use_rings:
+        for node, data in sorted(pocket_graph.nodes(data=True)):
+            if data['in_pocket']:
+                rings.append(data['edge_annots'])
+    return pocket_graph_dgl, rings
 
 
 def bfs_expand(G, initial_nodes, depth=2):

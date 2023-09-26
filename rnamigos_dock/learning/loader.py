@@ -1,10 +1,14 @@
 import os
 import sys
 
+import itertools
+from dgl.dataloading import GraphCollator
 import numpy as np
+from numpy import random
 from pathlib import Path
 import pandas as pd
 import pickle
+from rnaglib.kernels.node_sim import k_block_list
 from rdkit import Chem, RDLogger
 from rdkit.Chem import MACCSkeys
 from rdkit.Chem import AllChem
@@ -156,7 +160,8 @@ class DockingDataset(Dataset):
                  seed=0,
                  debug=False,
                  cache_graphs=True,
-                 undirected=False
+                 undirected=False,
+                 use_rings=False
                  ):
         """
             Setup for data loader.
@@ -180,10 +185,12 @@ class DockingDataset(Dataset):
         self.ligand_encoder = MolEncoder(fp_type=fp_type)
 
         self.cache_graphs = cache_graphs
+        self.use_rings = use_rings
         if cache_graphs:
             all_pockets = set(self.systems['PDB_ID_POCKET'].unique())
             self.all_pockets = {pocket_id: load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
-                                                          undirected=self.undirected) for pocket_id in all_pockets}
+                                                          undirected=self.undirected,
+                                                          use_rings=self.use_rings) for pocket_id in all_pockets}
         if seed:
             print(f">>> shuffling with random seed {seed}")
             np.random.seed(seed)
@@ -201,14 +208,19 @@ class DockingDataset(Dataset):
         row = self.systems.iloc[idx].values
         pocket_id, ligand_smiles = row[0], row[1]
         if self.cache_graphs:
-            pocket_graph = self.all_pockets[pocket_id]
+            pocket_graph, rings = self.all_pockets[pocket_id]
         else:
-            pocket_graph = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
-                                          undirected=self.undirected)
+            pocket_graph, rings = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
+                                                 undirected=self.undirected,
+                                                 use_rings=self.use_rings)
         ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
         target = ligand_fp if self.target == 'native_fp' else row[2]
         # print("1 : ", time.perf_counter() - t0)
-        return pocket_graph, ligand_fp, target, [idx]
+        return {'graph': pocket_graph,
+                'ligand_fp': ligand_fp,
+                'target': target,
+                'rings': rings,
+                'idx': [idx]}
 
 
 class NativeSampler(Sampler):
@@ -231,6 +243,52 @@ class NativeSampler(Sampler):
         return self.num_pos * 2
 
 
+class RingCollater():
+    def __init__(self, node_simfunc=None, max_size_kernel=None):
+        self.node_simfunc = node_simfunc
+        self.max_size_kernel = max_size_kernel
+        self.graph_collator = GraphCollator()
+
+    def k_block(self, node_rings):
+        # We need to reimplement because current one expects dicts
+        block = np.zeros((len(node_rings), len(node_rings)))
+        assert self.node_simfunc.compare(node_rings[0],
+                                         node_rings[0]) > 0.99, "Identical rings giving non 1 similarity."
+        sims = [self.node_simfunc.compare(n1, n2)
+                for i, (n1, n2) in enumerate(itertools.combinations(node_rings, 2))]
+        block[np.triu_indices(len(node_rings), 1)] = sims
+        block += block.T
+        block += np.eye(len(node_rings))
+        return block
+
+    def collate(self, items):
+        batch = {}
+        for key, value in items[0].items():
+            values = [d[key] for d in items]
+            if key == 'rings':
+                if self.node_simfunc is None:
+                    batch[key] = None, None
+                    continue
+                # Taken from rglib
+                flat_rings = list()
+                for ring in values:
+                    flat_rings.extend(ring)
+                if self.max_size_kernel is None or len(flat_rings) < self.max_size_kernel:
+                    # Just take them all
+                    node_ids = [1 for _ in flat_rings]
+                else:
+                    # Take only 'max_size_kernel' elements
+                    node_ids = [1 for _ in range(self.max_size_kernel)] + \
+                               [0 for _ in range(len(flat_rings) - self.max_size_kernel)]
+                    random.shuffle(node_ids)
+                    flat_rings = [node for i, node in enumerate(flat_rings) if node_ids[i] == 1]
+                k_block = self.k_block(flat_rings)
+                batch[key] = torch.from_numpy(k_block).detach().float(), node_ids
+            else:
+                batch[key] = self.graph_collator.collate(items=values)
+        return batch
+
+
 class VirtualScreenDataset(DockingDataset):
     def __init__(self,
                  pockets_path,
@@ -238,8 +296,9 @@ class VirtualScreenDataset(DockingDataset):
                  systems,
                  decoy_mode='pdb',
                  fp_type='MACCS',
+                 use_rings=False,
                  ):
-        super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False)
+        super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False, use_rings=use_rings)
         self.ligands_path = ligands_path
         self.decoy_mode = decoy_mode
         self.all_pockets_id = list(self.systems['PDB_ID_POCKET'].unique())
@@ -255,9 +314,10 @@ class VirtualScreenDataset(DockingDataset):
         try:
             pocket_id = self.all_pockets_id[idx]
             if self.cache_graphs:
-                pocket_graph = self.all_pockets[pocket_id]
+                pocket_graph, _ = self.all_pockets[pocket_id]
             else:
-                pocket_graph = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"))
+                pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
+                                                 use_rings=False)
 
             actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'actives.txt'))
             decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'decoys.txt'))

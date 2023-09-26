@@ -110,7 +110,7 @@ class Embedder(nn.Module):
         Model for producing node embeddings.
     """
 
-    def __init__(self, in_dim, hidden_dim, num_hidden_layers, num_rels=19, num_bases=-1):
+    def __init__(self, in_dim, hidden_dim, num_hidden_layers, num_rels=20, num_bases=-1):
         super(Embedder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
@@ -230,7 +230,7 @@ class RNAmigosModel(nn.Module):
             lig_h = self.lig_encoder(lig_fp)
             pred = torch.cat((pred, lig_h), dim=1)
         pred = self.decoder(pred)
-        return pred
+        return pred, embeddings
 
     def from_pretrained(self, model_path, verbose=False):
         state_dict = torch.load(model_path)
