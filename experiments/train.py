@@ -75,19 +75,18 @@ def main(cfg: DictConfig):
     train_systems, validation_systems = np.split(train_systems.sample(frac=1, random_state=42),
                                                  [int(.8 * len(train_systems))])
     train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
-    test_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
+    validation_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
 
     train_sampler = NativeSampler(train_systems) if cfg.train.target == 'is_native' else None
-    test_sampler = NativeSampler(test_systems) if cfg.train.target == 'is_native' else None
+    validation_sampler = NativeSampler(validation_dataset) if cfg.train.target == 'is_native' else None
     collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=cfg.train.max_kernel)
     loader_args = {'shuffle': train_sampler is None,
                    'batch_size': cfg.train.batch_size,
                    'num_workers': cfg.train.num_workers,
-                   'collate_fn': collater.collate
-                   }
+                   'collate_fn': collater.collate}
 
     train_loader = GraphDataLoader(dataset=train_dataset, sampler=train_sampler, **loader_args)
-    test_loader = GraphDataLoader(dataset=test_dataset, sampler=test_sampler, **loader_args)
+    val_loader = GraphDataLoader(dataset=validation_dataset, sampler=validation_sampler, **loader_args)
 
     print('Created data loader')
 
@@ -170,18 +169,16 @@ def main(cfg: DictConfig):
                      optimizer=optimizer,
                      device=device,
                      train_loader=train_loader,
-                     test_loader=test_loader,
+                     val_loader=val_loader,
                      save_path=Path(result_folder, 'model.pth'),
                      writer=writer,
                      num_epochs=num_epochs,
                      early_stop_threshold=cfg.train.early_stop,
                      pretrain_weight=cfg.train.pretrain_weight)
 
-    use_rnamigos1_ligands = False
     test_systems = get_systems(target=cfg.train.target,
                                rnamigos1_split=cfg.train.rnamigos1_split,
                                use_rnamigos1_train=cfg.train.use_rnamigos1_train,
-                               use_rnamigos1_ligands=use_rnamigos1_ligands,
                                return_test=True)
 
     logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")

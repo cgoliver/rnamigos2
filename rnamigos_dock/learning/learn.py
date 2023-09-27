@@ -81,7 +81,7 @@ def train_dock(model,
                criterion,
                optimizer,
                train_loader,
-               test_loader,
+               val_loader,
                save_path,
                writer=None,
                device='cpu',
@@ -97,7 +97,7 @@ def train_dock(model,
     :param optimizer: the optimizer to use (eg SGD or Adam)
     :param device: the device on which to run
     :param train_loader: dataloader for training
-    :param test_loader: dataloader for validation
+    :param val_loader: dataloader for validation
     :param save_path: where to save the model
     :param writer: a Tensorboard object (defined in utils)
     :param num_epochs: int number of epochs
@@ -175,7 +175,7 @@ def train_dock(model,
         # writer.log_scalar("Train accuracy during training", train_accuracy, epoch)
 
         # Test phase
-        test_loss = test(model, test_loader, criterion, device)
+        test_loss = test(model, val_loader, criterion, device)
         print(">> test loss ", test_loss)
 
         writer.add_scalar("Test loss during training", test_loss, epoch)
