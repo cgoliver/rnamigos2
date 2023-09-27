@@ -13,12 +13,11 @@ cd ..
 source .venv/bin/activate
 
 # rnamigos1 no pretrain
-# python experiments/train.py model.encoder.hidden_dim=16 model.decoder.in_dim=16  model.decoder.out_dim=166 data.undirected=True train.target=native_fp train.use_rnamigos1_train=True name=retrain_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
+python experiments/train.py model.encoder.hidden_dim=16 model.decoder.in_dim=16  model.decoder.out_dim=166 data.undirected=True train.target=native_fp train.use_rnamigos1_train=True name=retrain_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
 
 # add r_1 pretrain undirected
-# python experiments/train.py model.encoder.hidden_dim=16 model.decoder.in_dim=16  model.decoder.out_dim=166 data.undirected=True train.target=native_fp train.use_rnamigos1_train=True model.use_pretrained=True model.pretrained_path=pretrained/R_1_16_undirected/model.pth name=retrain_r1_undirected_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
+python experiments/train.py model.encoder.hidden_dim=16 model.decoder.in_dim=16  model.decoder.out_dim=166 data.undirected=True train.target=native_fp train.use_rnamigos1_train=True model.use_pretrained=True model.pretrained_path=pretrained/R_1_16_undirected/model.pth name=retrain_r1_undirected_${SLURM_ARRAY_TASK_ID} train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
 
-:'
 # rnamigos 1 architecture + new data
 python experiments/train.py model.encoder.hidden_dim=16\
 			    model.decoder.in_dim=16 \
@@ -113,8 +112,7 @@ python experiments/train.py model.encoder.hidden_dim=64 \
 			     model.pretrained_path=pretrained/R_iso_64/model.pth \
 			     name=train_native_bigpockets_${SLURM_ARRAY_TASK_ID} \
 			     train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
-'
-
+			      
 # docking score target
 python experiments/train.py model.encoder.hidden_dim=64 \
 			    model.decoder.out_dim=166 \
@@ -128,4 +126,3 @@ python experiments/train.py model.encoder.hidden_dim=64 \
 			    train.rnamigos1_split=${SLURM_ARRAY_TASK_ID} \
 			    model.decoder.activation=none \
 			    train.num_workers=4
-
