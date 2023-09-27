@@ -41,11 +41,12 @@ if __name__ == "__main__":
                 p = Path(run, "ef.csv")
                 ef = pd.read_csv(p)
                     
+                print(run)
                 results.append({
                                 'MAR_mean': np.mean(ef['ef']),
                                 'MAR_std': np.std(ef['ef']),
                                 'split': split,
-                                'run': run,
+                                'run': '-'.join(run.split('-')[:-1]),
                                 **{p.split(".")[-1]: df[p][0] for p in grid_params}
                                 }
                                )
@@ -53,5 +54,7 @@ if __name__ == "__main__":
                 print("missing ", run, split) 
 
     df = pd.DataFrame(results)
-    split_meaned = df.groupby('run').mean().reset_index().drop_duplicates(subset='run').drop(['split', 'run'], axis=1).sort_values(by='MAR_mean')
+    print(df)
+    # split_meaned = df.groupby('run').mean().reset_index().drop_duplicates(subset='run').drop(['split', 'run'], axis=1).sort_values(by='MAR_mean')
+    split_meaned = df.groupby('run', as_index=False)['MAR_mean'].mean().reset_index().drop_duplicates(subset='run').sort_values(by='MAR_mean')
     print(split_meaned.to_markdown(index=False))

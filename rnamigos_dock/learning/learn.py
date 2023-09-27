@@ -67,7 +67,7 @@ def test(model, test_loader, criterion, device):
 
         # Do the computations for the forward pass
         with torch.no_grad():
-            pred = model(graph, docked_fp)
+            pred,_ = model(graph, docked_fp)
             if criterion.__repr__() == 'BCELoss()':
                 loss = criterion(pred.squeeze(), target.squeeze(dim=0).float())
             else:

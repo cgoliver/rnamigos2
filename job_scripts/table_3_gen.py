@@ -30,8 +30,10 @@ if __name__ == "__main__":
                     print("missing ", target, run, split) 
 
     df = pd.DataFrame(results)
-    split_meaned = df.groupby('run').mean().reset_index().drop_duplicates(subset='run').drop(['split'], axis=1).sort_values(by='MAR_mean')
-    print(split_meaned.to_markdown())
+    print(df)
+    # split_meaned = df.groupby('run').mean().reset_index().drop_duplicates(subset='run').drop(['split'], axis=1).sort_values(by='MAR_mean')
+    split_meaned = df.groupby('run').mean().reset_index().drop_duplicates(subset='run').sort_values(by='MAR_mean')
+    # print(split_meaned.to_markdown())
 
 
     
