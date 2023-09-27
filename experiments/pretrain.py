@@ -8,7 +8,7 @@ import hydra
 from rnaglib.kernels import node_sim
 from rnaglib.data_loading import rna_dataset, rna_loader
 from rnaglib.representations import GraphRepresentation, RingRepresentation
-from rnaglib.learning import models, learning_utils, learn
+from rnaglib.learning import learning_utils, learn
 from rnaglib.config.graph_keys import GRAPH_KEYS, TOOL
 
 from rnamigos_dock.learning.models import Embedder
@@ -27,7 +27,7 @@ def main(cfg: DictConfig):
     node_simfunc = node_sim.SimFunctionNode(method=cfg.simfunc, depth=cfg.depth)
     edge_map = GRAPH_KEYS['edge_map'][TOOL]
     edge_map = to_undirected(edge_map) if cfg.data.undirected else edge_map
-    graph_representation = GraphRepresentation(framework='dgl',edge_map=edge_map)
+    graph_representation = GraphRepresentation(framework='dgl', edge_map=edge_map)
     ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
     unsupervised_dataset = rna_dataset.RNADataset(nt_features=node_features,
                                                   data_path=cfg.data.pretrain_graphs,

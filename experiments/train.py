@@ -5,14 +5,14 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from loguru import logger
 
+from rnaglib.kernels.node_sim import SimFunctionNode
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import pandas as pd
 
-from rnamigos_dock.learning.loader import DockingDataset, get_systems, NativeSampler
-from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
+from rnamigos_dock.learning.loader import get_systems, DockingDataset, NativeSampler, RingCollater, VirtualScreenDataset
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
@@ -59,21 +59,31 @@ def main(cfg: DictConfig):
                                use_rnamigos1_train=cfg.train.use_rnamigos1_train,
                                use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
                                return_test=True)
+
+    if cfg.train.simfunc not in {'R_iso', 'R_1'}:
+        node_simfunc = None
+    else:
+        node_simfunc = SimFunctionNode(cfg.train.simfunc, depth=cfg.train.simfunc_depth)
+
     dataset_args = {'pockets_path': cfg.data.pocket_graphs,
                     'target': cfg.train.target,
                     'shuffle': cfg.train.shuffle,
                     'seed': cfg.train.seed,
                     'debug': cfg.debug,
                     'undirected': cfg.data.undirected}
-    train_dataset = DockingDataset(systems=train_systems, **dataset_args)
-    test_dataset = DockingDataset(systems=test_systems, **dataset_args)
+
+    train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
+    test_dataset = DockingDataset(systems=test_systems, use_rings=False, **dataset_args)
 
     train_sampler = NativeSampler(train_systems) if cfg.train.target == 'is_native' else None
     test_sampler = NativeSampler(test_systems) if cfg.train.target == 'is_native' else None
+    collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=cfg.train.max_kernel)
     loader_args = {'shuffle': train_sampler is None,
                    'batch_size': cfg.train.batch_size,
                    'num_workers': cfg.train.num_workers,
+                   'collate_fn': collater.collate
                    }
+
     train_loader = GraphDataLoader(dataset=train_dataset, sampler=train_sampler, **loader_args)
     test_loader = GraphDataLoader(dataset=test_dataset, sampler=test_sampler, **loader_args)
 
@@ -162,7 +172,8 @@ def main(cfg: DictConfig):
                      save_path=Path(result_folder, 'model.pth'),
                      writer=writer,
                      num_epochs=num_epochs,
-                     early_stop_threshold=cfg.train.early_stop)
+                     early_stop_threshold=cfg.train.early_stop,
+                     pretrain_weight=cfg.train.pretrain_weight)
 
     use_rnamigos1_ligands = False
     test_systems = get_systems(target=cfg.train.target,

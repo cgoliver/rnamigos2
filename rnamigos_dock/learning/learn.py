@@ -57,7 +57,9 @@ def test(model, test_loader, criterion, device):
     model.eval()
     test_loss = 0
     test_size = len(test_loader)
-    for batch_idx, (graph, docked_fp, target, idx) in enumerate(test_loader):
+    for batch_idx, (batch) in enumerate(test_loader):
+        graph, docked_fp, target, idx = batch['graph'], batch['ligand_fp'], batch['target'], batch['idx']
+
         # Get data on the devices
         docked_fp = docked_fp.to(device)
         target = target.to(device)
@@ -86,6 +88,7 @@ def train_dock(model,
                num_epochs=25,
                wall_time=None,
                early_stop_threshold=10,
+               pretrain_weight=0.1
                ):
     """
     Performs the entire training routine.
@@ -120,18 +123,25 @@ def train_dock(model,
         running_loss = 0.0
         time_epoch = time.perf_counter()
         num_batches = len(train_loader)
-        for batch_idx, (graph, docked_fp, target, idx) in enumerate(train_loader):
+        for batch_idx, (batch) in enumerate(train_loader):
+            graph, docked_fp, target, idx = batch['graph'], batch['ligand_fp'], batch['target'], batch['idx']
+            node_sim_block, subsampled_nodes = batch['rings']
             # Get data on the devices
             # convert ints to one hots
             graph = send_graph_to_device(graph, device)
             docked_fp = docked_fp.to(device)
             target = target.to(device)
-            pred = model(graph, docked_fp)
+            pred, embeddings = model(graph, docked_fp)
             if criterion.__repr__() == 'BCELoss()':
                 loss = criterion(pred.squeeze(), target.squeeze(dim=0).float())
             else:
                 loss = criterion(pred.squeeze(), target.float())
 
+            if pretrain_weight > 0 and node_sim_block is not None:
+                selected_embs = embeddings[subsampled_nodes]
+                K_predict = torch.mm(selected_embs, selected_embs.t())
+                pretrain_loss = torch.nn.MSELoss()(K_predict, node_sim_block)
+                loss += pretrain_weight * pretrain_loss
             # Backward
             loss.backward()
             optimizer.step()

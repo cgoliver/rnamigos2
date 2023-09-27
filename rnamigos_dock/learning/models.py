@@ -274,7 +274,7 @@ class RNAmigosModel(nn.Module):
             lig_h = self.lig_encoder(lig_fp)
             pred = torch.cat((pred, lig_h), dim=1)
         pred = self.decoder(pred)
-        return pred
+        return pred, embeddings
 
     def from_pretrained(self, model_path, verbose=True):
         state_dict = torch.load(model_path)
