@@ -60,7 +60,7 @@ def main(cfg: DictConfig):
                                use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
                                return_test=True)
 
-    if cfg.train.simfunc not in {'R_iso', 'R_1'}:
+    if cfg.train.simfunc not in {'R_iso', 'R_1', 'hungarian'}:
         node_simfunc = None
     else:
         node_simfunc = SimFunctionNode(cfg.train.simfunc, depth=cfg.train.simfunc_depth)
