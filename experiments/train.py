@@ -72,8 +72,10 @@ def main(cfg: DictConfig):
                     'debug': cfg.debug,
                     'undirected': cfg.data.undirected}
 
+    train_systems, validation_systems = np.split(train_systems.sample(frac=1, random_state=42),
+                                                 [int(.8 * len(train_systems))])
     train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
-    test_dataset = DockingDataset(systems=test_systems, use_rings=False, **dataset_args)
+    test_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
 
     train_sampler = NativeSampler(train_systems) if cfg.train.target == 'is_native' else None
     test_sampler = NativeSampler(test_systems) if cfg.train.target == 'is_native' else None
