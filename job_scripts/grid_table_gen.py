@@ -15,7 +15,7 @@ if __name__ == "__main__":
     # name=migos1_grid2-undirected_${undirected}-migos1_${migos1}-loss_${lossfunc}-lr_${lr}-split_${split}"
 
     # runs = glob.glob(str(RESULTS_DIR) + '/fp_native_grid2*')
-    runs = glob.glob(str(RESULTS_DIR) + '/migos1_grid2*')
+    runs = glob.glob(str(RESULTS_DIR) + '/migos1_grid3*')
     """
     grid_params = ['model.batch_norm', 
                    'model.dropout', 
@@ -34,26 +34,28 @@ if __name__ == "__main__":
 
     results = []
     for run in runs:
-        for split in range(10):
-            try:
-                with open(Path(run, 'config.yaml'), 'r') as f:
-                    df = pd.json_normalize(safe_load(f))
-                p = Path(run, "ef.csv")
-                ef = pd.read_csv(p)
-                    
-                print(run)
-                results.append({
-                                'MAR_mean': np.mean(ef['ef']),
-                                'MAR_std': np.std(ef['ef']),
-                                'split': split,
-                                'run': '-'.join(run.split('-')[:-1]),
-                                **{p.split(".")[-1]: df[p][0] for p in grid_params}
-                                }
-                               )
-            except FileNotFoundError:
-                print("missing ", run, split) 
+        try:
+            split = int(run.split("_")[-1])
+            with open(Path(run, 'config.yaml'), 'r') as f:
+                df = pd.json_normalize(safe_load(f))
+            p = Path(run, "ef.csv")
+            ef = pd.read_csv(p)
+                
+            print(run)
+            results.append({
+                            'MAR_mean': np.mean(ef['ef']),
+                            'MAR_std': np.std(ef['ef']),
+                            'split': split,
+                            'run': '-'.join(run.split('-')[:-1]),
+                            **{p.split(".")[-1]: df[p][0] for p in grid_params}
+                            }
+                           )
+        except FileNotFoundError:
+            print("missing ", run, split) 
 
     df = pd.DataFrame(results)
+    df = df.sort_values(by=['run', 'split'])
+    df.to_csv("tabl3.csv")
     print(df)
     # split_meaned = df.groupby('run').mean().reset_index().drop_duplicates(subset='run').drop(['split', 'run'], axis=1).sort_values(by='MAR_mean')
     split_meaned = df.groupby('run', as_index=False)['MAR_mean'].mean().reset_index().drop_duplicates(subset='run').sort_values(by='MAR_mean')
