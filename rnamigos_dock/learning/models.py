@@ -34,7 +34,7 @@ class Decoder(nn.Module):
 
         if activation == 'sigmoid':
             self.activation = nn.Sigmoid()
-        if activation == 'softmax':
+        elif activation == 'softmax':
             self.activation = nn.Softmax()
         else:
             self.activation = None

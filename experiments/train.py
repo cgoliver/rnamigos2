@@ -80,7 +80,7 @@ def main(cfg: DictConfig):
     validation_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
 
     train_sampler = NativeSampler(train_systems) if cfg.train.target == 'is_native' else None
-    validation_sampler = NativeSampler(validation_dataset) if cfg.train.target == 'is_native' else None
+    validation_sampler = NativeSampler(validation_systems) if cfg.train.target == 'is_native' else None
     collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=cfg.train.max_kernel)
     loader_args = {'shuffle': train_sampler is None,
                    'batch_size': cfg.train.batch_size,
