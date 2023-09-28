@@ -9,7 +9,6 @@ python_cmd="python experiments/pretrain.py
               model.encoder.hidden_dim=16
               model.encoder.subset_pocket_nodes=True
               data.undirected=True
-              device=gpu
               simfunc=R_1
               name=pretrain_R_1_undirected"
 python_cmd=$(echo $python_cmd) # to replace newlines
@@ -20,11 +19,10 @@ for simfunc in R_1 R_iso hungarian;
 do
 	for dim in 16 64;
     do
-    python_cmd="python experiments/train.py
+    python_cmd="python experiments/pretrain.py
                   model.dropout=0.3
                   model.encoder.hidden_dim=${dim}
                   model.encoder.subset_pocket_nodes=True
-                  device=gpu
                   simfunc=${simfunc}
                   name=pretrain_${simfunc}_${dim}"
     python_cmd=$(echo $python_cmd) # to replace newlines
