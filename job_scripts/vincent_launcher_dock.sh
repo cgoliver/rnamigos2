@@ -8,10 +8,10 @@ do
     do
     python_cmd="python experiments/train.py
                       model.encoder.hidden_dim=16
-                      model.encoder.hidden_dim=${dim+32}
-                      model.decoder.in_dim=${dim+32}
+                      model.encoder.hidden_dim=${dim}
+                      model.decoder.in_dim=$((dim+32))
                       model.decoder.out_dim=1
-                      model.decoder.activation=sigmoid
+                      model.decoder.activation=
 					            model.dropout=0.3
                       train.target=dock
                       train.loss=bce
@@ -28,13 +28,13 @@ do
     done
 done
 
-echo "${CMDARRAY[12]}"
+#echo "${CMDARRAY[13]}"
 
-#N_JOBS=50
-#for ((i = 0; i < ${#CMDARRAY[@]}; i++))
-#do
-#    eval "${CMDARRAY[$i]}" &
-#    [ $(( i+1 % N_JOBS )) -eq 0 ]  && wait
-#done
+N_JOBS=50
+for ((i = 0; i < ${#CMDARRAY[@]}; i++))
+do
+    eval "${CMDARRAY[$i]}" &
+    [ $(( i+1 % N_JOBS )) -eq 0 ]  && wait
+done
 
 

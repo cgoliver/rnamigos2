@@ -36,6 +36,8 @@ class Decoder(nn.Module):
             self.activation = nn.Sigmoid()
         if activation == 'softmax':
             self.activation = nn.Softmax()
+        else:
+            self.activation = None
 
         # create layers
         self.layers, self.batch_norms = self.build_model()
@@ -65,8 +67,9 @@ class Decoder(nn.Module):
                 output = F.dropout(output, self.dropout, training=self.training)
             else:
                 output = F.dropout(F.relu(output), self.dropout, training=self.training)
-
-        return self.activation(output)
+        if self.activation is not None:
+            output = self.activation(output)
+        return output
 
 
 class LigandEncoder(nn.Module):

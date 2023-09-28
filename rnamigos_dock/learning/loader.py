@@ -214,7 +214,12 @@ class DockingDataset(Dataset):
                                                  undirected=self.undirected,
                                                  use_rings=self.use_rings)
         ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
-        target = ligand_fp if self.target == 'native_fp' else row[2]
+        if self.target == 'native_fp':
+            target = ligand_fp
+        elif self.target == 'dock':
+            target = row[2]/40
+        else:
+            target = row[2]
         # print("1 : ", time.perf_counter() - t0)
         return {'graph': pocket_graph,
                 'ligand_fp': ligand_fp,
