@@ -36,7 +36,7 @@ class Decoder(nn.Module):
             self.activation = nn.Sigmoid()
         if activation == 'softmax':
             self.activation = nn.Softmax()
-        
+
         # create layers
         self.layers, self.batch_norms = self.build_model()
 
@@ -82,7 +82,7 @@ class LigandEncoder(nn.Module):
         self.dropout = dropout
         self.batch_norm = batch_norm
 
-        self.layers, self.batch_norms  = self.build_model()
+        self.layers, self.batch_norms = self.build_model()
 
     def build_model(self):
         layers = nn.ModuleList()
@@ -142,6 +142,7 @@ class Embedder(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_hidden_layers = num_hidden_layers
         self.num_rels = num_rels
+        num_bases = num_rels if num_bases == -1 else num_bases
         self.num_bases = num_bases
         self.batch_norm = batch_norm
         self.dropout = dropout
