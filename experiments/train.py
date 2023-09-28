@@ -104,6 +104,9 @@ def main(cfg: DictConfig):
                            dropout=cfg.model.dropout,
                            num_bases=cfg.model.encoder.num_bases
                            )
+    if cfg.model.use_pretrained:
+        print(">>> Using pretrained weights")
+        rna_encoder.from_pretrained(cfg.model.pretrained_path)
 
     lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
                                 hidden_dim=cfg.model.lig_encoder.hidden_dim,
@@ -125,11 +128,6 @@ def main(cfg: DictConfig):
                           pool=cfg.model.pool,
                           pool_dim=cfg.model.encoder.hidden_dim
                           )
-
-    print(model)
-    if cfg.model.use_pretrained:
-        print(">>> Using pretrained weights")
-        model.from_pretrained(cfg.model.pretrained_path, verbose=cfg.verbose)
 
     model = model.to(device)
 
@@ -177,11 +175,6 @@ def main(cfg: DictConfig):
                      num_epochs=num_epochs,
                      early_stop_threshold=cfg.train.early_stop,
                      pretrain_weight=cfg.train.pretrain_weight)
-
-    test_systems = get_systems(target=cfg.train.target,
-                               rnamigos1_split=cfg.train.rnamigos1_split,
-                               use_rnamigos1_train=cfg.train.use_rnamigos1_train,
-                               return_test=True)
 
     logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
     logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")

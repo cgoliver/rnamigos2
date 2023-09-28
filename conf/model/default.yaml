@@ -1,6 +1,6 @@
 encoder:
   in_dim: 4
-  hidden_dim: 32 
+  hidden_dim: 32
   num_layers: 3
   num_bases: -1
 
@@ -18,6 +18,6 @@ decoder:
 
 pool: 'att'
 dropout: 0.2
-batch_norm: true
-use_pretrained: false
-pretrained_path: pretrained/pretrained_model_graphlet.pth
+batch_norm: True
+use_pretrained: False
+pretrained_path: pretrained/R_1_16/model.pth

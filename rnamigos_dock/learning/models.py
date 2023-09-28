@@ -216,6 +216,11 @@ class Embedder(nn.Module):
         embeddings = torch.cat(all_embs, dim=0)
         return subgraph, embeddings
 
+    def from_pretrained(self, model_path):
+        state_dict = torch.load(model_path)
+        self.load_state_dict(state_dict)
+        return self
+
 
 ###############################################################################
 # Define full R-GCN model
@@ -277,13 +282,7 @@ class RNAmigosModel(nn.Module):
         pred = self.decoder(pred)
         return pred, embeddings
 
-    def from_pretrained(self, model_path, verbose=True):
+    def from_pretrained(self, model_path):
         state_dict = torch.load(model_path)
-        for n, p in state_dict.items():
-            try:
-                new_name = 'encoder.' + n
-                self.state_dict()[new_name] = p
-            except KeyError:
-                logger.info(f"Parameter {new_name} not in model")
-            else:
-                logger.info(f"Loaded parameter {new_name} from pretrained model")
+        self.load_state_dict(state_dict)
+        return self
