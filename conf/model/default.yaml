@@ -3,6 +3,7 @@ encoder:
   hidden_dim: 32
   num_layers: 3
   num_bases: -1
+  subset_pocket_nodes: True
 
 lig_encoder:
   in_dim: 166

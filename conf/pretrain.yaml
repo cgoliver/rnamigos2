@@ -10,3 +10,4 @@ epochs: 100
 simfunc: "R_1"
 depth: 2
 device: 'cpu'
+num_workers: 0

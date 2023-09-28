@@ -136,7 +136,8 @@ class Embedder(nn.Module):
         Model for producing node embeddings.
     """
 
-    def __init__(self, in_dim, hidden_dim, num_hidden_layers, batch_norm=True, num_rels=20, dropout=0.2, num_bases=-1):
+    def __init__(self, in_dim, hidden_dim, num_hidden_layers, subset_pocket_nodes=True,
+                 batch_norm=True, num_rels=20, dropout=0.2, num_bases=-1):
         super(Embedder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
@@ -146,6 +147,7 @@ class Embedder(nn.Module):
         self.num_bases = num_bases
         self.batch_norm = batch_norm
         self.dropout = dropout
+        self.subset_pocket_nodes = subset_pocket_nodes
 
         self.layers, self.batch_norms = self.build_model()
 
@@ -203,18 +205,20 @@ class Embedder(nn.Module):
 
         g.ndata['h'] = h
 
-        # This tedious step is necessary, otherwise subgraphing looses track of the batch
-        graphs = dgl.unbatch(g)
-        all_subgraphs = []
-        all_embs = []
-        for graph in graphs:
-            subgraph = dgl.node_subgraph(graph, graph.ndata['in_pocket'])
-            embeddings = subgraph.ndata.pop('h')
-            all_subgraphs.append(subgraph)
-            all_embs.append(embeddings)
-        subgraph = dgl.batch(all_subgraphs)
-        embeddings = torch.cat(all_embs, dim=0)
-        return subgraph, embeddings
+        graphs, embeddings = g, h
+        if self.subset_pocket_nodes:
+            # This tedious step is necessary, otherwise subgraphing looses track of the batch
+            graphs = dgl.unbatch(g)
+            all_subgraphs = []
+            all_embs = []
+            for graph in graphs:
+                subgraph = dgl.node_subgraph(graph, graph.ndata['in_pocket'])
+                embeddings = subgraph.ndata.pop('h')
+                all_subgraphs.append(subgraph)
+                all_embs.append(embeddings)
+            graphs = dgl.batch(all_subgraphs)
+            embeddings = torch.cat(all_embs, dim=0)
+        return graphs, embeddings
 
     def from_pretrained(self, model_path):
         state_dict = torch.load(model_path)

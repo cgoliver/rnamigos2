@@ -30,13 +30,16 @@ def main(cfg: DictConfig):
     graph_representation = GraphRepresentation(framework='dgl', edge_map=edge_map)
     ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
     unsupervised_dataset = rna_dataset.RNADataset(nt_features=node_features,
-                                                  data_path=cfg.data.pretrain_graphs,
+                                                  graphs_path=cfg.data.pretrain_graphs,
                                                   representations=[ring_representation, graph_representation])
-    train_loader = rna_loader.get_loader(dataset=unsupervised_dataset, split=False, num_workers=4)
+    train_loader = rna_loader.get_loader(dataset=unsupervised_dataset, split=False, num_workers=cfg.num_workers)
 
     model = Embedder(in_dim=cfg.model.encoder.in_dim,
                      hidden_dim=cfg.model.encoder.hidden_dim,
                      num_hidden_layers=cfg.model.encoder.num_layers,
+                     batch_norm=cfg.model.batch_norm,
+                     dropout=cfg.model.dropout,
+                     subset_pocket_nodes=False
                      )
 
     optimizer = torch.optim.Adam(model.parameters())
@@ -45,7 +48,7 @@ def main(cfg: DictConfig):
                                 train_loader=train_loader,
                                 learning_routine=learning_utils.LearningRoutine(num_epochs=cfg.epochs),
                                 rec_params={"similarity": True, "normalize": False, "use_graph": True,
-                                            "hops": cfg.depth, "device": cfg.device})
+                                            "hops": cfg.depth})
     model_dir = Path(cfg.paths.pretrain_save, cfg.name)
     model_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), Path(model_dir, 'model.pth'))
