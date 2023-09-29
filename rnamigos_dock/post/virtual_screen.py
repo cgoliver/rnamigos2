@@ -38,7 +38,7 @@ def enrichment_factor(scores, is_active, lower_is_better=True, **kwargs):
     return (n_actives_screened / n_screened) / (n_actives / len(scores))
 
 
-def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
+def run_virtual_screen(model, dataloader, metric=mean_active_rank, use_embedding_distance=True, **kwargs):
     """run_virtual_screen.
 
     :param model: trained affinity prediction model
@@ -64,7 +64,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
         model = model.to('cpu')
         scores = list(model.predict_ligands(pocket_graph, 
                                             ligands, 
-                                            use_embedding_distance=kwargs['use_embedding_distance']).squeeze().cpu().numpy())
+                                            use_embedding_distance=use_embedding_distance).squeeze().cpu().numpy())
         all_scores.append(scores)
         efs.append(metric(scores, is_active, **kwargs))
         inds.append(i)
