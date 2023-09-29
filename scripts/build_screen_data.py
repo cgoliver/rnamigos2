@@ -76,6 +76,8 @@ def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv'
         if not no_decoyfinder:
             with open(decoyfinder_path / 'decoys.txt', 'w') as de:
                 de.write("\n".join(get_decoyfinder_decoys(pocket.LIGAND_SMILES)))
+        with open(decoyfinder_path/ 'actives.txt', 'w') as ac:
+            ac.write(pocket.LIGAND_SMILES)
 
 
 pass

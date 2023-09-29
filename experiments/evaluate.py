@@ -99,19 +99,20 @@ def main(cfg: DictConfig):
         Experiment Setup
         '''
         lower_is_better = params['train']['target'] in ['dock', 'native_fp']
-        efs, inds, scores = run_virtual_screen(model, 
-                                               dataloader, 
-                                               metric=mean_active_rank, 
-                                               lower_is_better=lower_is_better,
-                                               use_embedding_distance=params['train']['target'] == 'native_fp'
-                                               )
+        efs, inds, scores, pocket_id  = run_virtual_screen(model, 
+                                                           dataloader, 
+                                                           metric=mean_active_rank, 
+                                                           lower_is_better=lower_is_better,
+                                                           use_embedding_distance=params['train']['target'] == 'native_fp'
+                                                           )
         for ef, score, ind in zip(efs, scores, inds):
 
             rows.append({
                          'score': ef,
                          'metric': 'MAR',
                          'data_idx': ind,
-                         'decoys': decoy_mode
+                         'decoys': decoy_mode,
+                         'pocket_id': pocket_id
                          }
                         )
 

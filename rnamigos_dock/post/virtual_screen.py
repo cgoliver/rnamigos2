@@ -53,6 +53,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, use_embedding
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
     failed_set = set()
     for i, (pocket_graph, ligands, is_active) in enumerate(dataloader):
+        pocket_id = dataloader.dataset.all_pockets_id[i]
         if pocket_graph is None:
             failed_set.add(pocket_graph)
             logger.trace(pocket_graph)
@@ -70,4 +71,4 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, use_embedding
         inds.append(i)
     logger.debug(f"VS failed on {failed_set}")
     print(efs)
-    return efs, inds, all_scores
+    return efs, inds, all_scores, pocket_id
