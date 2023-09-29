@@ -99,12 +99,12 @@ def main(cfg: DictConfig):
         Experiment Setup
         '''
         lower_is_better = params['train']['target'] in ['dock', 'native_fp']
-        efs, inds, scores, pocket_id  = run_virtual_screen(model, 
+        efs, inds, scores, pocket_ids  = run_virtual_screen(model, 
                                                            dataloader, 
                                                            metric=mean_active_rank, 
                                                            lower_is_better=lower_is_better,
                                                            )
-        for ef, score, ind in zip(efs, scores, inds):
+        for ef, score, ind, pocket_id in zip(efs, scores, inds, pocket_ids):
 
             rows.append({
                          'score': ef,
