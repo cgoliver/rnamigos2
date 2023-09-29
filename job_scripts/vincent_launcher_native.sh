@@ -15,8 +15,8 @@ do
 					            model.dropout=0.3
                       train.target=is_native
                       train.loss=bce
-                      train.num_epochs=100
-                      train.early_stop=50
+                      train.num_epochs=1000
+                      train.early_stop=100
                       train.learning_rate=1e-3
                       train.rnamigos1_split=${split}
                       name=rnamigos2_native_dim${dim}_${split}
@@ -38,8 +38,8 @@ for dim in 16 64;
                   model.dropout=0.3
                   train.target=is_native
                   train.loss=bce
-                  train.num_epochs=100
-                  train.early_stop=50
+                  train.num_epochs=1000
+                  train.early_stop=100
                   train.learning_rate=1e-3
                   name=native_chembl_dim${dim}
                   device=cpu

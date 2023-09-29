@@ -107,6 +107,7 @@ def main(cfg: DictConfig):
     if cfg.model.use_pretrained:
         print(">>> Using pretrained weights")
         rna_encoder.from_pretrained(cfg.model.pretrained_path)
+    rna_encoder.subset_pocket_nodes=True
 
     lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
                                 hidden_dim=cfg.model.lig_encoder.hidden_dim,

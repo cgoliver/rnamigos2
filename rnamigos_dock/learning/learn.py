@@ -138,7 +138,9 @@ def train_dock(model,
                 loss = criterion(pred.squeeze(), target.float())
 
             if pretrain_weight > 0 and node_sim_block is not None:
-                selected_embs = embeddings[subsampled_nodes]
+                subsampled_nodes_tensor = torch.tensor(subsampled_nodes, dtype=torch.bool)
+                selected_embs = embeddings[torch.where(subsampled_nodes_tensor == 1)]
+                node_sim_block = node_sim_block.to(device)
                 K_predict = torch.mm(selected_embs, selected_embs.t())
                 pretrain_loss = torch.nn.MSELoss()(K_predict, node_sim_block)
                 loss += pretrain_weight * pretrain_loss
