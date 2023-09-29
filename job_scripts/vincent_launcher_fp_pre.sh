@@ -34,40 +34,64 @@ CMDARRAY=()
 #  done
 #done
 #20xp
-for split in {0..9};
-do
-  for simfunc in R_1 R_iso hungarian
-  do
-    for prew in 0 1
-    do
-      for dim in 16 64;
-      do
-      python_cmd="python experiments/train.py
-                        model.encoder.hidden_dim=16
-                        model.decoder.in_dim=${dim}
-                        model.decoder.out_dim=166
-                        model.encoder.hidden_dim=${dim}
-                        model.decoder.activation=sigmoid
-                        model.use_pretrained=True
-                        model.pretrained_path=pretrained/pretrain_${simfunc}_${dim}/model.pth
-                        train.target=native_fp
-                        train.loss=bce
-                        train.num_epochs=1000
-                        train.early_stop=100
-                        train.learning_rate=1e-3
-                        train.num_workers=0
-                        train.rnamigos1_split=${split}
-                        train.use_rnamigos1_train=False
-                        train.pretrain_weight=${prew}
-                        train.simfunc=${simfunc}
-                        device=cpu
-                        name=rnamigos2_dim${dim}_sim${simfunc}_prew${prew}_${split}"
-      python_cmd=$(echo $python_cmd) # to replace newlines
-      CMDARRAY+=("$python_cmd")
-      done
-    done
-  done
-done
+#for split in {0..9};
+#do
+#  for simfunc in R_1 R_iso hungarian
+#  do
+#    for prew in 0 1
+#    do
+#      for dim in 16 64;
+#      do
+#      python_cmd="python experiments/train.py
+#                        model.encoder.hidden_dim=16
+#                        model.decoder.in_dim=${dim}
+#                        model.decoder.out_dim=166
+#                        model.encoder.hidden_dim=${dim}
+#                        model.decoder.activation=sigmoid
+#                        model.use_pretrained=True
+#                        model.pretrained_path=pretrained/pretrain_${simfunc}_${dim}/model.pth
+#                        train.target=native_fp
+#                        train.loss=bce
+#                        train.num_epochs=1000
+#                        train.early_stop=100
+#                        train.learning_rate=1e-3
+#                        train.num_workers=0
+#                        train.rnamigos1_split=${split}
+#                        train.use_rnamigos1_train=False
+#                        train.pretrain_weight=${prew}
+#                        train.simfunc=${simfunc}
+#                        device=cpu
+#                        name=rnamigos2_dim${dim}_sim${simfunc}_prew${prew}_${split}"
+#      python_cmd=$(echo $python_cmd) # to replace newlines
+#      CMDARRAY+=("$python_cmd")
+#      done
+#    done
+#  done
+#done
+#CHEMBL RUN
+python_cmd="python experiments/train.py
+                  model.encoder.hidden_dim=16
+                  model.decoder.in_dim=64
+                  model.decoder.out_dim=166
+                  model.encoder.hidden_dim=64
+                  model.decoder.activation=sigmoid
+                  model.use_pretrained=True
+                  model.pretrained_path=pretrained/pretrain_hungarian_64/model.pth
+                  train.target=native_fp
+                  train.loss=bce
+                  train.num_epochs=1000
+                  train.early_stop=100
+                  train.learning_rate=1e-3
+                  train.num_workers=0
+                  train.rnamigos1_split=None
+                  train.use_rnamigos1_train=False
+                  train.pretrain_weight=0
+                  train.simfunc=None
+                  device=cpu
+                  name=rnamigos2_dim64_simhungarian_prew0"
+python_cmd=$(echo $python_cmd) # to replace newlines
+CMDARRAY+=("$python_cmd")
+
 #120xp
 
 #echo "${CMDARRAY[40]}"

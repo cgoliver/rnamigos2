@@ -45,16 +45,38 @@
 #                  device=cpu
 #                  train.num_workers=0"
 #done
-#python_cmd=$(echo $python_cmd) # to replace newlines
-#CMDARRAY+=("$python_cmd")
-#
-#echo "${CMDARRAY[13]}"
-#
-##N_JOBS=50
-##for ((i = 0; i < ${#CMDARRAY[@]}; i++))
-##do
-##    eval "${CMDARRAY[$i]}" &
-##    [ $(( i+1 % N_JOBS )) -eq 0 ]  && wait
-##done
-#
-#
+
+python_cmd="python experiments/train.py
+                  model.encoder.hidden_dim=16
+                  model.encoder.hidden_dim=64
+                  model.decoder.in_dim=96
+                  model.decoder.out_dim=1
+                  model.decoder.activation=sigmoid
+                  model.use_pretrained=True
+                  model.pretrained_path=pretrained/pretrain_hungarian_64/model.pth
+                  train.target=is_native
+                  train.loss=bce
+                  train.num_epochs=1000
+                  train.early_stop=100
+                  train.learning_rate=1e-3
+                  name=native_chembl_dim64_simhungarian_prew0
+                  device=cpu
+                  train.num_workers=0
+                  train.rnamigos1_split=None
+                  train.pretrain_weight=0
+                  train.simfunc=None"
+
+
+python_cmd=$(echo $python_cmd) # to replace newlines
+CMDARRAY+=("$python_cmd")
+
+echo "${CMDARRAY[0]}"
+
+#N_JOBS=50
+#for ((i = 0; i < ${#CMDARRAY[@]}; i++))
+#do
+#    eval "${CMDARRAY[$i]}" &
+#    [ $(( i+1 % N_JOBS )) -eq 0 ]  && wait
+#done
+
+

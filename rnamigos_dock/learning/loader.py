@@ -127,7 +127,7 @@ def get_systems(target='dock', rnamigos1_split=None, return_test=False,
     :return:
     """
     # Can't split twice
-    assert rnamigos1_split is None or rnamigos1_split in {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+    assert rnamigos1_split in {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
     if target == 'dock':
         interactions_csv = os.path.join(script_dir, '../../data/csvs/docking_data.csv')
     elif target == 'native_fp':
@@ -137,7 +137,7 @@ def get_systems(target='dock', rnamigos1_split=None, return_test=False,
     else:
         raise ValueError("train.target should be in {dock, native_fp, is_native}, received : " + target)
     systems = pd.read_csv(interactions_csv, index_col=0)
-    if rnamigos1_split is None:
+    if rnamigos1_split == -1:
         split = 'TEST' if return_test else 'TRAIN'
         systems = systems.loc[systems['SPLIT'] == split]
     else:
