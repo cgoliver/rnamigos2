@@ -14,7 +14,7 @@ shuffle: true
 loss: 'l2'
 use_rnamigos1_train: False
 use_rnamigos1_ligands: False
-rnamigos1_split: none 
+rnamigos1_split: None
 learning_rate: 1e-3
 pretrain_weight: 0.
 simfunc: None

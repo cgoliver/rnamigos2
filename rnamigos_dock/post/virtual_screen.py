@@ -28,8 +28,6 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
     return (np.mean([rank for rank, (score, is_active) in enumerate(is_active_sorted) if is_active]) + 1) / len(scores)
 
 
-
-
 def enrichment_factor(scores, is_active, lower_is_better=True, **kwargs):
     n_actives = np.sum(is_active)
     n_screened = int(kwargs['frac'] * len(scores))
@@ -38,7 +36,7 @@ def enrichment_factor(scores, is_active, lower_is_better=True, **kwargs):
     return (n_actives_screened / n_screened) / (n_actives / len(scores))
 
 
-def run_virtual_screen(model, dataloader, metric=mean_active_rank, use_embedding_distance=True, **kwargs):
+def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     """run_virtual_screen.
 
     :param model: trained affinity prediction model
@@ -49,7 +47,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, use_embedding
     :returns scores: list of scores, one for each graph in the dataset 
     :returns inds: list of indices in the dataloader for which the score computation was successful
     """
-    efs, inds, all_scores, pocket_ids = [],[],[],[]
+    efs, inds, all_scores, pocket_ids = [], [], [], []
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
     failed_set = set()
     for i, (pocket_graph, ligands, is_active) in enumerate(dataloader):
@@ -63,8 +61,8 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, use_embedding
             logger.info(f"Done {i}/{len(dataloader)}")
 
         model = model.to('cpu')
-        scores = list(model.predict_ligands(pocket_graph, 
-                                            ligands, 
+        scores = list(model.predict_ligands(pocket_graph,
+                                            ligands,
                                             ).squeeze().cpu().numpy())
         all_scores.append(scores)
         efs.append(metric(scores, is_active, **kwargs))

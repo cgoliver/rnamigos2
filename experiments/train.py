@@ -22,6 +22,7 @@ from rnamigos_dock.learning.utils import mkdirs
 
 torch.set_num_threads(1)
 
+
 @hydra.main(version_base=None, config_path="../conf", config_name="train")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
@@ -173,6 +174,9 @@ def main(cfg: DictConfig):
     Run
     '''
     num_epochs = cfg.train.num_epochs
+    save_path = Path(result_folder, 'model.pth')
+    # model = model.from_pretrained(save_path)
+    # model.eval()
 
     print("training...")
     learn.train_dock(model=model,
@@ -181,7 +185,7 @@ def main(cfg: DictConfig):
                      device=device,
                      train_loader=train_loader,
                      val_loader=val_loader,
-                     save_path=Path(result_folder, 'model.pth'),
+                     save_path=save_path,
                      writer=writer,
                      num_epochs=num_epochs,
                      early_stop_threshold=cfg.train.early_stop,
@@ -204,7 +208,7 @@ def main(cfg: DictConfig):
     dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
     lower_is_better = cfg.train.target in ['dock', 'native_fp']
-    efs, inds, scores = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
+    efs, inds, scores, pocket_ids = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
 
     df = pd.DataFrame({'ef': efs, 'inds': inds})
     df.to_csv(Path(result_folder, 'ef.csv'))

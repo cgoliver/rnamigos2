@@ -291,5 +291,7 @@ class RNAmigosModel(nn.Module):
 
     def from_pretrained(self, model_path):
         state_dict = torch.load(model_path)
+        if 'model_state_dict' in state_dict:
+            state_dict = state_dict['model_state_dict']
         self.load_state_dict(state_dict)
         return self
