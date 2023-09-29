@@ -44,12 +44,12 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     :param model: trained affinity prediction model
     :param dataloader: Loader of VirtualScreenDataset object
     :param metric: function that takes a list of prediction and an is_active indicator and returns a score 
+    :param return_model_outputs: whether to return the scores given by the model.
 
     :returns scores: list of scores, one for each graph in the dataset 
     :returns inds: list of indices in the dataloader for which the score computation was successful
     """
-    efs = []
-    inds = []
+    efs, inds, all_scores = [],[],[]
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
     failed_set = set()
     for i, (pocket_graph, ligands, is_active) in enumerate(dataloader):
@@ -62,8 +62,12 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
             logger.info(f"Done {i}/{len(dataloader)}")
 
         model = model.to('cpu')
-        scores = list(model.predict_ligands(pocket_graph, ligands).squeeze().cpu().numpy())
+        scores = list(model.predict_ligands(pocket_graph, 
+                                            ligands, 
+                                            use_embedding_distance=kwargs['use_embedding_distance']).squeeze().cpu().numpy())
+        all_scores.append(scores)
         efs.append(metric(scores, is_active, **kwargs))
         inds.append(i)
     logger.debug(f"VS failed on {failed_set}")
-    return efs, inds
+    print(efs)
+    return efs, inds, all_scores

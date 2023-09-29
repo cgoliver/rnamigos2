@@ -15,7 +15,7 @@ if __name__ == "__main__":
     # name=migos1_grid2-undirected_${undirected}-migos1_${migos1}-loss_${lossfunc}-lr_${lr}-split_${split}"
 
     # runs = glob.glob(str(RESULTS_DIR) + '/fp_native_grid2*')
-    runs = glob.glob(str(RESULTS_DIR) + '/migos1_grid3*')
+    runs = glob.glob(str(RESULTS_DIR) + '/table2-rnamigos1*')
     """
     grid_params = ['model.batch_norm', 
                    'model.dropout', 

@@ -3,5 +3,7 @@ defaults:
   - tokens: default
   - model: default
   - train: default
-decoys: pdb
+decoys: all 
 saved_model_dir: . 
+result_dir: results/
+csv_name: default.csv
