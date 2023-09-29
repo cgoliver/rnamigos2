@@ -91,8 +91,6 @@ def main(cfg: DictConfig):
                                        decoy_mode=decoy_mode,
                                        fp_type='MACCS')
 
-        print(dataset[0])
-
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
         print('Created data loader')

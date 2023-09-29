@@ -5,5 +5,5 @@ defaults:
   - train: default
 decoys: all 
 saved_model_dir: . 
-result_dir: results/
+result_dir: outputs/
 csv_name: default.csv
