@@ -65,7 +65,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, use_embedding
         model = model.to('cpu')
         scores = list(model.predict_ligands(pocket_graph, 
                                             ligands, 
-                                            use_embedding_distance=use_embedding_distance).squeeze().cpu().numpy())
+                                            ).squeeze().cpu().numpy())
         all_scores.append(scores)
         efs.append(metric(scores, is_active, **kwargs))
         inds.append(i)
