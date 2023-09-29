@@ -1,4 +1,6 @@
 from pathlib import Path
+
+import numpy.random
 from dgl.dataloading import GraphDataLoader
 
 import hydra
@@ -26,6 +28,7 @@ def main(cfg: DictConfig):
     print('Done importing')
 
     if cfg.train.seed > 0:
+        numpy.random.seed(cfg.train.seed)
         torch.manual_seed(cfg.train.seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False

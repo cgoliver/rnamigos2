@@ -4,6 +4,28 @@ CMDARRAY=()
 
 for split in {0..9};
 do
+  #  FIRST NO PRE, UNDIRECTED
+  python_cmd="python experiments/train.py
+                    data.undirected=True
+                    model.decoder.in_dim=16
+                    model.decoder.out_dim=166
+                    model.encoder.num_bases=null
+                    model.encoder.hidden_dim=16
+                    model.decoder.activation=sigmoid
+                    train.target=native_fp
+                    train.loss=bce
+                    train.num_epochs=1000
+                    train.early_stop=100
+                    train.learning_rate=1e-3
+                    train.num_workers=0
+                    train.rnamigos1_split=$split
+                    train.use_rnamigos1_train=True
+                    device=cpu
+                    name=rnamigos1_repro_real_$split"
+  python_cmd=$(echo $python_cmd) # to replace newlines
+  CMDARRAY+=("$python_cmd")
+
+  # directed migos1
   python_cmd="python experiments/train.py
                         model.decoder.in_dim=16
 										    model.decoder.out_dim=166

@@ -4,27 +4,7 @@ CMDARRAY=()
 
 for split in {0..9};
 do
-#  FIRST NO PRE, BUT R_1 WAS DIRECTED
-#  THIS SHOULD BE MOVED IN FP_nopre, I forgot data=undirected
-  python_cmd="python experiments/train.py
-                    data.undirected=True
-                    model.decoder.in_dim=16
-                    model.decoder.out_dim=166
-                    model.encoder.num_bases=null
-                    model.encoder.hidden_dim=16
-                    model.decoder.activation=sigmoid
-                    train.target=native_fp
-                    train.loss=bce
-                    train.num_epochs=1000
-                    train.early_stop=100
-                    train.learning_rate=1e-3
-                    train.num_workers=0
-                    train.rnamigos1_split=$split
-                    train.use_rnamigos1_train=True
-                    device=cpu
-                    name=rnamigos1_repro_real_$split"
-  python_cmd=$(echo $python_cmd) # to replace newlines
-  CMDARRAY+=("$python_cmd")
+  # R_1 undirected pre
   for prew in 0 1
   do
     python_cmd="python experiments/train.py
@@ -34,6 +14,8 @@ do
                           model.encoder.num_bases=null
                           model.encoder.hidden_dim=16
                           model.decoder.activation=sigmoid
+                          model.use_pretrained=True
+                          model.pretrained_path=pretrained/pretrain_R_1_undirected/model.pth
                           train.target=native_fp
                           train.loss=bce
                           train.num_epochs=1000
@@ -50,7 +32,7 @@ do
     CMDARRAY+=("$python_cmd")
   done
 done
-
+#20xp
 for split in {0..9};
 do
   for simfunc in R_1 R_iso hungarian
@@ -65,6 +47,8 @@ do
                         model.decoder.out_dim=166
                         model.encoder.hidden_dim=${dim}
                         model.decoder.activation=sigmoid
+                        model.use_pretrained=True
+                        model.pretrained_path=pretrained/pretrain_${simfunc}_${dim}/model.pth
                         train.target=native_fp
                         train.loss=bce
                         train.num_epochs=1000
@@ -83,7 +67,7 @@ do
     done
   done
 done
-
+#120xp
 N_JOBS=30
 for ((i = 0; i < ${#CMDARRAY[@]}; i++))
 do
