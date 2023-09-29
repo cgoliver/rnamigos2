@@ -1,4 +1,6 @@
 from pathlib import Path
+
+import numpy.random
 from dgl.dataloading import GraphDataLoader
 
 import hydra
@@ -20,13 +22,13 @@ from rnamigos_dock.learning.utils import mkdirs
 
 torch.set_num_threads(1)
 
-
 @hydra.main(version_base=None, config_path="../conf", config_name="train")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
     print('Done importing')
 
     if cfg.train.seed > 0:
+        numpy.random.seed(cfg.train.seed)
         torch.manual_seed(cfg.train.seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
