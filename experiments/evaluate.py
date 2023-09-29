@@ -103,7 +103,6 @@ def main(cfg: DictConfig):
                                                            dataloader, 
                                                            metric=mean_active_rank, 
                                                            lower_is_better=lower_is_better,
-                                                           use_embedding_distance=params['train']['target'] == 'native_fp'
                                                            )
         for ef, score, ind in zip(efs, scores, inds):
 
