@@ -26,14 +26,6 @@ do
 
 	for dim in 16 64;
     do
-#      python experiments/train.py model.encoder.hidden_dim=16 \
-       #		            model.decoder.in_dim=16 \
-       #			    model.decoder.out_dim=166 \
-       #			    data.undirected=False \
-       #			    train.target=native_fp \
-       #			    train.loss=bce \
-       #			    name=directed_bigpockets_${SLURM_ARRAY_TASK_ID} \
-       #			    train.rnamigos1_split=${SLURM_ARRAY_TASK_ID}
     python_cmd="python experiments/train.py
                       model.encoder.hidden_dim=16
                       model.decoder.in_dim=${dim}

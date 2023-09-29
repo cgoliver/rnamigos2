@@ -20,7 +20,6 @@ from rnamigos_dock.learning.utils import mkdirs
 
 torch.set_num_threads(1)
 
-
 @hydra.main(version_base=None, config_path="../conf", config_name="train")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
