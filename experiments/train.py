@@ -20,6 +20,7 @@ from rnamigos_dock.learning.utils import mkdirs
 
 torch.set_num_threads(1)
 
+
 @hydra.main(version_base=None, config_path="../conf", config_name="train")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
@@ -78,17 +79,24 @@ def main(cfg: DictConfig):
                                                  [int(.8 * len(train_systems))])
     train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
     validation_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
-
+    # These one cannot be a shared object
     train_sampler = NativeSampler(train_systems) if cfg.train.target == 'is_native' else None
     validation_sampler = NativeSampler(validation_systems) if cfg.train.target == 'is_native' else None
-    collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=cfg.train.max_kernel)
+    # Cannot collect empty rings...
+    train_collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=cfg.train.max_kernel)
+    val_collater = RingCollater(node_simfunc=None)
     loader_args = {'shuffle': train_sampler is None,
                    'batch_size': cfg.train.batch_size,
-                   'num_workers': cfg.train.num_workers,
-                   'collate_fn': collater.collate}
+                   'num_workers': cfg.train.num_workers}
 
-    train_loader = GraphDataLoader(dataset=train_dataset, sampler=train_sampler, **loader_args)
-    val_loader = GraphDataLoader(dataset=validation_dataset, sampler=validation_sampler, **loader_args)
+    train_loader = GraphDataLoader(dataset=train_dataset,
+                                   sampler=train_sampler,
+                                   collate_fn=train_collater.collate,
+                                   **loader_args)
+    val_loader = GraphDataLoader(dataset=validation_dataset,
+                                 sampler=validation_sampler,
+                                 collate_fn=val_collater.collate,
+                                 **loader_args)
 
     print('Created data loader')
 
@@ -107,7 +115,7 @@ def main(cfg: DictConfig):
     if cfg.model.use_pretrained:
         print(">>> Using pretrained weights")
         rna_encoder.from_pretrained(cfg.model.pretrained_path)
-    rna_encoder.subset_pocket_nodes=True
+    rna_encoder.subset_pocket_nodes = True
 
     lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
                                 hidden_dim=cfg.model.lig_encoder.hidden_dim,
