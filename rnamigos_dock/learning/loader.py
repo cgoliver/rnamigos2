@@ -1,8 +1,10 @@
 import os
 import sys
 
-import itertools
+import dgl
 from dgl.dataloading import GraphCollator
+import itertools
+import networkx as nx
 import numpy as np
 from numpy import random
 from pathlib import Path
@@ -15,6 +17,7 @@ from rdkit.Chem import AllChem
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
 import torch
 from torch.utils.data import Dataset, Sampler
+from collections import defaultdict
 
 RDLogger.DisableLog('rdApp.*')  # disable warnings
 
@@ -56,7 +59,7 @@ def mol_encode_list(smiles_list, fp_type, encoding_func=mol_encode_one):
     return np.array(fps), ok_inds
 
 
-class MolEncoder:
+class MolFPEncoder:
     """
     Stateful encoder for using cashed computations
     """
@@ -66,13 +69,99 @@ class MolEncoder:
         cashed_path = os.path.join(script_dir, f'../../data/ligands/{"maccs" if fp_type == "MACCS" else "morgan"}.p')
         self.cashed_fps = pickle.load(open(cashed_path, 'rb'))
 
-    def encode_mol(self, smiles, fp_type=None):
+    def smiles_to_fp_one(self, smiles):
         if smiles in self.cashed_fps:
             return self.cashed_fps[smiles], True
         return mol_encode_one(smiles, self.fp_type)
 
-    def encode_list(self, smiles_list):
-        return mol_encode_list(smiles_list, fp_type=self.fp_type, encoding_func=self.encode_mol)
+    def smiles_to_fp_list(self, smiles_list):
+        return mol_encode_list(smiles_list, fp_type=self.fp_type, encoding_func=self.smiles_to_fp_one)
+
+
+def smiles_to_nx(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+
+    mol_graph = nx.Graph()
+
+    for atom in mol.GetAtoms():
+        mol_graph.add_node(atom.GetIdx(),
+                           atomic_num=atom.GetAtomicNum(),
+                           formal_charge=atom.GetFormalCharge(),
+                           chiral_tag=atom.GetChiralTag(),
+                           num_explicit_hs=atom.GetNumExplicitHs(),
+                           is_aromatic=atom.GetIsAromatic())
+
+    for bond in mol.GetBonds():
+        mol_graph.add_edge(bond.GetBeginAtomIdx(),
+                           bond.GetEndAtomIdx(),
+                           bond_type=bond.GetBondType())
+    return mol_graph
+
+
+def oh_tensor(category, n):
+    # One-hot float tensor construction
+    t = torch.zeros(n, dtype=torch.float)
+    t[category] = 1.0
+    return t
+
+
+class MolGraphEncoder:
+    """
+    Stateful encoder for using cashed computations
+    """
+
+    def __init__(self):
+        with open(os.path.join(script_dir, f'../../data/map_files/edges_and_nodes_map.pickle'), "rb") as f:
+            self.edge_map = pickle.load(f)
+            self.at_map = pickle.load(f)
+            self.chi_map = pickle.load(f)
+            self.charges_map = pickle.load(f)
+        cashed_path = os.path.join(script_dir, f'../../data/ligands/lig_graphs.p')
+        self.cashed_graphs = pickle.load(open(cashed_path, 'rb'))
+
+    @staticmethod
+    def set_as_one_hot_feat(graph_nx, edge_map, node_label, default_value=None):
+        one_hot = {a: oh_tensor(edge_map.get(label, default_value), len(edge_map)) for a, label in
+                   (nx.get_node_attributes(graph_nx, node_label)).items()}
+        nx.set_node_attributes(graph_nx, name=node_label, values=one_hot)
+
+    def as_one_hot(self, graph_nx):
+        self.set_as_one_hot_feat(graph_nx, edge_map=self.at_map, node_label='atomic_num', default_value=6)
+        self.set_as_one_hot_feat(graph_nx, edge_map=self.charges_map, node_label='formal_charge', default_value=0)
+        self.set_as_one_hot_feat(graph_nx, edge_map=self.chi_map, node_label='num_explicit_hs', default_value=0)
+        self.set_as_one_hot_feat(graph_nx, edge_map=self.chi_map, node_label='is_aromatic', default_value=0)
+        self.set_as_one_hot_feat(graph_nx, edge_map=self.chi_map, node_label='chiral_tag', default_value=0)
+
+    def graph_encode_one(self, smiles):
+        try:
+            graph_nx = smiles_to_nx(smiles)
+
+            # Get edges as one hot
+            edge_type = {edge: torch.tensor(self.edge_map[label]) for edge, label in
+                         (nx.get_edge_attributes(graph_nx, 'bond_type')).items()}
+            nx.set_edge_attributes(graph_nx, name='edge_type', values=edge_type)
+
+            # Set node features as one_hot
+            self.as_one_hot(graph_nx)
+
+            # to dgl
+            node_features = ['atomic_num', 'formal_charge', 'num_explicit_hs', 'is_aromatic', 'chiral_tag']
+            graph_nx = graph_nx.to_directed()
+            graph_dgl = dgl.from_networkx(nx_graph=graph_nx,
+                                          node_attrs=node_features,
+                                          edge_attrs=['edge_type'])
+
+            N = graph_dgl.number_of_nodes()
+            graph_dgl.ndata['h'] = torch.cat([graph_dgl.ndata[f].view(N, -1) for f in node_features], dim=1)
+            return graph_dgl
+        except Exception as e:
+            print(f"Failed on smiles {smiles} with exception {e}")
+            return None
+
+    def smiles_to_fp_one(self, smiles):
+        if smiles in self.cashed_graphs:
+            return self.cashed_graphs[smiles]
+        return self.graph_encode_one(smiles)
 
 
 def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
@@ -114,7 +203,7 @@ def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
     return systems
 
 
-def get_systems(target='dock', rnamigos1_split=None, return_test=False,
+def get_systems(target='dock', rnamigos1_split=-1, return_test=False,
                 use_rnamigos1_train=False, use_rnamigos1_ligands=False):
     """
     :param target: The systems to load 
@@ -156,6 +245,7 @@ class DockingDataset(Dataset):
                  systems,
                  target='dock',
                  fp_type='MACCS',
+                 return_ligands_graphs=False,
                  shuffle=False,
                  seed=0,
                  debug=False,
@@ -182,7 +272,8 @@ class DockingDataset(Dataset):
         self.num_edge_types = len(EDGE_MAP_RGLIB)
 
         self.fp_type = fp_type
-        self.ligand_encoder = MolEncoder(fp_type=fp_type)
+        self.ligand_encoder = MolFPEncoder(fp_type=fp_type)
+        self.ligand_graph_encoder = MolGraphEncoder() if return_ligands_graphs else None
 
         self.cache_graphs = cache_graphs
         self.use_rings = use_rings
@@ -213,16 +304,23 @@ class DockingDataset(Dataset):
             pocket_graph, rings = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
                                                  undirected=self.undirected,
                                                  use_rings=self.use_rings)
-        ligand_fp, success = self.ligand_encoder.encode_mol(smiles=ligand_smiles)
+        ligand_fp, success = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
+
+        # Maybe return ligand as a graph.
+        if self.ligand_graph_encoder is not None:
+            lig_graph = self.ligand_graph_encoder.smiles_to_fp_one(smiles=ligand_smiles)
+        else:
+            lig_graph = None
         if self.target == 'native_fp':
             target = ligand_fp
         elif self.target == 'dock':
-            target = row[2]/40
+            target = row[2] / 40
         else:
             target = row[2]
         # print("1 : ", time.perf_counter() - t0)
         return {'graph': pocket_graph,
                 'ligand_fp': ligand_fp,
+                'lig_graph': lig_graph,
                 'target': target,
                 'rings': rings,
                 'idx': [idx]}
@@ -330,7 +428,7 @@ class VirtualScreenDataset(DockingDataset):
             is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
             is_active[:len(actives_smiles)] = 1.
 
-            all_fps, ok_inds = self.ligand_encoder.encode_list(actives_smiles + decoys_smiles)
+            all_fps, ok_inds = self.ligand_encoder.smiles_to_fp_list(actives_smiles + decoys_smiles)
 
             return pocket_graph, torch.tensor(all_fps[ok_inds]), torch.tensor(is_active[ok_inds])
         except FileNotFoundError:
@@ -338,10 +436,12 @@ class VirtualScreenDataset(DockingDataset):
 
 
 if __name__ == '__main__':
-    pockets_path = '../../data/json_pockets'
+    pockets_path = '../../data/json_pockets_load'
     test_systems = get_systems(target='dock', return_test=True)
     dataset = DockingDataset(pockets_path=pockets_path,
                              systems=test_systems,
-                             target='dock')
+                             target='dock',
+                             return_ligands_graphs=True)
     a = dataset[0]
+    b=1
     pass

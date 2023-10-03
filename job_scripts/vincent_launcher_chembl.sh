@@ -21,7 +21,7 @@ python_cmd="python experiments/train.py
                   train.pretrain_weight=0
                   train.simfunc=None
                   device=cpu
-                  name=final_chembl_fp_dim64_simhungarian_prew0"
+                  name=final_chembl_fp_dim64_simhungarian"
 python_cmd=$(echo $python_cmd) # to replace newlines
 CMDARRAY+=("$python_cmd")
 
