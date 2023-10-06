@@ -97,14 +97,19 @@ class MolGraphEncoder:
     Stateful encoder for using cashed computations
     """
 
-    def __init__(self):
+    def __init__(self, cache=True):
         with open(os.path.join(script_dir, f'../../data/map_files/edges_and_nodes_map.pickle'), "rb") as f:
             self.edge_map = pickle.load(f)
             self.at_map = pickle.load(f)
             self.chi_map = pickle.load(f)
             self.charges_map = pickle.load(f)
-        cashed_path = os.path.join(script_dir, f'../../data/ligands/lig_graphs.p')
-        self.cashed_graphs = pickle.load(open(cashed_path, 'rb'))
+
+        self.cache = cache
+        if cache:
+            cashed_path = os.path.join(script_dir, f'../../data/ligands/lig_graphs.p')
+            self.cashed_graphs = pickle.load(open(cashed_path, 'rb'))
+        else:
+            self.cashed_graphs = list()
 
     @staticmethod
     def set_as_one_hot_feat(graph_nx, edge_map, node_label, default_value=None):
