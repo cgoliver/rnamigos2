@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 #
 #     This file is part of Decoy Finder
 #
@@ -16,32 +16,37 @@
 #    GNU General Public License for more details.
 #
 
-import os, urllib.request, urllib.error, urllib.parse, tempfile, random,  sys,  gzip, datetime, itertools, zlib
-#Decimal() can represent floating point data with higher precission than built-in float
+import os, urllib.request, urllib.error, urllib.parse, tempfile, random, sys, gzip, datetime, itertools, zlib
+# Decimal() can represent floating point data with higher precission than built-in float
 from decimal import Decimal
 
 DEBUG = 0
 if DEBUG:
-    def _debug(s): print(s)
+    def _debug(s):
+        print(s)
 else:
-    def _debug(s): pass
+    def _debug(s):
+        pass
 
-#m is a dict containign all backend modules
+# m is a dict containign all backend modules
 m = {}
 backend = None
 try:
     from cinfony import indy
+
     m['indy'] = indy
 except:
     pass
 try:
     from cinfony import cdk
+
     m['cdk'] = cdk
     backend = 'cdk'
 except:
     pass
 try:
     from openbabel import pybel
+
     m['pybel'] = pybel
     backend = 'pybel'
     ob_log_handler = pybel.ob.OBMessageHandler()
@@ -50,6 +55,7 @@ try:
 except ImportError:
     try:
         import pybel
+
         m['pybel'] = pybel
         backend = 'pybel'
         ob_log_handler = pybel.ob.OBMessageHandler()
@@ -59,6 +65,7 @@ except ImportError:
         pass
 try:
     from cinfony import rdk
+
     m['rdk'] = rdk
     backend = 'rdk'
 except ImportError:
@@ -82,57 +89,64 @@ backenddict = {}
 backenddict has the following form:
 {descriptor1:backend, descriptor2:backend,...}
 """
-#Now we set a default backend for all descriptors
+# Now we set a default backend for all descriptors
 for desc in _descs:
     backenddict[desc] = backend
 
-#The following would calculate the fingerprint using pybel
-#backenddict['fp'] = 'pybel'
+# The following would calculate the fingerprint using pybel
+# backenddict['fp'] = 'pybel'
 
 FPTYPE = 'MACCS'
+
 
 def set_fp_backend():
     if FPTYPE not in [fp.upper() for fp in m[backend].fps]:
         if 'rdk' in m and FPTYPE.lower() in m['rdk'].fps:
-            backenddict['fp']='rdk'
+            backenddict['fp'] = 'rdk'
             _debug('Fingerprint %s will be calculated using RDkit' % (FPTYPE))
         elif 'pybel' in m and FPTYPE in [fp.upper() for fp in m['pybel'].fps]:
-            backenddict['fp']='pybel'
+            backenddict['fp'] = 'pybel'
             _debug('Fingerprint %s will be calculated using OpenBabel' % (FPTYPE))
         elif 'indy' in m and FPTYPE.lower() in m['indy'].fps:
-            backenddict['fp']='indy'
+            backenddict['fp'] = 'indy'
             _debug('Fingerprint %s will be calculated using Indigo' % (FPTYPE))
         elif 'cdk' in m and FPTYPE.lower() in m['cdk'].fps:
-            backenddict['fp']='cdk'
+            backenddict['fp'] = 'cdk'
             _debug('Fingerprint %s will be calculated using the CDK' % (FPTYPE))
         else:
             raise ValueError('%s is not a recognized fingerprint type' % FPTYPE)
     else:
-        backenddict['fp']=backend
+        backenddict['fp'] = backend
         _debug('Fingerprint %s will be calculated using the default backend: %s' % (FPTYPE, backend))
+
 
 set_fp_backend()
 
-def set_format_backends(preferredbackend = backend):
+
+def set_format_backends(preferredbackend=backend):
     global format_backends
     format_backends = {}
     for format in m[preferredbackend].informats:
-        format_backends[format]=preferredbackend
+        format_backends[format] = preferredbackend
     for tk in m:
         if tk != preferredbackend:
             for format in m[tk].informats:
                 if format not in format_backends:
-                    format_backends[format]=tk
-def set_outformat_backends(preferredbackend = backend):
+                    format_backends[format] = tk
+
+
+def set_outformat_backends(preferredbackend=backend):
     global outformat_backends
     outformat_backends = {}
     for format in m[preferredbackend].outformats:
-        outformat_backends[format]=preferredbackend
+        outformat_backends[format] = preferredbackend
     for tk in m:
         if tk != preferredbackend:
             for format in m[tk].outformats:
                 if format not in outformat_backends:
-                    outformat_backends[format]=tk
+                    outformat_backends[format] = tk
+
+
 format_backends = {}
 outformat_backends = {}
 set_format_backends(backend)
@@ -140,82 +154,96 @@ set_outformat_backends(backend)
 
 informats = ''
 for format in format_backends:
-    informats += "*.%s " %format
+    informats += "*.%s " % format
     if format_backends[format] == 'pybel':
-        for compression in ('gz', 'tar',  'bz',  'bz2',  'tar.gz',  'tar.bz',  'tar.bz2'):
-            informats += "*.%s.%s " % (format,  compression)
+        for compression in ('gz', 'tar', 'bz', 'bz2', 'tar.gz', 'tar.bz', 'tar.bz2'):
+            informats += "*.%s.%s " % (format, compression)
 
 _debug('%s is the default backend' % backend)
 
-#Some default values:
+# Some default values:
 
 HBA_t = 2
 HBD_t = 1
-ClogP_t = Decimal(1)#1.5
+ClogP_t = Decimal(1)  # 1.5
 tanimoto_t = Decimal('0.75')
 tanimoto_d = Decimal('0.9')
 MW_t = 25
 RB_t = 1
 mind = 36
-maxd = 50 
+maxd = 50
 
-#Dict of ZINC subsets
+# Dict of ZINC subsets
 ZINC_subsets = {
-    "lead-like":"1"
-    ,"fragment-like":"2"
-    ,"drug-like":"3"
-    ,"all-purchasable":"6"
-    ,"everything":"10"
-    ,"clean-leads":"11"
-    ,"clean-fragments":"12"
-    ,"clean-drug-like":"13"
-    ,"all-clean":"16"
-    ,"leads-now":"21"
-    ,"frags-now":"22"
-    ,"drugs-now":"23"
-    ,"all-now":"26"
-    ,"sarah":"37"
-    ,"Stan":"94"
-    }
+    "lead-like": "1"
+    , "fragment-like": "2"
+    , "drug-like": "3"
+    , "all-purchasable": "6"
+    , "everything": "10"
+    , "clean-leads": "11"
+    , "clean-fragments": "12"
+    , "clean-drug-like": "13"
+    , "all-clean": "16"
+    , "leads-now": "21"
+    , "frags-now": "22"
+    , "drugs-now": "23"
+    , "all-now": "26"
+    , "sarah": "37"
+    , "Stan": "94"
+}
 
 calc_functs = {
-         'pybel':{
-            'calc_hba': lambda mol: mol.calcdesc(['HBA2'])['HBA2']
-            ,'calc_hbd': lambda mol: mol.calcdesc(['HBD'])['HBD']
-            ,'calc_clogp': lambda mol: Decimal(str(mol.calcdesc(['logP'])['logP']))
-            ,'calc_rot': lambda mol: mol.OBMol.NumRotors()
-            }
-        ,'cdk':{
-            'calc_hba': lambda mol: mol.calcdesc(['hBondacceptors'])['hBondacceptors']
-            ,'calc_hbd': lambda mol: mol.calcdesc(['hBondDonors'])['hBondDonors']
-            ,'calc_clogp': lambda mol: Decimal(str(mol.calcdesc(['xlogP'])['xlogP']))
-            ,'calc_rot': lambda mol: mol.calcdesc(['rotatableBondsCount'])['rotatableBondsCount']
-        }
-        ,'rdk':{
-            'calc_hba': lambda mol: mol.calcdesc(['NumHAcceptors'])['NumHAcceptors']
-            ,'calc_hbd': lambda mol: mol.calcdesc(['NumHDonors'])['NumHDonors']
-            ,'calc_clogp': lambda mol: Decimal(str(mol.calcdesc(['MolLogP'])['MolLogP']))
-            ,'calc_rot': lambda mol: mol.calcdesc(['NumRotatableBonds'])['NumRotatableBonds']
-        }
+    'pybel': {
+        'calc_hba': lambda mol: mol.calcdesc(['HBA2'])['HBA2']
+        , 'calc_hbd': lambda mol: mol.calcdesc(['HBD'])['HBD']
+        , 'calc_clogp': lambda mol: Decimal(str(mol.calcdesc(['logP'])['logP']))
+        , 'calc_rot': lambda mol: mol.OBMol.NumRotors()
     }
+    , 'cdk': {
+        'calc_hba': lambda mol: mol.calcdesc(['hBondacceptors'])['hBondacceptors']
+        , 'calc_hbd': lambda mol: mol.calcdesc(['hBondDonors'])['hBondDonors']
+        , 'calc_clogp': lambda mol: Decimal(str(mol.calcdesc(['xlogP'])['xlogP']))
+        , 'calc_rot': lambda mol: mol.calcdesc(['rotatableBondsCount'])['rotatableBondsCount']
+    }
+    , 'rdk': {
+        'calc_hba': lambda mol: mol.calcdesc(['NumHAcceptors'])['NumHAcceptors']
+        , 'calc_hbd': lambda mol: mol.calcdesc(['NumHDonors'])['NumHDonors']
+        , 'calc_clogp': lambda mol: Decimal(str(mol.calcdesc(['MolLogP'])['MolLogP']))
+        , 'calc_rot': lambda mol: mol.calcdesc(['NumRotatableBonds'])['NumRotatableBonds']
+    }
+}
+
 
 class ComparableMol(object):
     """
     """
+
     def __init__(self, mol, bknd):
         self.mol = mol
         self.__dict__['mol_' + bknd] = mol
 
-    #Calculate all interesting descriptors. Called only when needed
+    # Calculate all interesting descriptors. Called only when needed
 
-    def calc_hba(self, mol, b): return calc_functs[b]['calc_hba'](mol)
-    def calc_hbd(self, mol, b): return calc_functs[b]['calc_hbd'](mol)
-    def calc_clogp(self, mol, b): return calc_functs[b]['calc_clogp'](mol)
-    def calc_rot(self, mol, b): return calc_functs[b]['calc_rot'](mol)
-    def calc_fp(self, mol, b): return ComFp(fp = mol.calcfp(FPTYPE))
+    def calc_hba(self, mol, b):
+        return calc_functs[b]['calc_hba'](mol)
 
-    def calc_mw(self, mol, b): return mol.molwt
-    def calc_title(self, mol, b): return mol.title
+    def calc_hbd(self, mol, b):
+        return calc_functs[b]['calc_hbd'](mol)
+
+    def calc_clogp(self, mol, b):
+        return calc_functs[b]['calc_clogp'](mol)
+
+    def calc_rot(self, mol, b):
+        return calc_functs[b]['calc_rot'](mol)
+
+    def calc_fp(self, mol, b):
+        return ComFp(fp=mol.calcfp(FPTYPE))
+
+    def calc_mw(self, mol, b):
+        return mol.molwt
+
+    def calc_title(self, mol, b):
+        return mol.title
 
     def calc_can(self, mol, b):
         try:
@@ -233,7 +261,7 @@ class ComparableMol(object):
         if attr not in self.__dict__:
             if attr == 'mol':
                 mol = None
-                b=backend
+                b = backend
             elif attr.startswith('mol'):
                 b = attr.split('_')[1]
                 self.__dict__[attr] = m[b].Molecule(self.mol)
@@ -241,8 +269,8 @@ class ComparableMol(object):
                 if attr in backenddict:
                     b = backenddict[attr]
                 else:
-                    b=backend
-                bmol = 'mol_'+b
+                    b = backend
+                bmol = 'mol_' + b
                 if bmol not in self.__dict__:
                     mol = m[b].Molecule(self.mol)
                     self.__dict__[bmol] = mol
@@ -255,38 +283,44 @@ class ComparableMol(object):
         """
         For debug purposes
         """
-        return "Title: %s; HBA: %s; HBD: %s; CLogP: %s; MW:%s \n" % (self.title, self.hba, self.hbd, self.clogp, self.mw)
+        return "Title: %s; HBA: %s; HBD: %s; CLogP: %s; MW:%s \n" % (
+        self.title, self.hba, self.hbd, self.clogp, self.mw)
+
 
 class DbMol(ComparableMol):
     """
     Molecule from a database, with precalculated descriptors
     """
+
     def __init__(self, row):
         self.inchikey, maccsbits, self.rot, self.mw, self.clogp, self.hba, self.hbd, self.mdlmol = row
         self.bitset = set(eval(maccsbits))
         if REP == 'inchikey':
             self.can = self.inchikey
 
-    def calc_fp(self, *args): return ComFp(bitset = self.bitset)
+    def calc_fp(self, *args):
+        return ComFp(bitset=self.bitset)
 
     def calc_mol(self, bmol, b):
-        #Check wether it's compressed
+        # Check wether it's compressed
         if self.mdlmol[-4:-1] == 'END':
             return self.mdlmol
         return m[b].readstring('mol', str(zlib.decompress(self.mdlmol)))
+
 
 class ComFp(object):
     """
     Comparable fingerprint from a set of bits
     """
-    def __init__(self, bitset = None, fp = None):
+
+    def __init__(self, bitset=None, fp=None):
         self.fp = fp
         if bitset:
             self.bits = bitset
         elif fp:
             self.bits = set(fp.bits)
         if backend == 'cdk':
-            self.bits =set([bit+1 for bit in self.bits])
+            self.bits = set([bit + 1 for bit in self.bits])
 
     def __or__(self, other):
         """
@@ -296,19 +330,19 @@ class ComFp(object):
         if self.fp and other.fp:
             return self.fp | other.fp
         else:
-            return len(self.bits&other.bits) / float(len(self.bits|other.bits))
+            return len(self.bits & other.bits) / float(len(self.bits | other.bits))
 
     def __str__(self):
         return ", ".join([str(x) for x in self.bits])
 
 
-def get_zinc_slice(slicename = 'all', subset = '10', cachedir = tempfile.gettempdir(),  keepcache = False):
+def get_zinc_slice(slicename='all', subset='10', cachedir=tempfile.gettempdir(), keepcache=False):
     """
     returns an iterable list of files from  online ZINC slices
     """
     if slicename in ('all', 'single', 'usual', 'metals'):
-        script = "http://zinc12.docking.org/db/bysubset/%s/%s.sdf.csh" % (subset,slicename)
-        _debug( 'Downloading files in %s' % script)
+        script = "http://zinc12.docking.org/db/bysubset/%s/%s.sdf.csh" % (subset, slicename)
+        _debug('Downloading files in %s' % script)
         handler = urllib.request.urlopen(script)
         _debug("Reading ZINC data...")
         scriptcontent = handler.read().split('\n')
@@ -353,11 +387,12 @@ def get_zinc_slice(slicename = 'all', subset = '10', cachedir = tempfile.gettemp
             if not keepcache:
                 try:
                     os.remove(outfilename)
-                except Exception as  e:
+                except Exception as e:
                     _debug("Unable to remove %s" % (outfilename))
                     _debug(str(e))
     else:
         raise Exception("Unknown slice")
+
 
 def get_fileformat(filename):
     """
@@ -365,36 +400,39 @@ def get_fileformat(filename):
     """
     index = -1
     ext = filename.split(".")[index].lower()
-    while ext in ('gz', 'tar',  'bz',  'bz2'):
+    while ext in ('gz', 'tar', 'bz', 'bz2'):
         index -= 1
         ext = filename.split(".")[index].lower()
     if ext in format_backends:
         return ext
     else:
-       _debug("%s: unknown format"  % filename)
-       raise ValueError
+        _debug("%s: unknown format" % filename)
+        raise ValueError
+
 
 def get_format_backend(filename):
     format = get_fileformat(filename)
     ext = filename.split(".")[1].lower()
-    if ext not in ('gz', 'tar',  'bz',  'bz2'):
+    if ext not in ('gz', 'tar', 'bz', 'bz2'):
         return format_backends[format]
     else:
         return 'pybel'
+
 
 def query_db(conn, table='Molecules'):
     """
     Parses files from a SQL database with dbapi 2.0
     """
-    cursor= conn.cursor()
+    cursor = conn.cursor()
     if REP in ('can', 'smi'):
         f = 'smiles'
     else:
         f = REP
-    cursor.execute("""SELECT `%s`,`maccs`, `rotatable_bonds`, `weight`, `logp`, `hba`, `hbd`, `mol` FROM %s;""" % (f, table))
+    cursor.execute(
+        """SELECT `%s`,`maccs`, `rotatable_bonds`, `weight`, `logp`, `hba`, `hbd`, `mol` FROM %s;""" % (f, table))
     rowcount = 0
     for row in cursor:
-        rowcount +=1
+        rowcount += 1
         try:
             mol = DbMol(row)
             yield mol, rowcount, 'database'
@@ -402,6 +440,7 @@ def query_db(conn, table='Molecules'):
             print(e)
     else:
         cursor.close()
+
 
 def _parse_db_files(filelist):
     """
@@ -416,11 +455,12 @@ def _parse_db_files(filelist):
         for mol in mols:
             if mol:
                 try:
-                    cmol= ComparableMol(mol, b)
+                    cmol = ComparableMol(mol, b)
                     yield cmol, filecount, dbfile
                 except Exception as e:
                     _debug(e)
         filecount += 1
+
 
 def parse_query_files(filelist):
     """
@@ -439,6 +479,7 @@ def parse_query_files(filelist):
                     _debug(e)
     return query_dict
 
+
 def parse_db_files(filelist):
     """
     Parses files containing active ligands
@@ -454,9 +495,10 @@ def parse_db_files(filelist):
             if mol:
                 try:
                     cmol = ComparableMol(mol, b)
-                    yield cmol, 1, filelist[0] 
+                    yield cmol, 1, filelist[0]
                 except Exception as e:
                     _debug(e)
+
 
 def parse_decoy_files(decoyfilelist):
     """
@@ -476,28 +518,31 @@ def parse_decoy_files(decoyfilelist):
                     _debug(e)
     return decoy_set
 
+
 def isdecoy(
-                db_mol
-                ,ligand
-                ,HBA_t = HBA_t
-                ,HBD_t = HBD_t
-                ,ClogP_t = ClogP_t
-                ,MW_t = MW_t
-                ,RB_t = RB_t
-                ):
+        db_mol
+        , ligand
+        , HBA_t=HBA_t
+        , HBD_t=HBD_t
+        , ClogP_t=ClogP_t
+        , MW_t=MW_t
+        , RB_t=RB_t
+):
     """
     Check if db_mol can be considered a decoy of ligand
     """
     if ligand.hbd - HBD_t <= db_mol.hbd <= ligand.hbd + HBD_t:
         if ligand.mw - MW_t <= db_mol.mw <= ligand.mw + MW_t:
             if ligand.rot - RB_t <= db_mol.rot <= ligand.rot + RB_t:
-                if  ligand.hba - HBA_t <= db_mol.hba <= ligand.hba + HBA_t :
-                    if ligand.clogp - ClogP_t <= db_mol.clogp <= ligand.clogp + ClogP_t :
+                if ligand.hba - HBA_t <= db_mol.hba <= ligand.hba + HBA_t:
+                    if ligand.clogp - ClogP_t <= db_mol.clogp <= ligand.clogp + ClogP_t:
                         return True
     return False
 
+
 def get_ndecoys(ligands_dict, maxd):
     return sum((x for x in ligands_dict.values() if not maxd or maxd >= x))
+
 
 def checkoutputfile(outputfile):
     """
@@ -508,36 +553,37 @@ def checkoutputfile(outputfile):
         outputfile += "_decoys.sdf"
     while os.path.isfile(outputfile):
         fileexists += 1
-        filename,  extension = os.path.splitext(outputfile)
-        if filename.endswith("_%s" % (fileexists -1)):
-            filename = '_'.join(filename.split('_')[:-1]) +"_%s" % fileexists
+        filename, extension = os.path.splitext(outputfile)
+        if filename.endswith("_%s" % (fileexists - 1)):
+            filename = '_'.join(filename.split('_')[:-1]) + "_%s" % fileexists
         else:
             filename += "_%s" % fileexists
         outputfile = filename + extension
     return outputfile
 
+
 def find_decoys(
-                query_files = []
-                ,db_files = []
-                ,outputfile = 'found_decoys'
-                ,HBA_t = HBA_t
-                ,HBD_t = HBD_t
-                ,ClogP_t = ClogP_t
-                ,tanimoto_t = tanimoto_t
-                ,tanimoto_d = tanimoto_d
-                ,MW_t = MW_t
-                ,RB_t = RB_t
-                ,mind = mind
-                ,maxd = maxd
-                ,decoy_files = []
-                ,stopfile = ''
-                ,unique = False
-                ,internal = REP
-                ,conn = None
-                ,fptype = 'MACCS'
-                ,toolkits = {}
-                ,default_toolkit = backend
-                ):
+        query_files=[]
+        , db_files=[]
+        , outputfile='found_decoys'
+        , HBA_t=HBA_t
+        , HBD_t=HBD_t
+        , ClogP_t=ClogP_t
+        , tanimoto_t=tanimoto_t
+        , tanimoto_d=tanimoto_d
+        , MW_t=MW_t
+        , RB_t=RB_t
+        , mind=mind
+        , maxd=maxd
+        , decoy_files=[]
+        , stopfile=''
+        , unique=False
+        , internal=REP
+        , conn=None
+        , fptype='MACCS'
+        , toolkits={}
+        , default_toolkit=backend
+):
     """
     This is the star of the show
     """
@@ -588,8 +634,8 @@ def find_decoys(
 
     minreached = False
     if mind:
-        total_min = nactive_ligands*mind
-        yield ('total_min',  total_min,  nactive_ligands)
+        total_min = nactive_ligands * mind
+        yield ('total_min', total_min, nactive_ligands)
     else:
         mind = None
 
@@ -599,36 +645,36 @@ def find_decoys(
 
     outputfile = checkoutputfile(outputfile)
     format = get_fileformat(outputfile)
-    outbackend= format_backends[format]
+    outbackend = format_backends[format]
     decoyfile = m[outbackend].Outputfile(format, str(outputfile))
     decoys_fp_set = set()
 
-    yield ('ndecoys', ndecoys,  complete_ligand_sets)
+    yield ('ndecoys', ndecoys, complete_ligand_sets)
 
     for db_mol, filecount, db_file in db_entry_gen:
         saved = False
         used_db_files.add(db_file)
-        yield ('file',  filecount, db_file)
+        yield ('file', filecount, db_file)
         if maxd and len(ligands_max) >= nactive_ligands:
-            _debug( 'Maximum reached')
+            _debug('Maximum reached')
             minreached = True
             break
         if complete_ligand_sets >= nactive_ligands:
-            _debug( 'All decoy sets complete')
+            _debug('All decoy sets complete')
             break
-        if not mind or ndecoys < total_min :
+        if not mind or ndecoys < total_min:
             ligands_decoy = set()
             try:
                 for ligand in ligands_dict:
                     if ligand not in ligands_max:
-                        if isdecoy(db_mol,ligand,HBA_t,HBD_t,ClogP_t,MW_t,RB_t ):
+                        if isdecoy(db_mol, ligand, HBA_t, HBD_t, ClogP_t, MW_t, RB_t):
                             ligands_decoy.add(ligand)
                 if not ligands_decoy:
                     continue
                 too_similar = False
                 for active in ligands_dict:
                     active_T = active.fp | db_mol.fp
-                    if  active_T > tanimoto_t:
+                    if active_T > tanimoto_t:
                         too_similar = True
                         break
                 if not too_similar:
@@ -637,7 +683,7 @@ def find_decoys(
                     if tanimoto_d < 1:
                         for decoyfp in decoys_fp_set:
                             decoy_T = decoyfp | db_mol.fp
-                            if  decoy_T > tanimoto_d:
+                            if decoy_T > tanimoto_d:
                                 too_similar = True
                                 break
                     if too_similar:
@@ -648,16 +694,16 @@ def find_decoys(
                             continue
                         ligands_dict[ligand] += 1
                         if not saved:
-                            decoyfile.write(db_mol.__getattribute__('mol_'+outbackend))
+                            decoyfile.write(db_mol.__getattribute__('mol_' + outbackend))
                             decoys_can_set.add(db_mol.can)
                             decoys_fp_set.add(db_mol.fp)
                             saved = True
                         ndecoys = get_ndecoys(ligands_dict, maxd)
                         _debug('%s decoys found' % ndecoys)
-                        if ligands_dict[ligand] ==  mind:
+                        if ligands_dict[ligand] == mind:
                             _debug('Decoy set completed for ' + ligand.title)
                             complete_ligand_sets += 1
-                        yield ('ndecoys',  ndecoys, complete_ligand_sets)
+                        yield ('ndecoys', ndecoys, complete_ligand_sets)
                         if unique:
                             break
             except Exception as e:
@@ -670,16 +716,16 @@ def find_decoys(
             _debug('stopping by user request')
             break
     else:
-        _debug( 'No more input molecules')
+        _debug('No more input molecules')
 
     if mind:
-        _debug('Completed %s of %s decoy sets' % (complete_ligand_sets, nactive_ligands ))
+        _debug('Completed %s of %s decoy sets' % (complete_ligand_sets, nactive_ligands))
         minreached = complete_ligand_sets >= nactive_ligands
     if minreached:
         _debug("Found all wanted decoys")
     else:
         _debug("Not all wanted decoys found")
-    #Generate logfile
+    # Generate logfile
     # log = '"%s %s log file generated on %s"\n' % (metadata.NAME, metadata.VERSION, datetime.datetime.now())
     log = ""
     log += "\n"
@@ -706,7 +752,8 @@ def find_decoys(
     log += "\n"
     log += '"Active ligand","HBA","HBD","logP","MW","RB","number of Decoys found"\n'
     for active in ligands_dict:
-        log += '"%s","%s","%s","%s","%s","%s","%s"\n' % tuple([str(f) for f in (active.title,  active.hba,  active.hbd,  active.clogp,  active.mw,  active.rot,  ligands_dict[active])])
+        log += '"%s","%s","%s","%s","%s","%s","%s"\n' % tuple([str(f) for f in (
+        active.title, active.hba, active.hbd, active.clogp, active.mw, active.rot, ligands_dict[active])])
     log += "\n"
 
     # print(log)
@@ -720,6 +767,5 @@ def find_decoys(
         if os.path.exists(outputfile):
             os.remove(outputfile)
     _debug(backenddict)
-    #Last, special yield:
-    yield ('result',  ligands_dict,  [outputfile, minreached])
-
+    # Last, special yield:
+    yield ('result', ligands_dict, [outputfile, minreached])

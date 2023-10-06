@@ -50,12 +50,14 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     efs, inds, all_scores, pocket_ids = [], [], [], []
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
     failed_set = set()
+    failed = 0
     for i, (pocket_graph, ligands, is_active) in enumerate(dataloader):
         pocket_id = dataloader.dataset.all_pockets_id[i]
         if pocket_graph is None:
             failed_set.add(pocket_graph)
             logger.trace(pocket_graph)
             logger.debug(f"VS fail")
+            failed += 1
             continue
         if not i % 20:
             logger.info(f"Done {i}/{len(dataloader)}")
@@ -69,5 +71,6 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
         inds.append(i)
         pocket_ids.append(pocket_id)
     logger.debug(f"VS failed on {failed_set}")
+    print(failed)
     print(efs)
     return efs, inds, all_scores, pocket_ids

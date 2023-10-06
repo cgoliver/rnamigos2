@@ -210,7 +210,8 @@ def main(cfg: DictConfig):
                                    ligands_path=cfg.data.ligand_db,
                                    systems=test_systems,
                                    decoy_mode='pdb',
-                                   fp_type='MACCS')
+                                   fp_type='MACCS',
+                                   use_graphligs=cfg.model.use_graphligs)
     # Loader is asynchronous
     loader_args = {'shuffle': False,
                    'batch_size': 1,
