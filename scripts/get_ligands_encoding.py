@@ -63,7 +63,7 @@ failed = 0
 mol_graph_encoder = MolGraphEncoder()
 prev_graph = None
 for i, sm in enumerate(tqdm(ligands)):
-    out_graph = mol_graph_encoder.smiles_to_fp_one(sm)
+    out_graph = mol_graph_encoder.smiles_to_graph_one(sm)
     # Terible fix that only happens on one buggy smiles
     # CCCCC(=O)NCCOCCOCCOCCNC(=O)C[N]1=C(Sc2c1cccc2)CC1=CC=[N](c2c1cccc2)C
     # This is not parsed by rdkit, and also caused an error for MACCS and morgan, we returned whole zeroes

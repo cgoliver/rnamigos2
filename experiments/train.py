@@ -16,7 +16,7 @@ import pandas as pd
 
 from rnamigos_dock.learning.loader import get_systems, DockingDataset, NativeSampler, RingCollater, VirtualScreenDataset
 from rnamigos_dock.learning import learn
-from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
+from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 from rnamigos_dock.learning.utils import mkdirs
 
@@ -76,6 +76,7 @@ def main(cfg: DictConfig):
                     'shuffle': cfg.train.shuffle,
                     'seed': cfg.train.seed,
                     'debug': cfg.debug,
+                    'use_graphligs': cfg.model.use_graphligs,
                     'undirected': cfg.data.undirected}
 
     train_systems, validation_systems = np.split(train_systems.sample(frac=1, random_state=42),
@@ -120,11 +121,22 @@ def main(cfg: DictConfig):
         rna_encoder.from_pretrained(cfg.model.pretrained_path)
     rna_encoder.subset_pocket_nodes = True
 
-    lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
-                                hidden_dim=cfg.model.lig_encoder.hidden_dim,
-                                num_hidden_layers=cfg.model.lig_encoder.num_layers,
-                                batch_norm=cfg.model.batch_norm,
-                                dropout=cfg.model.dropout)
+    if cfg.model.use_graphligs:
+        graphlig_cfg = cfg.model.graphlig_encoder
+        if graphlig_cfg.use_pretrained:
+            lig_encoder = LigandGraphEncoder.from_pretrained("pretrained/optimol")
+        else:
+            lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg.features_dim,
+                                             l_size=graphlig_cfg.l_size,
+                                             gcn_hdim=graphlig_cfg.gcn_hdim,
+                                             gcn_layers=graphlig_cfg.gcn_layers,
+                                             batch_norm=cfg.model.batch_norm)
+    else:
+        lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
+                                    hidden_dim=cfg.model.lig_encoder.hidden_dim,
+                                    num_hidden_layers=cfg.model.lig_encoder.num_layers,
+                                    batch_norm=cfg.model.batch_norm,
+                                    dropout=cfg.model.dropout)
 
     decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
                       out_dim=cfg.model.decoder.out_dim,
@@ -208,7 +220,8 @@ def main(cfg: DictConfig):
     dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
     lower_is_better = cfg.train.target in ['dock', 'native_fp']
-    efs, inds, scores, pocket_ids = run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better)
+    efs, inds, scores, pocket_ids = run_virtual_screen(model, dataloader, metric=mean_active_rank,
+                                                       lower_is_better=lower_is_better)
 
     df = pd.DataFrame({'ef': efs, 'inds': inds})
     df.to_csv(Path(result_folder, 'ef.csv'))

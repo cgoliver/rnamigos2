@@ -158,7 +158,7 @@ class MolGraphEncoder:
             print(f"Failed on smiles {smiles} with exception {e}")
             return None
 
-    def smiles_to_fp_one(self, smiles):
+    def smiles_to_graph_one(self, smiles):
         if smiles in self.cashed_graphs:
             return self.cashed_graphs[smiles]
         return self.graph_encode_one(smiles)
@@ -245,7 +245,7 @@ class DockingDataset(Dataset):
                  systems,
                  target='dock',
                  fp_type='MACCS',
-                 return_ligands_graphs=False,
+                 use_graphligs=False,
                  shuffle=False,
                  seed=0,
                  debug=False,
@@ -273,7 +273,7 @@ class DockingDataset(Dataset):
 
         self.fp_type = fp_type
         self.ligand_encoder = MolFPEncoder(fp_type=fp_type)
-        self.ligand_graph_encoder = MolGraphEncoder() if return_ligands_graphs else None
+        self.ligand_graph_encoder = MolGraphEncoder() if use_graphligs else None
 
         self.cache_graphs = cache_graphs
         self.use_rings = use_rings
@@ -308,7 +308,7 @@ class DockingDataset(Dataset):
 
         # Maybe return ligand as a graph.
         if self.ligand_graph_encoder is not None:
-            lig_graph = self.ligand_graph_encoder.smiles_to_fp_one(smiles=ligand_smiles)
+            lig_graph = self.ligand_graph_encoder.smiles_to_graph_one(smiles=ligand_smiles)
         else:
             lig_graph = None
         if self.target == 'native_fp':
@@ -319,8 +319,7 @@ class DockingDataset(Dataset):
             target = row[2]
         # print("1 : ", time.perf_counter() - t0)
         return {'graph': pocket_graph,
-                'ligand_fp': ligand_fp,
-                'lig_graph': lig_graph,
+                'ligand_input': lig_graph if lig_graph is not None else ligand_fp,
                 'target': target,
                 'rings': rings,
                 'idx': [idx]}
@@ -441,7 +440,7 @@ if __name__ == '__main__':
     dataset = DockingDataset(pockets_path=pockets_path,
                              systems=test_systems,
                              target='dock',
-                             return_ligands_graphs=True)
+                             use_graphligs=True)
     a = dataset[0]
-    b=1
+    b = 1
     pass

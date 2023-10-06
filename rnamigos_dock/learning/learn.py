@@ -58,16 +58,16 @@ def test(model, test_loader, criterion, device):
     test_loss = 0
     test_size = len(test_loader)
     for batch_idx, (batch) in enumerate(test_loader):
-        graph, docked_fp, target, idx = batch['graph'], batch['ligand_fp'], batch['target'], batch['idx']
+        graph, ligand_input, target, idx = batch['graph'], batch['ligand_input'], batch['target'], batch['idx']
 
         # Get data on the devices
-        docked_fp = docked_fp.to(device)
+        ligand_input = ligand_input.to(device)
         target = target.to(device)
         graph = send_graph_to_device(graph, device)
 
         # Do the computations for the forward pass
         with torch.no_grad():
-            pred, _ = model(graph, docked_fp)
+            pred, _ = model(graph, ligand_input)
             if criterion.__repr__() == 'BCELoss()':
                 loss = criterion(pred.squeeze(), target.squeeze(dim=0).float())
             else:
@@ -124,14 +124,14 @@ def train_dock(model,
         time_epoch = time.perf_counter()
         num_batches = len(train_loader)
         for batch_idx, (batch) in enumerate(train_loader):
-            graph, docked_fp, target, idx = batch['graph'], batch['ligand_fp'], batch['target'], batch['idx']
+            graph, ligand_input, target, idx = batch['graph'], batch['ligand_input'], batch['target'], batch['idx']
             node_sim_block, subsampled_nodes = batch['rings']
             # Get data on the devices
             # convert ints to one hots
             graph = send_graph_to_device(graph, device)
-            docked_fp = docked_fp.to(device)
+            ligand_input = ligand_input.to(device)
             target = target.to(device)
-            pred, embeddings = model(graph, docked_fp)
+            pred, embeddings = model(graph, ligand_input)
             if criterion.__repr__() == 'BCELoss()':
                 loss = criterion(pred.squeeze(), target.squeeze(dim=0).float())
             else:

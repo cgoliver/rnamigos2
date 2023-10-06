@@ -3,15 +3,70 @@ Script for RGCN model.
 
 """
 
-from loguru import logger
+import os
+import sys
+import json
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 import dgl
-import dgl.function as fn
 from dgl.nn.pytorch.glob import SumPooling, GlobalAttentionPooling
-from dgl import mean_nodes
 from dgl.nn.pytorch.conv import RelGraphConv
+
+
+class RGCN(nn.Module):
+    """ RGCN encoder with num_hidden_layers + 2 RGCN layers, and sum pooling. """
+
+    def __init__(self, features_dim, h_dim, num_rels, num_layers, num_bases=-1, gcn_dropout=0, batch_norm=False,
+                 self_loop=False, jumping_knowledge=True):
+        super(RGCN, self).__init__()
+
+        self.features_dim, self.h_dim = features_dim, h_dim
+        self.num_layers = num_layers
+        self.p = gcn_dropout
+
+        self.self_loop = self_loop
+        self.num_rels = num_rels
+        self.num_bases = num_bases
+        # create rgcn layers
+        self.build_model()
+
+        self.batch_norm = batch_norm
+        if self.batch_norm:
+            self.batch_norm_layers = nn.ModuleList([nn.BatchNorm1d(h_dim) for _ in range(num_layers)])
+        self.pool = SumPooling()
+
+    def build_model(self):
+        self.layers = nn.ModuleList()
+        # input to hidden
+        i2h = RelGraphConv(self.features_dim, self.h_dim, self.num_rels, self_loop=self.self_loop,
+                           activation=nn.ReLU(), dropout=self.p)
+        self.layers.append(i2h)
+        # hidden to hidden
+        for _ in range(self.num_layers - 2):
+            h2h = RelGraphConv(self.h_dim, self.h_dim, self.num_rels,
+                               self_loop=self.self_loop, activation=nn.ReLU(), dropout=self.p)
+            self.layers.append(h2h)
+        # hidden to output
+        h2o = RelGraphConv(self.h_dim, self.h_dim, self.num_rels,
+                           self_loop=self.self_loop, activation=nn.ReLU(), dropout=self.p)
+        self.layers.append(h2o)
+
+    def forward(self, g):
+        sequence = []
+        for i, layer in enumerate(self.layers):
+            # Node update
+            g.ndata['h'] = layer(g, g.ndata['h'], g.edata['edge_type'])
+            # Jumping knowledge connexion
+            sequence.append(g.ndata['h'])
+            if self.batch_norm:
+                g.ndata['h'] = self.batch_norm_layers[i](g.ndata['h'])
+        # Concatenation :
+        g.ndata['h'] = torch.cat(sequence, dim=1)  # Num_nodes * (h_dim*num_layers)
+        out = self.pool(g, g.ndata['h'])
+        return out
 
 
 class Decoder(nn.Module):
@@ -132,6 +187,67 @@ class LigandEncoder(nn.Module):
             else:
                 h = F.dropout(F.relu(h), self.dropout, training=self.training)
         return h
+
+
+class LigandGraphEncoder(nn.Module):
+    def __init__(self,
+                 l_size=56,
+                 gcn_hdim=32,
+                 gcn_layers=3,
+                 features_dim=22,
+                 num_rels=4,
+                 batch_norm=False,
+                 # cat_mu_v=True,
+                 cut_embeddings=False
+                 ):
+        super(LigandGraphEncoder, self).__init__()
+        self.features_dim = features_dim
+        self.gcn_hdim = gcn_hdim
+        self.gcn_layers = gcn_layers
+        self.num_rels = num_rels
+        # self.cat_mu_v = cat_mu_v
+        # To use on optimol's embeddings
+        self.cut_embeddings = cut_embeddings
+        # Bottleneck
+        self.l_size = l_size
+        # layers:
+        self.encoder = RGCN(self.features_dim, self.gcn_hdim, self.num_rels, self.gcn_layers, num_bases=-1,
+                            batch_norm=batch_norm)
+
+        self.encoder_mean = nn.Linear(self.gcn_hdim * self.gcn_layers, self.l_size)
+        self.encoder_logv = nn.Linear(self.gcn_hdim * self.gcn_layers, self.l_size)
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
+
+    @staticmethod
+    def from_pretrained(trained_dir):
+        # Loads trained model weights, with or without the affinity predictor
+        params = json.load(open(os.path.join(trained_dir, 'params.json'), 'r'))
+        weight_path = os.path.join(trained_dir, 'weights.pth')
+        ligraph_encoder = LigandGraphEncoder(**params, cut_embeddings=True)
+        whole_state_dict = torch.load(weight_path)
+        filtered_state_dict = {}
+        for (k, v) in whole_state_dict.items():
+            if 'encoder' in k:
+                if k.startswith('encoder.layers'):
+                    filtered_state_dict[k.replace('weight', 'linear_r.W')] = v
+                else:
+                    filtered_state_dict[k] = v
+        ligraph_encoder.load_state_dict(filtered_state_dict)
+        return ligraph_encoder
+
+    def forward(self, g):
+        # Weird optimol pretrained_model
+        if self.cut_embeddings:
+            g.ndata['h'] = g.ndata['h'][:, :-6]
+        e_out = self.encoder(g)
+        mu = self.encoder_mean(e_out)
+        # if self.cat_mu_v:
+        #     logv = self.encoder_logv(e_out)
+        #     mu = torch.cat((mu, logv), dim=-1)
+        return mu
 
 
 class Embedder(nn.Module):
