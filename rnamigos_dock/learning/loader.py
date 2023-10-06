@@ -297,7 +297,7 @@ class DockingDataset(Dataset):
             pocket_graph, rings = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
                                                  undirected=self.undirected,
                                                  use_rings=self.use_rings)
-        ligand_fp, success = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
+        ligand_fp = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
 
         # Maybe return ligand as a graph.
         if self.use_graphligs:
