@@ -1,6 +1,7 @@
 import os
 import sys
 
+import dgl
 import pickle
 
 import numpy as np
@@ -60,20 +61,18 @@ pickle.dump(maccs_map, open(maccs_path, 'wb'))
 lig_graphs_map = {}
 lig_graphs = '../data/ligands/lig_graphs.p'
 failed = 0
-mol_graph_encoder = MolGraphEncoder()
-prev_graph = None
+mol_graph_encoder = MolGraphEncoder(cache=False)
 for i, sm in enumerate(tqdm(ligands)):
     out_graph = mol_graph_encoder.smiles_to_graph_one(sm)
-    # Terible fix that only happens on one buggy smiles
+    # buggy smiles
     # CCCCC(=O)NCCOCCOCCOCCNC(=O)C[N]1=C(Sc2c1cccc2)CC1=CC=[N](c2c1cccc2)C
     # This is not parsed by rdkit, and also caused an error for MACCS and morgan, we returned whole zeroes
-    if out_graph is None:
+    if out_graph.num_nodes() <= 1:
         failed += 1
         print("Failed for smiles : ", sm)
-        graph = prev_graph
+        graph = dgl.graph(([], []))
     else:
         graph = out_graph
     lig_graphs_map[sm] = graph
-    prev_graph = graph
 print("Failed on ", failed)
 pickle.dump(lig_graphs_map, open(lig_graphs, 'wb'))

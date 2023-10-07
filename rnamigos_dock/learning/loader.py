@@ -26,56 +26,43 @@ script_dir = os.path.dirname(__file__)
 from rnamigos_dock.tools.graph_utils import load_rna_graph
 
 
-def mol_encode_one(smiles, fp_type):
-    success = False
-    assert fp_type in {'MACCS', 'morgan'}
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        if fp_type == 'MACCS':
-            # for some reason RDKit maccs is 167 bits
-            # see: https://github.com/rdkit/rdkit/blob/master/rdkit/Chem/MACCSkeys.py
-            # seems like the 0 position is never used
-            fp = list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:]
-        else:
-            fp = list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString()))
-        success = True
-    except:
-        if fp_type == 'MACCS':
-            fp = [0] * 166
-        else:
-            fp = [0] * 1024
-    fp = np.asarray(fp)
-    return fp, success
-
-
-def mol_encode_list(smiles_list, fp_type, encoding_func=mol_encode_one):
-    fps = []
-    ok_inds = []
-    for i, sm in enumerate(smiles_list):
-        fp, success = encoding_func(sm, fp_type=fp_type)
-        fps.append(fp)
-        if success:
-            ok_inds.append(i)
-    return np.array(fps), ok_inds
-
-
 class MolFPEncoder:
     """
     Stateful encoder for using cashed computations
     """
 
     def __init__(self, fp_type='MACCS'):
+        assert fp_type in {'MACCS', 'morgan'}
         self.fp_type = fp_type
         cashed_path = os.path.join(script_dir, f'../../data/ligands/{"maccs" if fp_type == "MACCS" else "morgan"}.p')
         self.cashed_fps = pickle.load(open(cashed_path, 'rb'))
 
     def smiles_to_fp_one(self, smiles):
         if smiles in self.cashed_fps:
-            return self.cashed_fps[smiles], True
-        return mol_encode_one(smiles, self.fp_type)
+            return self.cashed_fps[smiles]
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if self.fp_type == 'MACCS':
+                # for some reason RDKit maccs is 167 bits
+                # see: https://github.com/rdkit/rdkit/blob/master/rdkit/Chem/MACCSkeys.py
+                # seems like the 0 position is never used
+                fp = list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:]
+            else:
+                fp = list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString()))
+        except:
+            if self.fp_type == 'MACCS':
+                fp = [0] * 166
+            else:
+                fp = [0] * 1024
+        fp = np.asarray(fp)
+        return fp
 
     def smiles_to_fp_list(self, smiles_list):
-        return mol_encode_list(smiles_list, fp_type=self.fp_type, encoding_func=self.smiles_to_fp_one)
+        fps = []
+        for i, sm in enumerate(smiles_list):
+            fp = self.smiles_to_fp_one(sm)
+            fps.append(fp)
+        return np.array(fps)
 
 
 def smiles_to_nx(smiles):
@@ -110,14 +97,19 @@ class MolGraphEncoder:
     Stateful encoder for using cashed computations
     """
 
-    def __init__(self):
+    def __init__(self, cache=True):
         with open(os.path.join(script_dir, f'../../data/map_files/edges_and_nodes_map.pickle'), "rb") as f:
             self.edge_map = pickle.load(f)
             self.at_map = pickle.load(f)
             self.chi_map = pickle.load(f)
             self.charges_map = pickle.load(f)
-        cashed_path = os.path.join(script_dir, f'../../data/ligands/lig_graphs.p')
-        self.cashed_graphs = pickle.load(open(cashed_path, 'rb'))
+
+        self.cache = cache
+        if cache:
+            cashed_path = os.path.join(script_dir, f'../../data/ligands/lig_graphs.p')
+            self.cashed_graphs = pickle.load(open(cashed_path, 'rb'))
+        else:
+            self.cashed_graphs = list()
 
     @staticmethod
     def set_as_one_hot_feat(graph_nx, edge_map, node_label, default_value=None):
@@ -132,7 +124,9 @@ class MolGraphEncoder:
         self.set_as_one_hot_feat(graph_nx, edge_map=self.chi_map, node_label='is_aromatic', default_value=0)
         self.set_as_one_hot_feat(graph_nx, edge_map=self.chi_map, node_label='chiral_tag', default_value=0)
 
-    def graph_encode_one(self, smiles):
+    def smiles_to_graph_one(self, smiles):
+        if smiles in self.cashed_graphs:
+            return self.cashed_graphs[smiles]
         try:
             graph_nx = smiles_to_nx(smiles)
 
@@ -156,12 +150,15 @@ class MolGraphEncoder:
             return graph_dgl
         except Exception as e:
             print(f"Failed on smiles {smiles} with exception {e}")
-            return None
+            return dgl.graph(([], []))
 
-    def smiles_to_graph_one(self, smiles):
-        if smiles in self.cashed_graphs:
-            return self.cashed_graphs[smiles]
-        return self.graph_encode_one(smiles)
+    def smiles_to_graph_list(self, smiles_list):
+        graphs = []
+        for i, sm in enumerate(smiles_list):
+            graph = self.smiles_to_graph_one(sm)
+            graphs.append(graph)
+        batch = dgl.batch(graphs)
+        return batch
 
 
 def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
@@ -272,6 +269,7 @@ class DockingDataset(Dataset):
         self.num_edge_types = len(EDGE_MAP_RGLIB)
 
         self.fp_type = fp_type
+        self.use_graphligs = use_graphligs
         self.ligand_encoder = MolFPEncoder(fp_type=fp_type)
         self.ligand_graph_encoder = MolGraphEncoder() if use_graphligs else None
 
@@ -304,10 +302,10 @@ class DockingDataset(Dataset):
             pocket_graph, rings = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
                                                  undirected=self.undirected,
                                                  use_rings=self.use_rings)
-        ligand_fp, success = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
+        ligand_fp = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
 
         # Maybe return ligand as a graph.
-        if self.ligand_graph_encoder is not None:
+        if self.use_graphligs:
             lig_graph = self.ligand_graph_encoder.smiles_to_graph_one(smiles=ligand_smiles)
         else:
             lig_graph = None
@@ -319,7 +317,7 @@ class DockingDataset(Dataset):
             target = row[2]
         # print("1 : ", time.perf_counter() - t0)
         return {'graph': pocket_graph,
-                'ligand_input': lig_graph if lig_graph is not None else ligand_fp,
+                'ligand_input': lig_graph if self.use_graphligs else ligand_fp,
                 'target': target,
                 'rings': rings,
                 'idx': [idx]}
@@ -327,7 +325,7 @@ class DockingDataset(Dataset):
 
 class NativeSampler(Sampler):
     def __init__(self, systems_dataframe):
-        # super().__init__(data_source=None)
+        super().__init__(data_source=None)
         positive = (systems_dataframe['IS_NATIVE'] == 1).values
         self.positive_rows = np.where(positive)[0]
         self.negative_rows = np.where(1 - positive)[0]
@@ -399,8 +397,10 @@ class VirtualScreenDataset(DockingDataset):
                  decoy_mode='pdb',
                  fp_type='MACCS',
                  use_rings=False,
+                 use_graphligs=False,
                  ):
-        super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False, use_rings=use_rings)
+        super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False, use_rings=use_rings,
+                         use_graphligs=use_graphligs)
         self.ligands_path = ligands_path
         self.decoy_mode = decoy_mode
         self.all_pockets_id = list(self.systems['PDB_ID_POCKET'].unique())
@@ -427,9 +427,12 @@ class VirtualScreenDataset(DockingDataset):
             is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
             is_active[:len(actives_smiles)] = 1.
 
-            all_fps, ok_inds = self.ligand_encoder.smiles_to_fp_list(actives_smiles + decoys_smiles)
-
-            return pocket_graph, torch.tensor(all_fps[ok_inds]), torch.tensor(is_active[ok_inds])
+            if self.use_graphligs:
+                all_inputs = self.ligand_graph_encoder.smiles_to_graph_list(actives_smiles + decoys_smiles)
+            else:
+                all_inputs = self.ligand_encoder.smiles_to_fp_list(actives_smiles + decoys_smiles)
+                all_inputs = torch.tensor(all_inputs)
+            return pocket_graph, all_inputs, torch.tensor(is_active)
         except FileNotFoundError:
             return None, None, None
 
