@@ -77,6 +77,7 @@ def main(cfg: DictConfig):
                     'seed': cfg.train.seed,
                     'debug': cfg.debug,
                     'use_graphligs': cfg.model.use_graphligs,
+                    'use_normalized_score': cfg.train.use_normalized_score,
                     'undirected': cfg.data.undirected}
 
     train_systems, validation_systems = np.split(train_systems.sample(frac=1, random_state=42),
