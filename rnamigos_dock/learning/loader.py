@@ -94,6 +94,15 @@ def get_systems(target='dock', rnamigos1_split=-1, return_test=False,
     return systems
 
 
+def stretch_values(value):
+    """
+    Takes a value in 0,1 and strech lower ones
+    :param value:
+    :return:
+    """
+    return value ** (1 / 3)
+
+
 class DockingDataset(Dataset):
 
     def __init__(self,
@@ -101,6 +110,7 @@ class DockingDataset(Dataset):
                  systems,
                  target='dock',
                  use_normalized_score=False,
+                 stretch_scores=False,
                  fp_type='MACCS',
                  use_graphligs=False,
                  shuffle=False,
@@ -132,6 +142,7 @@ class DockingDataset(Dataset):
         # Setup task and values
         self.target = target
         self.use_normalized_score = use_normalized_score
+        self.stretch_scores = stretch_scores
 
         # Setup Ligands
         self.fp_type = fp_type
@@ -182,6 +193,8 @@ class DockingDataset(Dataset):
                 target = row['TOTAL'] / 40
             else:
                 target = row['normalized_values']
+                if self.stretch_scores:
+                    target = stretch_values(target)
         else:
             target = row['IS_NATIVE']
         # print("1 : ", time.perf_counter() - t0)

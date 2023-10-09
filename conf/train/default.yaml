@@ -10,8 +10,8 @@ embed_only: false
 early_stop: 10
 use_nucs: true
 target: dock # dock or native_fp or is_native
-use_normalized_score: False # dock or native_fp or is_native
-
+use_normalized_score: False # To use quantiles instead of scores
+stretch_scores: False # To put more emphasis on better scores
 shuffle: true
 loss: 'l2'
 use_rnamigos1_train: False
