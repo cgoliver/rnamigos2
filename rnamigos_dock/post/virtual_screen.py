@@ -29,7 +29,7 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
 
 
 def enrichment_factor(scores, is_active, lower_is_better=True, **kwargs):
-    n_actives = np.sum(is_active)
+    n_actives = np.sum(is_active.numpy())
     n_screened = int(kwargs['frac'] * len(scores))
     is_active_sorted = [a for _, a in sorted(zip(scores, is_active), reverse=lower_is_better)]
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
@@ -66,6 +66,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
         if len(ligands) < 10:
             logger.warning(f"Skipping pocket{i}, not enough decoys")
             continue
+        kwargs['frac'] = 0.01
         scores = list(model.predict_ligands(pocket_graph,
                                             ligands,
                                             ).squeeze().cpu().numpy())

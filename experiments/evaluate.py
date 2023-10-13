@@ -65,11 +65,15 @@ def main(cfg: DictConfig):
 
     model = model.to(device)
 
-    test_systems = get_systems(target=params['train']['target'],
-                               rnamigos1_split=params['train']['rnamigos1_split'],
-                               use_rnamigos1_train=params['train']['use_rnamigos1_train'],
-                               use_rnamigos1_ligands=False,
-                               return_test=True)
+    if cfg.custom_dir:
+        test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(g).stem for g in os.listdir(cfg.data.pocket_graphs)]})
+    else:
+        test_systems = get_systems(target=params['train']['target'],
+                                   rnamigos1_split=params['train']['rnamigos1_split'],
+                                   use_rnamigos1_train=params['train']['use_rnamigos1_train'],
+                                   use_rnamigos1_ligands=False,
+                                   return_test=True,
+                                   )
 
     # Loader is asynchronous
     loader_args = {'shuffle': False,
@@ -85,7 +89,8 @@ def main(cfg: DictConfig):
         decoys = [cfg.decoys]
 
     for decoy_mode in decoys:
-        dataset = VirtualScreenDataset(pockets_path=params['data']['pocket_graphs'],
+        pocket_path = cfg.data.pocket_graphs if cfg.custom_dir else params['data']['pocket_graphs']
+        dataset = VirtualScreenDataset(pocket_path,
                                        ligands_path=params['data']['ligand_db'],
                                        systems=test_systems,
                                        decoy_mode=decoy_mode,
@@ -101,14 +106,14 @@ def main(cfg: DictConfig):
         lower_is_better = params['train']['target'] in ['dock', 'native_fp']
         efs, inds, scores, pocket_ids  = run_virtual_screen(model, 
                                                            dataloader, 
-                                                           metric=mean_active_rank, 
+                                                           metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank, 
                                                            lower_is_better=lower_is_better,
                                                            )
         for ef, score, ind, pocket_id in zip(efs, scores, inds, pocket_ids):
 
             rows.append({
                          'score': ef,
-                         'metric': 'MAR',
+                         'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
                          'data_idx': ind,
                          'decoys': decoy_mode,
                          'pocket_id': pocket_id
