@@ -6,6 +6,7 @@ import pandas as pd
 from Bio.PDB import *
 from rnaglib.prepare_data import fr3d_to_graph
 from rnaglib.drawing import rna_draw
+from rnaglib.utils import dump_json 
 from rnaglib.utils import bfs 
 
 CANONICALS = ['B53', 'B35', 'CWW']
@@ -57,11 +58,14 @@ if __name__ == "__main__":
 
         expanded_nodes = bfs(big_G, list(G.nodes()), depth=1, label='LW')
         G_expand = big_G.subgraph(expanded_nodes).copy()
-        rna_draw(G_expand, show=True)
+        # rna_draw(G_expand, show=True)
         NC_before = Counter([d['LW'].upper() for _,_,d in G.edges(data=True)])
         NC_after = Counter([d['LW'].upper() for _,_,d in G_expand.edges(data=True)])
 
         pockets.append(G_expand)
+
+        if sum([c for k,c in NC_after.items() if k not in CANONICALS]) > 1:
+            dump_json(f"../data/robin_graphs/{pocket.ROBIN_ID}.json", G_expand)
 
         rows.append({"ROBIN ID": pocket.ROBIN_ID, 
                      "PDBID": pocket.PDBID,

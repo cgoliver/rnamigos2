@@ -7,7 +7,6 @@ import pandas as pd
 from loguru import logger
 from rdkit import Chem
 
-from decoy_finder import find_decoys
 
 
 def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv"):
@@ -28,8 +27,12 @@ def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv")
             return []
 
 
-def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv', save_path='data/ligand_db',
-                         no_decoyfinder=True):
+def build_actives_decoys(
+                         pdb=False,
+                         decoyfinder=False,
+                         pdb_data_path='data/rnamigos2_dataset_consolidated.csv', 
+                         save_path='data/ligand_db',
+                         ):
     """ Build active and decoy lists for every pocket in master dataset `rnamigos2_dataset_consolidated.csv`
 
     Each pocket ID gets a folder:
@@ -38,7 +41,11 @@ def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv'
                 actives.txt
                 decoys.txt
     """
-    if not no_decoyfinder:
+
+    if not decoyfinder and not pdb:
+        return
+
+    if decoyfinder:
         from decoy_finder import find_decoys
 
     pdb_df = pd.read_csv(pdb_data_path)
@@ -58,37 +65,54 @@ def build_actives_decoys(pdb_data_path='data/rnamigos2_dataset_consolidated.csv'
         pdb_path.mkdir(parents=True, exist_ok=True)
         chembl_path.mkdir(parents=True, exist_ok=True)
 
-        if not no_decoyfinder:
+        if decoyfinder:
             decoyfinder_path.mkdir(parents=True, exist_ok=True)
             decoyfinder_decoys = get_decoyfinder_decoys(pocket.LIGAND_SMILES)
 
-        with open(pdb_path / 'actives.txt', 'w') as ac:
-            ac.write(pocket.LIGAND_SMILES)
-        with open(chembl_path / 'actives.txt', 'w') as ac:
-            ac.write(pocket.LIGAND_SMILES)
-        with open(pdb_path / 'decoys.txt', 'w') as de:
-            de.write("\n".join(pdb_ligands - set(pocket.LIGAND_SMILES)))
-        with open(chembl_path / 'decoys.txt', 'w') as de:
-            de.write("\n".join(list((pdb_ligands | chembl_ligands) - set(pocket.LIGAND_SMILES))))
-        with open(chembl_path / 'decoys.txt', 'w') as de:
-            de.write("\n".join(list((pdb_ligands | chembl_ligands) - set(pocket.LIGAND_SMILES))))
-
-        if not no_decoyfinder:
             with open(decoyfinder_path / 'decoys.txt', 'w') as de:
                 de.write("\n".join(get_decoyfinder_decoys(pocket.LIGAND_SMILES)))
-        with open(decoyfinder_path/ 'actives.txt', 'w') as ac:
-            ac.write(pocket.LIGAND_SMILES)
+            with open(decoyfinder_path / 'actives.txt', 'w') as ac:
+                ac.write(pocket.LIGAND_SMILES)
+        if pdb:
+            with open(pdb_path / 'actives.txt', 'w') as ac:
+                ac.write(pocket.LIGAND_SMILES)
+            with open(chembl_path / 'actives.txt', 'w') as ac:
+                ac.write(pocket.LIGAND_SMILES)
+            with open(pdb_path / 'decoys.txt', 'w') as de:
+                de.write("\n".join(pdb_ligands - set(pocket.LIGAND_SMILES)))
+            with open(chembl_path / 'decoys.txt', 'w') as de:
+                de.write("\n".join(list((pdb_ligands | chembl_ligands) - set(pocket.LIGAND_SMILES))))
+
 
 
 pass
 
+def build_actives_decoys_robin(robin_data="data/SMM_Target_Hits.csv", save_path="data/ligand_db"):
+    df = pd.read_csv(robin_data)
+    for target in df.columns:
+        name = target.rstrip("_hit")
+        robin_path = Path(save_path, name, 'robin')
+        robin_path.mkdir(parents=True, exist_ok=True)
+
+        actives = list(df.loc[df[target] == 1]['Smile'])
+        decoys = list(df.loc[df[target] == 0]['Smile'])
+        with open(robin_path / 'decoys.txt', 'w') as de:
+            de.write("\n".join(decoys))
+        with open(robin_path / 'actives.txt', 'w') as ac:
+            ac.write("\n".join(actives))
+    pass
+
 
 def cline():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--no-decoyfinder', action='store_true', default=False)
+    parser.add_argument('--decoyfinder', action='store_true', default=False)
+    parser.add_argument('--pdb', action='store_true', default=False)
+    parser.add_argument('--robin', action='store_true', default=False)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = cline()
-    build_actives_decoys(no_decoyfinder=args.no_decoyfinder)
+    build_actives_decoys(pdb=args.pdb, decoyfinder=args.decoyfinder)
+    if args.robin:
+        build_actives_decoys_robin()

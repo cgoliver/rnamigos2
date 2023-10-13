@@ -63,6 +63,9 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
             logger.info(f"Done {i}/{len(dataloader)}")
 
         model = model.to('cpu')
+        if len(ligands) < 10:
+            logger.warning(f"Skipping pocket{i}, not enough decoys")
+            continue
         scores = list(model.predict_ligands(pocket_graph,
                                             ligands,
                                             ).squeeze().cpu().numpy())

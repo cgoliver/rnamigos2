@@ -5,7 +5,7 @@
 #SBATCH --mem-per-cpu=5G
 #SBATCH --time=12:00:00
 #SBATCH --output inf_%a.out
-#SBATCH --array=0-100%20
+#SBATCH --array=0-400%20
 
 cd ..
 source .venv/bin/activate

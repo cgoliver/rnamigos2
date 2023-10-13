@@ -26,7 +26,6 @@ if __name__ == "__main__":
             rows.append({'name': name, 'decoy_mode': res.decoys, 'score': res.score})
 
     res_df = pd.DataFrame(rows)
-    print(res_df)
-    res_df = res_df.pivot_table(columns='decoy_mode', index='name', values='score')
+    res_df = res_df.pivot(columns='decoy_mode', index='name', values='score')
     print(res_df.to_latex())
     print(res_df.to_markdown())
