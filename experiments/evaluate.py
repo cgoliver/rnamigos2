@@ -13,7 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 
 from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
-from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
+from rnamigos_dock.learning.models import Embedder, LigandGraphEncoder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen
 
 
@@ -40,11 +40,41 @@ def main(cfg: DictConfig):
                                num_bases=params['model']['encoder']['num_bases']
                                )
 
-    lig_encoder = LigandEncoder(in_dim=params['model']['lig_encoder']['in_dim'],
-                                hidden_dim=params['model']['lig_encoder']['hidden_dim'],
-                                num_hidden_layers=params['model']['lig_encoder']['num_layers'],
-                                batch_norm=params['model']['batch_norm'],
-                                dropout=params['model']['dropout'])
+    if params['model']['use_graphligs']:
+        graphlig_cfg = params['model']['graphlig_encoder']
+        """
+        "features_dim": 16,
+         "num_rels": 4,
+         "l_size": 56,
+         "gcn_hdim": 32,
+         "gcn_layers": 3,
+         "batch_norm": false
+         """
+        if graphlig_cfg['use_pretrained']:
+            lig_encoder = LigandGraphEncoder(features_dim=16,
+                                             l_size=56,
+                                             num_rels=4,
+                                             gcn_hdim=32,
+                                             gcn_layers=3,
+                                             batch_norm=False,
+                                             cut_embeddings=True)
+
+
+            
+        else:
+            lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg['features_dim'],
+                                         l_size=graphlig_cfg['l_size'],
+                                         gcn_hdim=graphlig_cfg['gcn_hdim'],
+                                         gcn_layers=graphlig_cfg['gcn_layers'],
+                                         batch_norm=params['model']['batch_norm'],
+                                         cut_embeddings=True)
+
+    else:
+        lig_encoder = LigandEncoder(in_dim=params['model']['lig_encoder']['in_dim'],
+                                    hidden_dim=params['model']['lig_encoder']['hidden_dim'],
+                                    num_hidden_layers=params['model']['lig_encoder']['num_layers'],
+                                    batch_norm=params['model']['batch_norm'],
+                                    dropout=params['model']['dropout'])
 
     decoder = Decoder(dropout=params['model']['dropout'],
                       batch_norm=params['model']['batch_norm'],
@@ -94,7 +124,8 @@ def main(cfg: DictConfig):
                                        ligands_path=params['data']['ligand_db'],
                                        systems=test_systems,
                                        decoy_mode=decoy_mode,
-                                       fp_type='MACCS')
+                                       fp_type='MACCS',
+                                       use_graphligs=params['model']['use_graphligs'])
 
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
