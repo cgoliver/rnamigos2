@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from dgl.dataloading import GraphDataLoader
-from yaml import safe_load 
+from yaml import safe_load
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -33,23 +33,16 @@ def main(cfg: DictConfig):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     rna_encoder = Embedder(in_dim=params['model']['encoder']['in_dim'],
-                               hidden_dim=params['model']['encoder']['hidden_dim'],
-                               num_hidden_layers=params['model']['encoder']['num_layers'],
-                               batch_norm=params['model']['batch_norm'],
-                               dropout=params['model']['dropout'],
-                               num_bases=params['model']['encoder']['num_bases']
-                               )
+                           hidden_dim=params['model']['encoder']['hidden_dim'],
+                           num_hidden_layers=params['model']['encoder']['num_layers'],
+                           batch_norm=params['model']['batch_norm'],
+                           dropout=params['model']['dropout'],
+                           num_bases=params['model']['encoder']['num_bases']
+                           )
 
     if params['model']['use_graphligs']:
         graphlig_cfg = params['model']['graphlig_encoder']
-        """
-        "features_dim": 16,
-         "num_rels": 4,
-         "l_size": 56,
-         "gcn_hdim": 32,
-         "gcn_layers": 3,
-         "batch_norm": false
-         """
+        # For optimol compatibility.
         if graphlig_cfg['use_pretrained']:
             lig_encoder = LigandGraphEncoder(features_dim=16,
                                              l_size=56,
@@ -58,16 +51,12 @@ def main(cfg: DictConfig):
                                              gcn_layers=3,
                                              batch_norm=False,
                                              cut_embeddings=True)
-
-
-            
         else:
             lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg['features_dim'],
-                                         l_size=graphlig_cfg['l_size'],
-                                         gcn_hdim=graphlig_cfg['gcn_hdim'],
-                                         gcn_layers=graphlig_cfg['gcn_layers'],
-                                         batch_norm=params['model']['batch_norm'],
-                                         cut_embeddings=True)
+                                             l_size=graphlig_cfg['l_size'],
+                                             gcn_hdim=graphlig_cfg['gcn_hdim'],
+                                             gcn_layers=graphlig_cfg['gcn_layers'],
+                                             batch_norm=params['model']['batch_norm'])
 
     else:
         lig_encoder = LigandEncoder(in_dim=params['model']['lig_encoder']['in_dim'],
@@ -88,8 +77,7 @@ def main(cfg: DictConfig):
                           pool_dim=params['model']['encoder']['hidden_dim']
                           )
 
-
-    state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'), map_location='cuda:0')['model_state_dict']
+    state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'), map_location=device)['model_state_dict']
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -135,9 +123,9 @@ def main(cfg: DictConfig):
         Experiment Setup
         '''
         lower_is_better = params['train']['target'] in ['dock', 'native_fp']
-        efs, inds, scores, status, pocket_ids  = run_virtual_screen(model, 
-                                                                   dataloader, 
-                                                                   metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank, 
+        efs, inds, scores, status, pocket_ids = run_virtual_screen(model,
+                                                                   dataloader,
+                                                                   metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank,
                                                                    lower_is_better=lower_is_better,
                                                                    )
         for pocket_id, score_list, status_list in zip(pocket_ids, scores, status):
@@ -145,16 +133,12 @@ def main(cfg: DictConfig):
                 raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id})
 
         for ef, score, ind, pocket_id in zip(efs, scores, inds, pocket_ids):
-
             rows.append({
-                         'score': ef,
-                         'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
-                         'data_idx': ind,
-                         'decoys': decoy_mode,
-                         'pocket_id': pocket_id
-                         }
-                        )
-
+                'score': ef,
+                'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
+                'data_idx': ind,
+                'decoys': decoy_mode,
+                'pocket_id': pocket_id})
         print('Mean EF :', np.mean(efs))
 
     df = pd.DataFrame(rows)
@@ -163,5 +147,7 @@ def main(cfg: DictConfig):
 
     df_raw = pd.DataFrame(raw_rows)
     df_raw.to_csv(d / Path(cfg.csv_name.split(".")[0] + "_raw.csv"))
+
+
 if __name__ == "__main__":
     main()

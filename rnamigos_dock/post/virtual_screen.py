@@ -1,6 +1,7 @@
 """ Run a virtual screen with a trained model
 """
 import numpy as np
+from dgl import DGLGraph
 from loguru import logger
 import torch
 
@@ -63,7 +64,8 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
             logger.info(f"Done {i}/{len(dataloader)}")
 
         model = model.to('cpu')
-        if len(ligands) < 10:
+        if ((isinstance(ligands, torch.Tensor) and len(ligands) < 10)
+                or (isinstance(ligands, DGLGraph) and ligands.batch_size < 10)):
             logger.warning(f"Skipping pocket{i}, not enough decoys")
             continue
         kwargs['frac'] = 0.01
