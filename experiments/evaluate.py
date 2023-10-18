@@ -59,7 +59,7 @@ def main(cfg: DictConfig):
                           )
 
 
-    state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'))['model_state_dict']
+    state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'), map_location='cuda:0')['model_state_dict']
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -82,7 +82,7 @@ def main(cfg: DictConfig):
                    'collate_fn': lambda x: x[0]
                    }
 
-    rows = []
+    rows, raw_rows = [], []
     if cfg.decoys == 'all':
         decoys = ['pdb', 'pdb_chembl', 'decoy_finder']
     else:
@@ -104,11 +104,15 @@ def main(cfg: DictConfig):
         Experiment Setup
         '''
         lower_is_better = params['train']['target'] in ['dock', 'native_fp']
-        efs, inds, scores, pocket_ids  = run_virtual_screen(model, 
-                                                           dataloader, 
-                                                           metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank, 
-                                                           lower_is_better=lower_is_better,
-                                                           )
+        efs, inds, scores, status, pocket_ids  = run_virtual_screen(model, 
+                                                                   dataloader, 
+                                                                   metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank, 
+                                                                   lower_is_better=lower_is_better,
+                                                                   )
+        for pocket_id, score_list, status_list in zip(pocket_ids, scores, status):
+            for score, status in zip(score_list, status_list):
+                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id})
+
         for ef, score, ind, pocket_id in zip(efs, scores, inds, pocket_ids):
 
             rows.append({
@@ -125,5 +129,8 @@ def main(cfg: DictConfig):
     df = pd.DataFrame(rows)
     d = Path(cfg.result_dir, parents=True, exist_ok=True)
     df.to_csv(d / cfg.csv_name)
+
+    df_raw = pd.DataFrame(raw_rows)
+    df_raw.to_csv(d / Path(cfg.csv_name.split(".")[0] + "_raw.csv"))
 if __name__ == "__main__":
     main()

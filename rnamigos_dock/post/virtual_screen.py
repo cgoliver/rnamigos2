@@ -47,7 +47,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     :returns scores: list of scores, one for each graph in the dataset 
     :returns inds: list of indices in the dataloader for which the score computation was successful
     """
-    efs, inds, all_scores, pocket_ids = [], [], [], []
+    efs, inds, all_scores, status, pocket_ids = [], [], [], [], []
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
     failed_set = set()
     failed = 0
@@ -72,9 +72,10 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
                                             ).squeeze().cpu().numpy())
         all_scores.append(scores)
         efs.append(metric(scores, is_active, **kwargs))
+        status.append(list(is_active.numpy()))
         inds.append(i)
         pocket_ids.append(pocket_id)
     logger.debug(f"VS failed on {failed_set}")
     print(failed)
     print(efs)
-    return efs, inds, all_scores, pocket_ids
+    return efs, inds, all_scores, status, pocket_ids
