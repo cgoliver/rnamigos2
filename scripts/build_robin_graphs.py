@@ -65,6 +65,9 @@ if __name__ == "__main__":
         if sum([c for k,c in NC_after.items()]) > 1:
             dump_json(f"{pocket.ROBIN_ID}.json", G_expand)
 
+        if sum([c for k,c in NC_after.items() if k not in CANONICALS]) > 1:
+            dump_json(f"../data/robin_graphs/{pocket.ROBIN_ID}.json", G_expand)
+
         rows.append({"ROBIN ID": pocket.ROBIN_ID, 
                      "PDBID": pocket.PDBID,
                      "Ligand": pocket.LIGAND,

@@ -7,3 +7,4 @@ decoys: all
 saved_model_dir: . 
 result_dir: outputs/
 csv_name: default.csv
+custom_dir: false

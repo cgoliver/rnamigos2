@@ -13,7 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 
 from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
-from rnamigos_dock.learning.models import Embedder, LigandEncoder, Decoder, RNAmigosModel
+from rnamigos_dock.learning.models import Embedder, LigandGraphEncoder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen
 
 
@@ -40,11 +40,41 @@ def main(cfg: DictConfig):
                                num_bases=params['model']['encoder']['num_bases']
                                )
 
-    lig_encoder = LigandEncoder(in_dim=params['model']['lig_encoder']['in_dim'],
-                                hidden_dim=params['model']['lig_encoder']['hidden_dim'],
-                                num_hidden_layers=params['model']['lig_encoder']['num_layers'],
-                                batch_norm=params['model']['batch_norm'],
-                                dropout=params['model']['dropout'])
+    if params['model']['use_graphligs']:
+        graphlig_cfg = params['model']['graphlig_encoder']
+        """
+        "features_dim": 16,
+         "num_rels": 4,
+         "l_size": 56,
+         "gcn_hdim": 32,
+         "gcn_layers": 3,
+         "batch_norm": false
+         """
+        if graphlig_cfg['use_pretrained']:
+            lig_encoder = LigandGraphEncoder(features_dim=16,
+                                             l_size=56,
+                                             num_rels=4,
+                                             gcn_hdim=32,
+                                             gcn_layers=3,
+                                             batch_norm=False,
+                                             cut_embeddings=True)
+
+
+            
+        else:
+            lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg['features_dim'],
+                                         l_size=graphlig_cfg['l_size'],
+                                         gcn_hdim=graphlig_cfg['gcn_hdim'],
+                                         gcn_layers=graphlig_cfg['gcn_layers'],
+                                         batch_norm=params['model']['batch_norm'],
+                                         cut_embeddings=True)
+
+    else:
+        lig_encoder = LigandEncoder(in_dim=params['model']['lig_encoder']['in_dim'],
+                                    hidden_dim=params['model']['lig_encoder']['hidden_dim'],
+                                    num_hidden_layers=params['model']['lig_encoder']['num_layers'],
+                                    batch_norm=params['model']['batch_norm'],
+                                    dropout=params['model']['dropout'])
 
     decoder = Decoder(dropout=params['model']['dropout'],
                       batch_norm=params['model']['batch_norm'],
@@ -59,17 +89,21 @@ def main(cfg: DictConfig):
                           )
 
 
-    state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'))['model_state_dict']
+    state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'), map_location='cuda:0')['model_state_dict']
     model.load_state_dict(state_dict)
     model.eval()
 
     model = model.to(device)
 
-    test_systems = get_systems(target=params['train']['target'],
-                               rnamigos1_split=params['train']['rnamigos1_split'],
-                               use_rnamigos1_train=params['train']['use_rnamigos1_train'],
-                               use_rnamigos1_ligands=False,
-                               return_test=True)
+    if cfg.custom_dir:
+        test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(g).stem for g in os.listdir(cfg.data.pocket_graphs)]})
+    else:
+        test_systems = get_systems(target=params['train']['target'],
+                                   rnamigos1_split=params['train']['rnamigos1_split'],
+                                   use_rnamigos1_train=params['train']['use_rnamigos1_train'],
+                                   use_rnamigos1_ligands=False,
+                                   return_test=True,
+                                   )
 
     # Loader is asynchronous
     loader_args = {'shuffle': False,
@@ -78,18 +112,20 @@ def main(cfg: DictConfig):
                    'collate_fn': lambda x: x[0]
                    }
 
-    rows = []
+    rows, raw_rows = [], []
     if cfg.decoys == 'all':
         decoys = ['pdb', 'pdb_chembl', 'decoy_finder']
     else:
         decoys = [cfg.decoys]
 
     for decoy_mode in decoys:
-        dataset = VirtualScreenDataset(pockets_path=params['data']['pocket_graphs'],
+        pocket_path = cfg.data.pocket_graphs if cfg.custom_dir else params['data']['pocket_graphs']
+        dataset = VirtualScreenDataset(pocket_path,
                                        ligands_path=params['data']['ligand_db'],
                                        systems=test_systems,
                                        decoy_mode=decoy_mode,
-                                       fp_type='MACCS')
+                                       fp_type='MACCS',
+                                       use_graphligs=params['model']['use_graphligs'])
 
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
@@ -99,16 +135,20 @@ def main(cfg: DictConfig):
         Experiment Setup
         '''
         lower_is_better = params['train']['target'] in ['dock', 'native_fp']
-        efs, inds, scores, pocket_ids  = run_virtual_screen(model, 
-                                                           dataloader, 
-                                                           metric=mean_active_rank, 
-                                                           lower_is_better=lower_is_better,
-                                                           )
+        efs, inds, scores, status, pocket_ids  = run_virtual_screen(model, 
+                                                                   dataloader, 
+                                                                   metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank, 
+                                                                   lower_is_better=lower_is_better,
+                                                                   )
+        for pocket_id, score_list, status_list in zip(pocket_ids, scores, status):
+            for score, status in zip(score_list, status_list):
+                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id})
+
         for ef, score, ind, pocket_id in zip(efs, scores, inds, pocket_ids):
 
             rows.append({
                          'score': ef,
-                         'metric': 'MAR',
+                         'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
                          'data_idx': ind,
                          'decoys': decoy_mode,
                          'pocket_id': pocket_id
@@ -120,5 +160,8 @@ def main(cfg: DictConfig):
     df = pd.DataFrame(rows)
     d = Path(cfg.result_dir, parents=True, exist_ok=True)
     df.to_csv(d / cfg.csv_name)
+
+    df_raw = pd.DataFrame(raw_rows)
+    df_raw.to_csv(d / Path(cfg.csv_name.split(".")[0] + "_raw.csv"))
 if __name__ == "__main__":
     main()

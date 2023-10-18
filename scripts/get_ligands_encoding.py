@@ -14,7 +14,7 @@ from tqdm import tqdm
 if __name__ == '__main__':
     sys.path.append('..')
 
-from rnamigos_dock.learning.loader import MolGraphEncoder
+from rnamigos_dock.learning.ligand_encoding import MolGraphEncoder
 
 interactions_csv_dock = '../data/csvs/docking_data.csv'
 systems = pd.read_csv(interactions_csv_dock)
