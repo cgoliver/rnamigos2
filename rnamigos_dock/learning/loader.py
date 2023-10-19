@@ -280,12 +280,14 @@ class VirtualScreenDataset(DockingDataset):
                  fp_type='MACCS',
                  use_rings=False,
                  use_graphligs=False,
+                 rognan=False
                  ):
         super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False, use_rings=use_rings,
                          use_graphligs=use_graphligs)
         self.ligands_path = ligands_path
         self.decoy_mode = decoy_mode
         self.all_pockets_id = list(self.systems['PDB_ID_POCKET'].unique())
+        self.rognan = rognan
         pass
 
     def __len__(self):
@@ -296,15 +298,18 @@ class VirtualScreenDataset(DockingDataset):
 
     def __getitem__(self, idx):
         try:
-            pocket_id = self.all_pockets_id[idx]
+            if self.rognan: 
+                pocket_id = self.all_pockets_id[0]
+            else:
+                pocket_id = self.all_pockets_id[idx]
             if self.cache_graphs:
                 pocket_graph, _ = self.all_pockets[pocket_id]
             else:
                 pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
                                                  use_rings=False)
 
-            actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'actives.txt'))
-            decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_id, self.decoy_mode, 'decoys.txt'))
+            actives_smiles = self.parse_smiles(Path(self.ligands_path, self.all_pockets_id[idx], self.decoy_mode, 'actives.txt'))
+            decoys_smiles = self.parse_smiles(Path(self.ligands_path, self.all_pockets_id[idx], self.decoy_mode, 'decoys.txt'))
 
             is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
             is_active[:len(actives_smiles)] = 1.

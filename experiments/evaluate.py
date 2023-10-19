@@ -113,7 +113,8 @@ def main(cfg: DictConfig):
                                        systems=test_systems,
                                        decoy_mode=decoy_mode,
                                        fp_type='MACCS',
-                                       use_graphligs=params['model']['use_graphligs'])
+                                       use_graphligs=params['model']['use_graphligs'],
+                                       rognan=cfg.rognan)
 
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
