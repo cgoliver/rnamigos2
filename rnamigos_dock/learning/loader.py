@@ -280,13 +280,15 @@ class VirtualScreenDataset(DockingDataset):
                  fp_type='MACCS',
                  use_rings=False,
                  use_graphligs=False,
-                 rognan=False
+                 rognan=False,
+                 lig_ids='data/lig_ids.csv'
                  ):
         super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False, use_rings=use_rings,
                          use_graphligs=use_graphligs)
         self.ligands_path = ligands_path
         self.decoy_mode = decoy_mode
         self.all_pockets_id = list(self.systems['PDB_ID_POCKET'].unique())
+        self.smiles_2_id = dict(zip(df['smiles'], df['id']))
         self.rognan = rognan
         pass
 
@@ -299,7 +301,7 @@ class VirtualScreenDataset(DockingDataset):
     def __getitem__(self, idx):
         try:
             if self.rognan: 
-                pocket_id = self.all_pockets_id[0]
+                pocket_id = self.all_pockets_id[np.random.randint(0, len(self.all_pockets_id))]
             else:
                 pocket_id = self.all_pockets_id[idx]
             if self.cache_graphs:
@@ -319,9 +321,10 @@ class VirtualScreenDataset(DockingDataset):
             else:
                 all_inputs = self.ligand_encoder.smiles_to_fp_list(actives_smiles + decoys_smiles)
                 all_inputs = torch.tensor(all_inputs)
-            return pocket_graph, all_inputs, torch.tensor(is_active)
+            lig_ids = [self.smiles_2_id(s) for s in actives_smiles + decoys_smiles]
+            return pocket_graph, all_inputs, torch.tensor(is_active), torch.tensor(lig_ids)
         except FileNotFoundError:
-            return None, None, None
+            return None, None, None, None
 
 
 if __name__ == '__main__':

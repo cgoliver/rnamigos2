@@ -48,11 +48,13 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     :returns scores: list of scores, one for each graph in the dataset 
     :returns inds: list of indices in the dataloader for which the score computation was successful
     """
-    efs, inds, all_scores, status, pocket_ids = [], [], [], [], []
+    efs, inds, all_scores, status, all_smiles, pocket_ids = [], [], [], [], [], []
+    id_to_smiles = pd.read_csv("data/lig_id.csv")
+    id_to_smiles = dict(zip(id_to_smiles['id'], id_to_smiles['smiles']))
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
     failed_set = set()
     failed = 0
-    for i, (pocket_graph, ligands, is_active) in enumerate(dataloader):
+    for i, (pocket_graph, ligands, is_active, lig_ids) in enumerate(dataloader):
         pocket_id = dataloader.dataset.all_pockets_id[i]
         if pocket_graph is None:
             failed_set.add(pocket_graph)
@@ -73,6 +75,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
                                             ligands,
                                             ).squeeze().cpu().numpy())
         all_scores.append(scores)
+        all_smiles.append([id_to_smiles[i] for i in lig_ids])
         efs.append(metric(scores, is_active, **kwargs))
         status.append(list(is_active.numpy()))
         inds.append(i)
@@ -80,4 +83,4 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     logger.debug(f"VS failed on {failed_set}")
     print(failed)
     print(efs)
-    return efs, inds, all_scores, status, pocket_ids
+    return efs, inds, all_scores, status, pocket_ids, all_smiles

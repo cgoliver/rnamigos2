@@ -124,14 +124,14 @@ def main(cfg: DictConfig):
         Experiment Setup
         '''
         lower_is_better = params['train']['target'] in ['dock', 'native_fp']
-        efs, inds, scores, status, pocket_ids = run_virtual_screen(model,
-                                                                   dataloader,
-                                                                   metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank,
-                                                                   lower_is_better=lower_is_better,
-                                                                   )
-        for pocket_id, score_list, status_list in zip(pocket_ids, scores, status):
-            for score, status in zip(score_list, status_list):
-                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id})
+        efs, inds, scores, status, pocket_ids, all_smiles = run_virtual_screen(model,
+                                                                               dataloader,
+                                                                               metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank,
+                                                                               lower_is_better=lower_is_better,
+                                                                              )
+        for pocket_id, score_list, status_list, smiles_list in zip(pocket_ids, scores, status, all_smiles):
+            for score, status, smiles in zip(score_list, status_list, smiles_list):
+                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id, 'smiles': smiles, 'decoys': decoy_mode})
 
         for ef, score, ind, pocket_id in zip(efs, scores, inds, pocket_ids):
             rows.append({
