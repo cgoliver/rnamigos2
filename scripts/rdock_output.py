@@ -45,17 +45,21 @@ for pocket_id, pocket in df.groupby('PDB_ID_POCKET'):
         except FileNotFoundError:
             print("missing ", pocket_id)
         else:
-            scores, is_active = [], []
+            scores, is_active, all_smiles = [], [], []
             for sm in actives:
                 s = list(pocket.loc[pocket['LIGAND_SMILES'] == sm.strip()]['INTER'])[0]
                 scores.append(s)
                 is_active.append(1)
+                all_smiles.append(sm)
                 raw_rows.append({'raw_score': s,
                                  'is_active': 1,
-                                 'pocket_id': pocket_id})
+                                 'smiles': sm.lstrip().rstrip(),
+                                 'pocket_id': pocket_id,
+                                 'decoys': decoy_set})
             missing_sms = []
             for sm in decoys:
                 is_active.append(0)
+                all_smiles.append(sm)
                 try:
                     s = list(pocket.loc[pocket['LIGAND_SMILES'] == sm.strip()]['INTER'])[0]
                     scores.append(s)
@@ -64,7 +68,9 @@ for pocket_id, pocket in df.groupby('PDB_ID_POCKET'):
                     
                 raw_rows.append({'raw_score': s,
                                  'is_active': 0,
-                                 'pocket_id': pocket_id})
+                                 'smiles': sm.lstrip().rstrip(),
+                                 'pocket_id': pocket_id,
+                                 'decoys': decoy_set})
 
             print(scores)
             ef = mean_active_rank(scores, is_active)

@@ -8,16 +8,21 @@ import pandas as pd
 def merge_splits(csvs):
     split_dict = defaultdict(list)
     for c in csvs:
-        name = "_".join(Path(c).stem.split("_")[:-1])
-        split_dict[name].append(c)
+        for i in range(10):
+            split_dict[c].append(f"outputs/{c}_{i}.csv")
     merged_dfs = {}
     for n, paths in split_dict.items():
         merged_dfs[n] = pd.concat([pd.read_csv(p) for p in paths])
     return merged_dfs
 
 if __name__ == "__main__":
-    csvs = glob.glob("outputs/*.csv")
-    dfs = merge_splits(csvs)
+    runs = ['rnamigos1_repro_real',
+            'rnamigos2_dim16',
+            'rnamigos2_dim64_simR_1_prew0',
+            'rnamigos2_dim64_simhungarian_prew0'
+            ]
+    #csvs = glob.glob("outputs/rnamigos*.csv")
+    dfs = merge_splits(runs)
     rows = []
     for name, df in dfs.items():
         print(name, df)
