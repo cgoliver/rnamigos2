@@ -8,3 +8,4 @@ saved_model_dir: results/trained_models/dock/final_chembl_dock_graphligs_dim64_s
 result_dir: outputs/
 csv_name: default.csv
 custom_dir: false
+rognan: false
