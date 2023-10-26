@@ -8,10 +8,10 @@ import seaborn as sns
 
 # TEST SET
 runs = [
-    'final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0.csv',
-    'definitive_chembl_fp_dim64_simhungarian_prew0.csv',
-    'final_chembl_native_graphligs_dim64_optimol1.csv',
-    'rdock.csv',
+    'definitive_chembl_fp_dim64_simhungarian_prew0_newdecoys.csv',
+    'final_chembl_native_graphligs_dim64_optimol1_newdecoys.csv',
+    'final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0_newdecoys.csv',
+    'rdock_newdecoys.csv',
 ]
 # names = [
 #     r'\textrm{Dock}',
@@ -20,12 +20,12 @@ runs = [
 #     r'\textrm{RDOCK 6.0}',
 # ]
 names = [
-    r'\texttt{dock}',
     r'\texttt{fp}',
     r'\texttt{native}',
+    r'\texttt{dock}',
     r'\texttt{rDock}',
 ]
-decoy_mode = 'pdb_chembl'
+decoy_mode = 'chembl'
 
 # ROBIN
 # runs = [
@@ -64,11 +64,15 @@ if __name__ == "__main__":
     print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
 
     # Choose palette to get a different color for us and rdock
-    palette_ours = sns.color_palette("Blues", n_colors=3)
-    palette_ours = sns.color_palette("crest", n_colors=3)
-    palette_rdock = sns.color_palette("Reds", n_colors=2)
-    palette = palette_ours + palette_rdock[1:]
+    # palette_ours = sns.color_palette("Blues", n_colors=3)
+    # palette_ours = sns.color_palette("crest", n_colors=3)
+    # palette_rdock = sns.color_palette("Reds", n_colors=2)
+    # palette = palette_ours + palette_rdock[1:]
 
+    raw_hex = ["#61C6E7", "#4F7BF0", "#6183E7", "#FA4828"]
+    raw_hex = ["#3180e0", "#2ba9ff", "#2957d8", "#FA4828"]
+    hex_plt = [f"{raw}" for raw in raw_hex]
+    palette = sns.color_palette(hex_plt)
 
     plt.rcParams['text.usetex'] = True
     matplotlib.rcParams['mathtext.fontset'] = 'stix'
@@ -83,6 +87,7 @@ if __name__ == "__main__":
     sns.boxplot(x="name",
                 y="score",
                 hue="name",
+                order=names,
                 legend=False,
                 data=big_df,
                 width=.5,
