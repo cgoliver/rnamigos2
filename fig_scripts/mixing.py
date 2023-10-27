@@ -44,45 +44,70 @@ def get_mix_pair(df, score1, score2, all_thresh):
 
 def mix_all(df):
     """
+    Look into mixing of all three methods. The tricky part is sampling on the 2d simplex.
+    :param df:
+    :return:
     """
-    all_thresh = np.linspace(0.4, 0.6, 3)
+    # get all coefs, because of the simplex constraint it is not simple
+    all_thresh = np.linspace(0, 1, 6)
+    xs, ys, zs = np.meshgrid(all_thresh, all_thresh, all_thresh, indexing='ij')
+    xs = xs.flatten()
+    ys = ys.flatten()
+    zs = zs.flatten()
+    norm_coeffs = xs + ys + zs + 1e-5
+    coeffs = np.stack((xs, ys, zs))
+    coeffs = (coeffs / norm_coeffs).T
+
+    # Not the most efficient : remove the first (full zeros) and then
+    # go through the list and remove if close to existing one in the list
+    to_remove = [0]
+    import scipy.spatial.distance as scidist
+    for i in range(1, len(coeffs)):
+        min_dist = min(scidist.cdist(coeffs[:i], coeffs[i][None, ...]))
+        if min_dist < 0.001:
+            to_remove.append(i)
+    coeffs = np.delete(coeffs, to_remove, axis=0)
+    print(f"Filtered coeffs results in {len(coeffs)} grid points")
+
     pockets = df['pocket_id'].unique()
     all_thresh_res = []
-    xs, ys, zs = [],[],[]
-    for i, mixed in enumerate(all_thresh):
-        for j, mixed_2 in enumerate(all_thresh):
-            all_efs = []
-            for pi, p in enumerate(pockets):
-                pocket_df = df.loc[df['pocket_id'] == p]
-                pocket_df = pocket_df.reset_index(drop=True)
-                docking_scores = pocket_df['dock']
-                new_scores = pocket_df['fp']
-                scores_3 = pocket_df['native']
-                normalized_docking = normalize(docking_scores)
-                normalized_new = normalize(new_scores)
-                normalized_new_3 = normalize(scores_3)
+    for x, y, z in coeffs:
+        all_efs = []
+        for pi, p in enumerate(pockets):
+            pocket_df = df.loc[df['pocket_id'] == p]
+            pocket_df = pocket_df.reset_index(drop=True)
+            docking_scores = pocket_df['dock']
+            fp_scores = pocket_df['fp']
+            native_scores = pocket_df['native']
+            normalized_docking = normalize(docking_scores)
+            normalized_fp = normalize(fp_scores)
+            normalized_native = normalize(native_scores)
 
-                pocket_df['combined'] = (mixed * normalized_docking
-                                         + (mixed_2) * normalized_new
-                                         + (1 - mixed - mixed_2) * normalized_new_3).values
-                # pocket_df['combined'] = -(mixed * np.exp(- normalized_docking / 3) +
-                #                           (1 - mixed) * np.exp(-normalized_new / 3))
-                # pocket_df['combined'] = (mixed * normalized_docking ** 4 + (1 - mixed) * normalized_new ** 4).values
-                sorted_df = pocket_df.sort_values(by='combined')
-                sorted_df = sorted_df.reset_index(drop=True)
-                native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
-                enrich = native_ind / len(sorted_df)
-                all_efs.append(enrich)
-            pocket_ef = np.mean(all_efs)
-            print(i, j, pocket_ef)
-            xs.append(i)
-            ys.append(j)
-            zs.append(pocket_ef)
-            all_thresh_res.append(pocket_ef)
+            pocket_df['combined'] = (x * normalized_docking
+                                     + y * normalized_fp
+                                     + z * normalized_native).values
+            # pocket_df['combined'] = -(x * np.exp(- normalized_docking / 3) +
+            #                           y * np.exp(-normalized_fp / 3) +
+            #                           z * np.exp(-normalized_native / 3))
+            sorted_df = pocket_df.sort_values(by='combined')
+            sorted_df = sorted_df.reset_index(drop=True)
+            native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
+            enrich = native_ind / len(sorted_df)
+            all_efs.append(enrich)
+        pocket_ef = np.mean(all_efs)
+        print(x, y, pocket_ef)
+        all_thresh_res.append(pocket_ef)
+    # Print best result
+    zs = np.array(all_thresh_res)
+    best_i = np.argmax(zs)
+    print('Best results for ', coeffs[best_i], ' value of MAR : ', zs[best_i])
+
+    # 3D scatter plot the results
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
+    xs = coeffs[:, 0].flatten()
+    ys = coeffs[:, 1].flatten()
     ax.scatter(xs, ys, zs)
-    print(max(zs))
     plt.show()
     return all_thresh_res
 
