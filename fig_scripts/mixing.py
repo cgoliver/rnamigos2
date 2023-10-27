@@ -196,4 +196,4 @@ if __name__ == "__main__":
     # big_df_raw= pd.read_csv("../outputs/big_df_raw.csv")
     # plot_pairs(big_df_raw)
     # get_table_mixing(big_df_raw)
-    mix_all(big_df_raw)
+    # mix_all(big_df_raw)
