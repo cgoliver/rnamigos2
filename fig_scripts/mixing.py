@@ -1,3 +1,4 @@
+import itertools
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,7 +13,24 @@ def normalize(scores):
     return out_scores
 
 
-def get_mix_pair(df, score1, score2, all_thresh):
+def get_one(df, score):
+    """
+    """
+    pockets = df['pocket_id'].unique()
+    all_efs = []
+    for pi, p in enumerate(pockets):
+        pocket_df = df.loc[df['pocket_id'] == p]
+        pocket_df = pocket_df.reset_index(drop=True)
+        sorted_df = pocket_df.sort_values(by=score)
+        sorted_df = sorted_df.reset_index(drop=True)
+        native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
+        enrich = native_ind / len(sorted_df)
+        all_efs.append(enrich)
+    pocket_ef = np.mean(all_efs)
+    return pocket_ef
+
+
+def get_mix_pair(df, score1, score2, all_thresh, verbose=True):
     """
     """
     pockets = df['pocket_id'].unique()
@@ -37,9 +55,54 @@ def get_mix_pair(df, score1, score2, all_thresh):
             enrich = native_ind / len(sorted_df)
             all_efs.append(enrich)
         pocket_ef = np.mean(all_efs)
-        print(i, pocket_ef)
+        if verbose:
+            print(i, pocket_ef)
         all_thresh_res.append(pocket_ef)
     return all_thresh_res
+
+
+def get_table_mixing(df):
+    all_methods = ['fp', 'native', 'dock', 'rdock']
+    n_intervals = 10
+    all_thresh = np.linspace(0, 1, n_intervals)
+    all_res = {}
+    # Do singletons
+    for method in all_methods:
+        result = get_one(df, score=method)
+        print(method, result)
+        all_res[method] = result
+
+    # Do pairs
+    for pair in itertools.combinations(all_methods, 2):
+        all_results = get_mix_pair(df, score1=pair[0], score2=pair[1], all_thresh=all_thresh, verbose=False)
+        best_idx = np.argmax(np.array(all_results))
+        best_perf = all_results[best_idx]
+        print(pair, f"{best_idx}/{n_intervals}", best_perf)
+        all_res[pair] = best_perf
+    for k, v in all_res.items():
+        print(k, v)
+
+
+def plot_pairs(df):
+    score1 = 'rdock'
+    score1 = 'dock'
+    score1 = 'fp'
+    # scores_2 = ['dock']
+    # scores_2 = ['fp']
+    # scores_2 = ['native']
+    scores_2 = ['native']
+    # scores_2 = ['fp', 'native']
+    # scores_2 = ['dock', 'fp', 'native']
+
+    all_thresh = np.linspace(0, 1, 10)
+    for score2 in scores_2:
+        all_thresh_res = get_mix_pair(df, score1, score2, all_thresh=all_thresh)
+        plt.plot(all_thresh, all_thresh_res, label=score2)
+
+    # plt.ylim(0.98, 1)
+    plt.legend()
+    plt.show()
+    return df
 
 
 def mix_all(df):
@@ -49,7 +112,7 @@ def mix_all(df):
     :return:
     """
     # get all coefs, because of the simplex constraint it is not simple
-    all_thresh = np.linspace(0, 1, 6)
+    all_thresh = np.linspace(0, 1, 10)
     xs, ys, zs = np.meshgrid(all_thresh, all_thresh, all_thresh, indexing='ij')
     xs = xs.flatten()
     ys = ys.flatten()
@@ -95,7 +158,7 @@ def mix_all(df):
             enrich = native_ind / len(sorted_df)
             all_efs.append(enrich)
         pocket_ef = np.mean(all_efs)
-        print(x, y, pocket_ef)
+        print(x, y, z, pocket_ef)
         all_thresh_res.append(pocket_ef)
     # Print best result
     zs = np.array(all_thresh_res)
@@ -110,28 +173,6 @@ def mix_all(df):
     ax.scatter(xs, ys, zs)
     plt.show()
     return all_thresh_res
-
-
-def plot_pairs(df):
-    score1 = 'rdock'
-    score1 = 'dock'
-    score1 = 'fp'
-    # scores_2 = ['dock']
-    # scores_2 = ['fp']
-    # scores_2 = ['native']
-    scores_2 = ['native']
-    # scores_2 = ['fp', 'native']
-    # scores_2 = ['dock', 'fp', 'native']
-
-    all_thresh = np.linspace(0, 1, 10)
-    for score2 in scores_2:
-        all_thresh_res = get_mix_pair(df, score1, score2, all_thresh=all_thresh)
-        plt.plot(all_thresh, all_thresh_res, label=score2)
-
-    # plt.ylim(0.98, 1)
-    plt.legend()
-    plt.show()
-    return df
 
 
 if __name__ == "__main__":
@@ -154,4 +195,5 @@ if __name__ == "__main__":
 
     # big_df_raw= pd.read_csv("../outputs/big_df_raw.csv")
     # plot_pairs(big_df_raw)
+    # get_table_mixing(big_df_raw)
     mix_all(big_df_raw)
