@@ -7,142 +7,84 @@ from scipy.signal import savgol_filter
 
 import matplotlib
 
-# matplotlib.rcParams['mathtext.fontset'] = 'stix'
-# matplotlib.rcParams['font.family'] = 'STIXGeneral'
+matplotlib.rcParams['mathtext.fontset'] = 'stix'
+matplotlib.rcParams['font.family'] = 'STIXGeneral'
+
+import glob
+import matplotlib
+import matplotlib.ticker as ticker
+from matplotlib import scale as mscale
+from matplotlib import transforms as mtransforms
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 
-def ef(df, score_column):
-    native = df.iloc[0]['PDB_POCKET'].split("_")[2]
-    sorted_df = df.sort_values(by=score_column)
-    sorted_df = sorted_df.reset_index(drop=True)
-    native_ind = sorted_df.loc[sorted_df['LIG_NAME'] == native].index[0]
-    enrich = 1 - (native_ind / len(sorted_df))
+def virtual_screen(df, sort_up_to=0, score_column='rdock'):
+    df = df.reset_index(drop=True)
+    sort_up_to = int(sort_up_to)
+    df[:sort_up_to] = df[:sort_up_to].sort_values(score_column, ascending=False).values
+    native_ind = df.loc[df['is_active'] == 1].index[0]
+    enrich = 1 - (native_ind / len(df))
     return enrich
 
 
-def virtual_screen(df, score_column, time_column, time_limit, pocket_id, sort_col=None):
-    if sort_col is None:
-        pocket_df = df.loc[df['PDB_POCKET'] == pocket_id].sample(frac=1)
-    else:
-        pocket_df = df.loc[df['PDB_POCKET'] == pocket_id].sort_values(by=sort_col)
+def build_ef_df():
+    runs = ['rdock',
+            'final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0',
+            'definitive_chembl_fp_dim64_simhungarian_prew0',
+            'final_chembl_native_graphligs_dim64_optimol1'
+            ]
+    decoy = 'chembl'
+    raw_dfs = [pd.read_csv(f"../outputs/{r}_newdecoys_raw.csv") for r in runs]
+    raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
+    raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
+    big_df_raw = raw_dfs[0][['pocket_id', 'is_active']]
 
-    pocket_df = pocket_df.reset_index(drop=True)
+    # Now add score and flip docking scores, dock scores and distances for which low is better
+    big_df_raw['rdock'] = -raw_dfs[0]['raw_score'].values
+    big_df_raw['dock'] = -raw_dfs[1]['raw_score'].values
+    big_df_raw['fp'] = -raw_dfs[2]['raw_score'].values
+    big_df_raw['native'] = raw_dfs[3]['raw_score'].values
 
-    elapsed_time = 0
-    obtained_scores = []
-    computed = 0
-    for ind, row in pocket_df.iterrows():
-        elapsed_time += row[time_column]
-        if elapsed_time > time_limit:
-            if not sort_col is None:
-                obtained_scores.append(row[sort_col])
-            else:
-                obtained_scores.append(10000.)
-        else:
-            obtained_scores.append(row[score_column])
-            computed += 1
-
-    pocket_df['obtained_score'] = obtained_scores
-
-    enrich = ef(pocket_df, 'obtained_score')
-
-    return enrich
-
-
-def launch_pockets(df, param, pockets, models, i):
-    rows = []
-    for pi, p in enumerate(pockets):
-        print(p)
-        print(f"{pi} of {len(pockets)}")
-        for t in np.linspace(500, 70000, 20):
-            scores = []
-            # repeats screen and take average EF
-            for n in range(10):
-                np.random.seed(n)
-                try:
-                    s = virtual_screen(df,
-                                       param['score_column'],
-                                       param['time_column'],
-                                       t,
-                                       p,
-                                       sort_col=param['sort_col'])
-                    rows.append({'time_limit': t,
-                                 'pocket': p,
-                                 'ef': s,
-                                 'model': models[i],
-                                 'seed': n
-                                 }
-                                )
-                except Exception as e:
-                    print(f"error {e} on {p}")
-    return rows
-
-
-def build_ef_df(csv=None):
-    """
-    Index(['index', 'lig_id', 'docking_time', 'sort_time', 'report_time',
-       'PDB_POCKET', 'LIG_NAME', 'POCKET_ID', 'INTER_SCORE', 'PREDICTED_SCORE',
-       'INTER_SCORE_TRANS', 'PREDICTED_SCORE_TRANS', 'ELAPSED_TIME',
-       'ELAPSED_TIME_2', 'RDOCK_TIME', 'RNAMIGOS_PREDICTION_TIME'],
-      dtype='object')
-    """
-
-    df = pd.read_csv("predictions_docking_results_time_test.csv")
-    df['combined'] = df['INTER_SCORE'] + df['PREDICTED_SCORE']
-    pockets = df['PDB_POCKET'].unique()
-
-    models = ['RDOCK', 'RNAmigos2.0', 'RNAmigos2.0 pre-sort + RDOCK', 'Combined Score',
-              'Combined Score + RNAmigos Pre-sort', 'Combined Score + Combined sort']
-    models = ['RDOCK', 'RNAmigos2.0 pre-sort + RDOCK']
-
-    params = [{'score_column': 'INTER_SCORE', 'time_column': 'docking_time', 'sort_col': None},
-              # {'score_column': 'PREDICTED_SCORE', 'time_column': 'ELAPSED_TIME_2', 'sort_col': None},
-              {'score_column': 'INTER_SCORE', 'time_column': 'docking_time', 'sort_col': 'PREDICTED_SCORE'},
-              # {'score_column': 'combined', 'time_column': 'docking_time', 'sort_col': None},
-              # {'score_column': 'combined', 'time_column': 'docking_time', 'sort_col': 'PREDICTED_SCORE'},
-              ]
-
+    pockets = big_df_raw['pocket_id'].unique()
     ef_df_rows = []
-    for i, param in enumerate(params):
-        print(param)
-        """
-        parallel = Parallel(n_jobs=16, return_as="generator")
-        for rows in parallel(delayed(launch_pockets)(df, param, p, models, i) for p in pockets):
-            ef_df_rows.extend(rows)
-        """
-        for pi, p in enumerate(pockets):
-            print(p)
-            print(f"{pi} of {len(pockets)}")
-            for t in np.linspace(500, 70000, 20):
-                scores = []
-                # repeats screen and take average EF
-                for n in range(10):
-                    np.random.seed(n)
-                    try:
-                        s = virtual_screen(df,
-                                           param['score_column'],
-                                           param['time_column'],
-                                           t,
-                                           p,
-                                           sort_col=param['sort_col'])
-                        ef_df_rows.append({'time_limit': t,
-                                           'pocket': p,
-                                           'ef': s,
-                                           'model': models[i],
-                                           'seed': n
-                                           }
-                                          )
-                    except Exception as e:
-                        print(f"error {e} on {p}")
-
+    nsteps = 20
+    for pi, pocket in enumerate(pockets):
+        if not pi % 20:
+            print(f"Doing pocket {pi}/{len(pockets)}")
+        pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
+        for n in range(10):
+            # Shuffle
+            np.random.seed(n)
+            pocket_df = pocket_df.sample(frac=1)
+            for sort_up_to in np.linspace(0, len(pocket_df), nsteps).astype(int):
+                s = virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                res = {'sort_up_to': sort_up_to,
+                       'pocket': pocket,
+                       'ef': s,
+                       'model': 'rdock',
+                       'seed': n}
+                ef_df_rows.append(res)
+        for sort_col in ['dock', 'fp', 'native']:
+            pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
+            for sort_up_to in np.linspace(0, len(pocket_df), nsteps).astype(int):
+                s = virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                res = {'sort_up_to': sort_up_to,
+                       'pocket': pocket,
+                       'ef': s,
+                       'model': sort_col,
+                       'seed': 0}
+                ef_df_rows.append(res)
     df = pd.DataFrame(ef_df_rows)
-    df.to_csv("time_ef_keep.csv")
+    df.to_csv("time_ef.csv")
     return df
 
 
 def line_plot(df):
     window_size = 3
-    df = df[~df['model'].isin(['Combined Score', 'Combined Score + RNAmigos Pre-sort'])]
+    # df = df[~df['model'].isin(['Combined Score', 'Combined Score + RNAmigos Pre-sort'])]
     df['smoothed_ef'] = savgol_filter(df['ef'], window_size, 2)
     df = df.sort_values(by='time_limit')
     rdock = df[df['model'] == "RDOCK"]
@@ -239,9 +181,8 @@ def vax_plot(df):
 
 
 if __name__ == "__main__":
-    # df = build_ef_df()
-    df = pd.read_csv("time_ef_keep.csv")
-    df = df.replace({'RNAmigos2.0 pre-sort + RDOCK': 'Mixed'})
-    line_plot(df)
+    df = build_ef_df()
+    # df = pd.read_csv("time_ef.csv")
+    # line_plot(df)
     # vax_plot(df)
     pass
