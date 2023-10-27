@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from plot_utils import PALETTE, CustomScale
+
 # TEST SET
 runs = [
     'definitive_chembl_fp_dim64_simhungarian_prew0_newdecoys.csv',
@@ -51,71 +53,9 @@ sorterIndex = dict(zip(names, range(len(names))))
 means['name_rank'] = means['name'].map(sorterIndex)
 means = means.sort_values(['name_rank'], ascending=[True])
 
-# SETUP PLOT
-raw_hex = ["#61C6E7", "#4F7BF0", "#6183E7", "#FA4828"]
-raw_hex = ["#3180e0", "#2ba9ff", "#2957d8", "#FA4828"]
-hex_plt = [f"{raw}" for raw in raw_hex]
-palette = sns.color_palette(hex_plt)
-plt.rcParams['text.usetex'] = True
-matplotlib.rcParams['mathtext.fontset'] = 'stix'
-matplotlib.rcParams['font.family'] = 'STIXGeneral'
-# plt.rcParams.update({'font.size': 16})
-plt.rc('font', size=16)  # fontsize of the tick labels
-plt.rc('ytick', labelsize=13)  # fontsize of the tick labels
-plt.rc('grid', color='grey', alpha=0.2)
+main_palette = PALETTE
+violin_palette = PALETTE
 
-main_palette = palette
-violin_palette = palette
-
-
-class CustomScale(mscale.ScaleBase):
-    name = 'custom'
-
-    def __init__(self, axis):
-        mscale.ScaleBase.__init__(self, axis=axis)
-        self.offset = 0.03
-        self.thresh = None
-
-    def get_transform(self):
-        return self.CustomTransform(thresh=self.thresh, offset=self.offset)
-
-    def set_default_locators_and_formatters(self, axis):
-        pass
-
-    class CustomTransform(mtransforms.Transform):
-        input_dims = 1
-        output_dims = 1
-        is_separable = True
-
-        def __init__(self, offset, thresh):
-            mtransforms.Transform.__init__(self)
-            self.thresh = thresh
-            self.offset = offset
-
-        def transform_non_affine(self, a):
-            return - np.log(1 + self.offset - a)
-
-        def inverted(self):
-            return CustomScale.InvertedCustomTransform(thresh=self.thresh, offset=self.offset)
-
-    class InvertedCustomTransform(mtransforms.Transform):
-        input_dims = 1
-        output_dims = 1
-        is_separable = True
-
-        def __init__(self, offset, thresh):
-            mtransforms.Transform.__init__(self)
-            self.offset = offset
-            self.thresh = thresh
-
-        def transform_non_affine(self, a):
-            return 1 - np.exp(-a) + self.offset
-
-        def inverted(self):
-            return CustomScale.CustomTransform(offset=self.offset, thresh=self.thresh)
-
-
-mscale.register_scale(CustomScale)
 plt.gca().set_yscale('custom')
 # yticks= np.arange(0.6, 1)
 yticks = [0.6, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99]
@@ -189,7 +129,7 @@ patch_violinplot(violin_palette)
 plt.ylim(0.58, 1.001)
 plt.xlabel("")
 plt.ylabel("Mean Active Rank (MAR)")
-sns.despine()
+# sns.despine()
 plt.grid(True, which='both', axis='y')
 plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
 plt.show()
