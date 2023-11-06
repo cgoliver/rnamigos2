@@ -1,21 +1,15 @@
-import glob
-import matplotlib
-import matplotlib.ticker as ticker
-from matplotlib import scale as mscale
-from matplotlib import transforms as mtransforms
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from plot_utils import PALETTE, CustomScale
+from plot_utils import PALETTE
 
 # TEST SET
 runs = [
-    'definitive_chembl_fp_dim64_simhungarian_prew0_newdecoys.csv',
-    'final_chembl_native_graphligs_dim64_optimol1_newdecoys.csv',
-    'final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0_newdecoys.csv',
-    'rdock_newdecoys.csv',
+    'paper_fp.csv',
+    'paper_native.csv',
+    'paper_dock.csv',
+    'rdock.csv',
     'mixed.csv',
     'mixed_rdock.csv',
 ]
@@ -28,13 +22,6 @@ names = [
     r'\texttt{mixed\newline+ rDock}',
 ]
 decoy_mode = 'chembl'
-
-# ROBIN
-# runs = [
-#         'final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0_robin.csv',
-#         'final_chembl_fp_dim64_simhungarian_prew0_robin.csv',
-#         'final_chembl_native_graphligs_dim64_optimol1_robin.csv'
-#        ]
 
 # Parse ef data for the runs and gather them in a big database
 dfs = (pd.read_csv(f"../outputs/{f}") for f in runs)
@@ -78,7 +65,6 @@ sns.boxplot(x="name",
             fliersize=0,
             log_scale=False,
             meanline=True
-            # showmeans=True
             )
 
 # ADD POINTS
@@ -129,20 +115,17 @@ sns.stripplot(x="name",
               # legend=False,
               jitter=0,
               size=6,
-              # color='black',
               palette=main_palette,
               marker="D",
               edgecolor='black',
               linewidth=1.5,
-              # alpha=0.5,
               data=means)
 
 plt.ylim(0.58, 1.001)
 plt.xlabel("")
 plt.ylabel("Mean Active Rank")
-# sns.despine()
 plt.grid(True, which='both', axis='y')
+plt.vlines(3.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
 # plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
-plt.vlines(3.5, 0.65, 1, colors='grey', linestyles= (0, (5, 10)))
-plt.savefig("../outputs/violins_mixed.pdf", bbox_inches='tight')
+plt.savefig("violins_mixed.pdf", bbox_inches='tight')
 plt.show()

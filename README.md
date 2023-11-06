@@ -101,3 +101,41 @@ python experiments/eval.py
 
 ## Generate figures from paper
 
+The first step to reproduce the results and figures from the paper is to obtain the raw results files and csvs.
+Those files are directly available for download at :
+
+[//]: # (TODO)
+If you want to reproduce the results from scratch, first you need to set up the environment,
+data and model as detailed above. 
+
+[//]: # (Then, you need to pretrain a model that follows RNAmigos1 and one using directed graphs and )
+[//]: # (hungarian similarity function, there is a script to pretrain models in *job_scripts/*.)
+Then, you need to pretrain a model, by running :
+```bash    
+python experiments/pretrain.py name=pretrained_hungarian_64
+```
+Then you need to train models using those pretrained models. 
+Finally, once models are trained, you will need to make an inference on the test set for each trained model, resulting 
+in output csvs containing the pocket id, ligand id and predicted score.
+Scripts are available to run all relevant trainings and inferences.
+```bash
+bash job_scripts/paper_runs.sh
+# TODO add inference script and also for rdock
+```
+
+Now we expect the *outputs/* directory to hold paper_{fp, native, dock, rdock}_{, _raw}.csv files.
+The first step is to produce ensembling results, by running 
+```bash
+cd fig_scripts
+python mixing.py
+```
+
+We now have the table of mixing results as well as the best ensemble models. 
+In addition, we have blended our models to produce csvs with mixed and mixed+rdock results.
+
+We can now run : 
+```bash
+python violins.py
+python ef_time.py
+```
+to produce the remaining Figures of the paper.

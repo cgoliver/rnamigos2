@@ -17,17 +17,15 @@ def virtual_screen(df, sort_up_to=0, score_column='rdock'):
 
 def build_ef_df():
     runs = ['rdock',
-            'final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0',
-            'definitive_chembl_fp_dim64_simhungarian_prew0',
-            'final_chembl_native_graphligs_dim64_optimol1'
+            'paper_dock',
+            'paper_native',
+            'paper_fp'
+            'mixed'
+            'mixed_rdock'
             ]
     decoy = 'chembl'
-    raw_dfs = [pd.read_csv(f"../outputs/{r}_newdecoys_raw.csv") for r in runs]
+    raw_dfs = [pd.read_csv(f"../outputs/{r}_raw.csv") for r in runs]
     raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
-
-    raw_dfs.append(pd.read_csv(f"../outputs/mixed_raw.csv"))
-    raw_dfs.append(pd.read_csv(f"../outputs/mixed_rdock_raw.csv"))
-
     raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
     big_df_raw = raw_dfs[0][['pocket_id', 'is_active']]
 
@@ -101,13 +99,8 @@ def plot_mean_std(ax, times, means, stds, label, color):
 
 
 def line_plot(df):
-    window_size = 3
-    # df = df[~df['model'].isin(['Combined Score', 'Combined Score + RNAmigos Pre-sort'])]
-    # df['smoothed_ef'] = savgol_filter(df['ef'], window_size, 2)
-    # df = df.sort_values(by='time_limit')
     # all_models = ['dock', 'fp', 'native', 'rdock']
     # names = [r'\texttt{fp}', r'\texttt{native}', r'\texttt{dock}', r'\texttt{rDock}', ]
-
     all_models = ['rdock', 'mixed']
     names = [r'\texttt{rDock}', r'\texttt{mixed+rDock}']
     model_res = []
@@ -121,7 +114,6 @@ def line_plot(df):
     plt.grid(True)
     ax = plt.gca()
     ax.set_yscale('custom')
-    # yticks= np.arange(0.6, 1)
     yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
     plt.gca().set_yticks(yticks)
 
@@ -209,8 +201,10 @@ def vax_plot(df):
 
 
 if __name__ == "__main__":
-    # df = build_ef_df()
+    # Build the time df for making the figures, this can be commented then
+    build_ef_df()
+
     df = pd.read_csv("time_ef.csv")
-    # line_plot(df)
+    line_plot(df)
     vax_plot(df)
     pass
