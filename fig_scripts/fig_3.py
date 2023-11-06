@@ -16,12 +16,16 @@ runs = [
     'final_chembl_native_graphligs_dim64_optimol1_newdecoys.csv',
     'final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0_newdecoys.csv',
     'rdock_newdecoys.csv',
+    'mixed.csv',
+    'mixed_rdock.csv',
 ]
 names = [
     r'\texttt{fp}',
     r'\texttt{native}',
     r'\texttt{dock}',
     r'\texttt{rDock}',
+    r'\texttt{mixed}',
+    r'\texttt{mixed\newline+ rDock}',
 ]
 decoy_mode = 'chembl'
 
@@ -58,29 +62,15 @@ violin_palette = PALETTE
 
 plt.gca().set_yscale('custom')
 # yticks= np.arange(0.6, 1)
-yticks = [0.6, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99]
+yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
 plt.gca().set_yticks(yticks)
 
-sns.stripplot(x="name",
-              y="score",
-              hue="name",
-              order=names,
-              legend=False,
-              jitter=0,
-              size=5,
-              # color='black',
-              palette=main_palette,
-              marker="D",
-              edgecolor='black',
-              linewidth=0.6,
-              # alpha=0.5,
-              data=means)
-
+# ADD WHISKERS
 sns.boxplot(x="name",
             y="score",
-            hue="name",
             order=names,
-            legend=False,
+            # hue="name",
+            # legend=False,
             data=big_df,
             width=.5,
             fill=False,
@@ -90,18 +80,35 @@ sns.boxplot(x="name",
             meanline=True
             # showmeans=True
             )
+
+# ADD POINTS
 big_df[['score']] = big_df[['score']].clip(lower=0.6)
 sns.stripplot(x="name",
               y="score",
-              hue="name",
               order=names,
-              legend=False,
+              # hue="name",
+              # legend=False,
               jitter=0.07,
               size=5,
               palette=main_palette,
               log_scale=False,
               alpha=0.6,
               data=big_df)
+
+# ADD DISTRIBUTION
+violin_alpha = 0.4
+sns.violinplot(x="name",
+               y="score",
+               order=names,
+               # hue="name",
+               # legend=False,
+               data=big_df,
+               width=.6,
+               palette=main_palette,
+               cut=0,
+               inner=None,
+               alpha=violin_alpha,
+               )
 
 
 def patch_violinplot(palette):
@@ -112,24 +119,30 @@ def patch_violinplot(palette):
         violins[i].set_edgecolor(palette[i])
 
 
-violin_alpha = 0.3
-sns.violinplot(x="name",
-               y="score",
-               hue="name",
-               legend=False,
-               data=big_df,
-               width=.6,
-               palette=violin_palette,
-               cut=0,
-               inner=None,
-               alpha=violin_alpha,
-               )
-patch_violinplot(violin_palette)
+patch_violinplot(main_palette)
+
+# ADD MEANS
+sns.stripplot(x="name",
+              y="score",
+              order=names,
+              # hue="name",
+              # legend=False,
+              jitter=0,
+              size=6,
+              # color='black',
+              palette=main_palette,
+              marker="D",
+              edgecolor='black',
+              linewidth=1.5,
+              # alpha=0.5,
+              data=means)
 
 plt.ylim(0.58, 1.001)
 plt.xlabel("")
-plt.ylabel("Mean Active Rank (MAR)")
+plt.ylabel("Mean Active Rank")
 # sns.despine()
 plt.grid(True, which='both', axis='y')
-plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
+# plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
+plt.vlines(3.5, 0.65, 1, colors='grey', linestyles= (0, (5, 10)))
+plt.savefig("../outputs/violins_mixed.pdf", bbox_inches='tight')
 plt.show()

@@ -1,15 +1,3 @@
-from joblib import Parallel, delayed
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from scipy.signal import savgol_filter
-
-import glob
-import matplotlib
-import matplotlib.ticker as ticker
-from matplotlib import scale as mscale
-from matplotlib import transforms as mtransforms
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -36,6 +24,10 @@ def build_ef_df():
     decoy = 'chembl'
     raw_dfs = [pd.read_csv(f"../outputs/{r}_newdecoys_raw.csv") for r in runs]
     raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
+
+    raw_dfs.append(pd.read_csv(f"../outputs/mixed_raw.csv"))
+    raw_dfs.append(pd.read_csv(f"../outputs/mixed_rdock_raw.csv"))
+
     raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
     big_df_raw = raw_dfs[0][['pocket_id', 'is_active']]
 
@@ -44,6 +36,8 @@ def build_ef_df():
     big_df_raw['dock'] = -raw_dfs[1]['raw_score'].values
     big_df_raw['fp'] = -raw_dfs[2]['raw_score'].values
     big_df_raw['native'] = raw_dfs[3]['raw_score'].values
+    big_df_raw['mixed'] = raw_dfs[4]['combined'].values
+    big_df_raw['mixed_rdock'] = raw_dfs[5]['combined'].values
 
     pockets = big_df_raw['pocket_id'].unique()
     ef_df_rows = []
@@ -51,6 +45,7 @@ def build_ef_df():
     for pi, pocket in enumerate(pockets):
         if not pi % 20:
             print(f"Doing pocket {pi}/{len(pockets)}")
+        # RDOCK alone
         pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
         for n in range(10):
             # Shuffle
@@ -64,6 +59,8 @@ def build_ef_df():
                        'model': 'rdock',
                        'seed': n}
                 ef_df_rows.append(res)
+
+        # Presort
         for sort_col in ['dock', 'fp', 'native']:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
@@ -74,6 +71,17 @@ def build_ef_df():
                        'model': sort_col,
                        'seed': 0}
                 ef_df_rows.append(res)
+
+        # Best
+        pocket_df = pocket_df.sort_values(by='mixed', ascending=False)
+        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+            s = virtual_screen(pocket_df, sort_up_to, score_column='mixed_rdock')
+            res = {'sort_up_to': i,
+                   'pocket': pocket,
+                   'ef': s,
+                   'model': "mixed",
+                   'seed': 0}
+            ef_df_rows.append(res)
     df = pd.DataFrame(ef_df_rows)
     df.to_csv("time_ef.csv")
     return df
@@ -97,8 +105,11 @@ def line_plot(df):
     # df = df[~df['model'].isin(['Combined Score', 'Combined Score + RNAmigos Pre-sort'])]
     # df['smoothed_ef'] = savgol_filter(df['ef'], window_size, 2)
     # df = df.sort_values(by='time_limit')
-    all_models = ['dock', 'fp', 'native', 'rdock']
-    names = [r'\texttt{fp}', r'\texttt{native}', r'\texttt{dock}', r'\texttt{rDock}', ]
+    # all_models = ['dock', 'fp', 'native', 'rdock']
+    # names = [r'\texttt{fp}', r'\texttt{native}', r'\texttt{dock}', r'\texttt{rDock}', ]
+
+    all_models = ['rdock', 'mixed']
+    names = [r'\texttt{rDock}', r'\texttt{mixed+rDock}']
     model_res = []
     for model in all_models:
         means, stds = get_means_stds(df, model)
@@ -111,18 +122,22 @@ def line_plot(df):
     ax = plt.gca()
     ax.set_yscale('custom')
     # yticks= np.arange(0.6, 1)
-    yticks = [0.6, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99]
+    yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
     plt.gca().set_yticks(yticks)
 
     times = np.linspace(0, 20, 20)
-    for (means, stds), name, color in zip(model_res, names, PALETTE):
+    # palette = PALETTE
+    palette = [PALETTE[3], PALETTE[-1]]
+    for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
+
     plt.axhline(y=0.99, color='grey', linestyle='--', alpha=0.7)
+    plt.axvline(x=1.6, color='grey', linestyle='--', alpha=0.7)
 
     # sns.lineplot(data=df, x='time_limit', y='ef', hue='model')
-    plt.ylabel(r"Mean Active Rank (\texttt{MAR})")
+    plt.ylabel(r"Mean Active Rank")
     plt.xlabel(r"Time Limit (hours)")
-    plt.legend(loc='lower right')
+    plt.legend(loc='center left')
     plt.ylim(0.45, 1.001)
     plt.savefig("line.pdf", format="pdf", bbox_inches='tight')
     plt.show()
@@ -150,7 +165,8 @@ def vax_plot(df):
     plt.rc('grid', color='grey', alpha=0.2)
 
     # strategy = 'RNAmigos2.0'
-    strategy = 'fp'
+    strategy = 'mixed'
+    # strategy = 'fp'
     # strategy = 'Combined Score'
     # strategy = 'Combined Score'
     plot_df = efficiency_df.loc[efficiency_df['model'] == strategy]
@@ -164,7 +180,7 @@ def vax_plot(df):
                        # scale=0.5,
                        )
     ax.axvline(x=0.0, color='red', linestyle='--', label="No effect", linewidth=2)
-    ax.legend(loc="lower left")
+    ax.legend(loc="center left")
     # sns.despine()
     # ax.axvline(x=np.median(efficiency_df['efficiency']), color='grey', linestyle='--')
 

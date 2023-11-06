@@ -6,17 +6,17 @@ import matplotlib.pyplot
 import numpy as np
 import seaborn as sns
 
-
 # SETUP PLOT
 plt.rcParams['text.usetex'] = True
 matplotlib.rcParams['mathtext.fontset'] = 'stix'
 matplotlib.rcParams['font.family'] = 'STIXGeneral'
 plt.rc('font', size=16)  # fontsize of the tick labels
 plt.rc('ytick', labelsize=13)  # fontsize of the tick labels
+plt.rc('xtick', labelsize=13)  # fontsize of the tick labels
 plt.rc('grid', color='grey', alpha=0.2)
 
-raw_hex = ["#61C6E7", "#4F7BF0", "#6183E7", "#FA4828"]
-raw_hex = ["#3180e0", "#2ba9ff", "#2957d8", "#FA4828"]
+# raw_hex = ["#61C6E7", "#4F7BF0", "#6183E7", "#FA4828"]
+raw_hex = ["#3180e0", "#2ba9ff", "#2957d8", "#FA4828", "#0a14db", "#803b96"]
 hex_plt = [f"{raw}" for raw in raw_hex]
 PALETTE = sns.color_palette(hex_plt)
 
@@ -26,7 +26,7 @@ class CustomScale(mscale.ScaleBase):
 
     def __init__(self, axis):
         mscale.ScaleBase.__init__(self, axis=axis)
-        self.offset = 0.03
+        self.offset = 0.01
         self.thresh = None
 
     def get_transform(self):
