@@ -2,7 +2,7 @@
 
 Welcome on RNAmigos 2.0 ! 
 
-<img src="img/vs_fig.png">
+<img src="images/vs_fig.png">
 
 ## Table of Contents: 
 
