@@ -1,5 +1,9 @@
 # RNAmigos 2.0
 
+Welcome on RNAmigos 2.0 ! 
+
+<img src="images/vs_fig.png">
+
 ## Table of Contents: 
 
 - [Description](#description)
@@ -66,7 +70,7 @@ To convert the mmCif to a 2.5D graph you will need to make sure you have the lat
 You can just run the inference script to get a score for each ligand in your SMILES .txt file.
 
 Taking example structure and ligand file from `/sample_files`, selecting residues `16-20` of chain `A` as the binding site, the corresponding command is :
-
+Now you just run the inference script to get a score for each ligand in your SMILES .txt file.
 ```
 python experiments/inference.py cif_path=sample_files/3ox0.cif \
                                 pdbid=3ox0 \
