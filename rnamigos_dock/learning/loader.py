@@ -326,6 +326,32 @@ class VirtualScreenDataset(DockingDataset):
         except FileNotFoundError:
             return None, None, None, None
 
+class InferenceDataset(DockingDataset):
+    def __init__(self,
+                 pocket_graph,
+                 smiles_list,
+                 systems,
+                 fp_type='MACCS',
+                 use_rings=False,
+                 use_graphligs=False,
+                 ):
+        self.pocket_graph = pocket_graph
+        self.smiles = smiles 
+        pass
+
+    def __len__(self):
+        return 1
+
+    def __getitem__(self, idx):
+        try:
+            if self.use_graphligs:
+                all_inputs = self.ligand_graph_encoder.smiles_to_graph_list(self.smiles)
+            else:
+                all_inputs = self.ligand_encoder.smiles_to_fp_list(self.smiles)
+                all_inputs = torch.tensor(all_inputs)
+            return self.pocket_graph, all_inputs
+        except FileNotFoundError:
+            return None, None
 
 if __name__ == '__main__':
     pockets_path = '../../data/json_pockets_load'

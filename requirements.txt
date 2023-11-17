@@ -1,6 +1,7 @@
 numpy
+dgl
 biopython
-rnaglib @ git+https://github.com/cgoliver/rnaglib@nox3dna
+rnaglib
 tensorboard
 hydra-core
 loguru

@@ -1,12 +1,16 @@
 from pathlib import Path
+import networkx as nx
 from collections import Counter
 
 import numpy as np
 import pandas as pd
 from Bio.PDB import *
-from rnaglib.prepare_data import fr3d_to_graph
+#from rnaglib.prepare_data import fr3d_to_graph
 from rnaglib.drawing import rna_draw
-from rnaglib.utils import bfs, dump_json
+from rnaglib.utils.graph_utils import bfs
+from rnaglib.utils import dump_json
+from rnaglib.utils import load_json
+from rnaglib.utils import graph_from_pdbid
 
 CANONICALS = ['B53', 'B35', 'CWW']
 
@@ -35,12 +39,27 @@ if __name__ == "__main__":
     dl_path = Path("ROBIN_PDBS")
     dl_path.mkdir(parents=True, exist_ok=True)
 
+    backend = 'fr3d'
+    backend = 'x3dna'
+
     pockets = []
     rows = []
     for pocket in df.itertuples():
         # get the pdb
         pdbl.retrieve_pdb_file(pocket.PDBID, pdir=dl_path)
-        big_G = fr3d_to_graph(Path(dl_path, pocket.PDBID + ".cif"))
+        if backend == 'fr3d':
+            big_G = fr3d_to_graph(Path(dl_path, pocket.PDBID + ".cif"))
+        elif backend == 'x3dna':
+            big_G = graph_from_pdbid(pocket.PDBID, redundancy='all')
+            pass
+        else:
+            print("invalid backend")
+            sys.exit()
+
+        if big_G is None:
+            print(f"{pocket.PDBID} no graph")
+            continue
+
         print(pocket.LIGAND)
         print(pocket.PDBID)
         if not pd.isna(pocket.LIGAND): 
@@ -50,23 +69,27 @@ if __name__ == "__main__":
             G = big_G.subgraph(pocket_res).copy()
         elif not pd.isna(pocket.RESLIST) :
             print("reslist")
+            pocket_res = pocket.RESLIST.split(";")
+            print(len(pocket_res))
             G = big_G.subgraph(pocket.RESLIST.split(";")).copy()
         else:
+            pocket_res = list(G.nodes())
             G = big_G
             pass
 
-        expanded_nodes = bfs(big_G, list(G.nodes()), depth=1, label='LW')
+        expanded_nodes = bfs(big_G, list(G.nodes()), depth=4, label='LW')
         G_expand = big_G.subgraph(expanded_nodes).copy()
         # rna_draw(G_expand, show=True)
+        nx.set_node_attributes(G_expand, {n: True if n in pocket_res else False for n in G_expand.nodes()}, 'in_pocket')
         NC_before = Counter([d['LW'].upper() for _,_,d in G.edges(data=True)])
         NC_after = Counter([d['LW'].upper() for _,_,d in G_expand.edges(data=True)])
 
         pockets.append(G_expand)
         if sum([c for k,c in NC_after.items()]) > 1:
-            dump_json(f"{pocket.ROBIN_ID}.json", G_expand)
+            dump_json(f"../data/robin_graphs_{backend}/{pocket.ROBIN_ID}.json", G_expand)
 
         if sum([c for k,c in NC_after.items() if k not in CANONICALS]) > 1:
-            dump_json(f"../data/robin_graphs/{pocket.ROBIN_ID}.json", G_expand)
+            dump_json(f"../data/robin_graphs_{backend}/{pocket.ROBIN_ID}.json", G_expand)
 
         rows.append({"ROBIN ID": pocket.ROBIN_ID, 
                      "PDBID": pocket.PDBID,
