@@ -54,7 +54,7 @@ You will need to provide the following:
 
 * Path to an mmCif file
 * Path to a .txt file with one SMILES string per line
-* A list of residue identifiers 
+* A list of binding site residue identifiers 
 
 To convert the mmCif to a 2.5D graph you will need to make sure you have the latest rnaglib and an optional dependency of rnaglib:
 
@@ -65,10 +65,13 @@ pip install git+https://github.com/cgoliver/fr3d-python.git
 
 Now you just run the inference script to get a score for each ligand in your SMILES .txt file.
 
-We can take a structure and ligand file from `/sample_files` and select residues 16-20 of chain A as the binding site.
+We can take an example structure and ligand file from `/sample_files`, selecting residues `16-20` of chain `A` as the binding site.
 
 ```
-python experiments/inference.py cif_path=sample_files/3ox0.cif residue_list=\[A.20,A.19,A.18,A.17,A.16\] ligands_path=sample_files/test_smiles.txt out_path=scores.txt
+python experiments/inference.py cif_path=sample_files/3ox0.cif \
+                                residue_list=\[A.20,A.19,A.18,A.17,A.16\] \
+                                ligands_path=sample_files/test_smiles.txt \
+                                out_path=scores.txt
 ``` 
 
 Once this executes you will have `scores.txt` that looks like this:
@@ -89,25 +92,6 @@ They are available at :
 [//]: # (TODO : get link to model weights.)
 
 and needs to be saved in saved_models.
-
-### Making a prediction
-
-You will need a binding site structure. 
-The first thing you need is a list of binding site nodes in the rnaglib format (pdbid.chain.resnumber) in a text file.
-* If your RNA is a canonical one (present in the PDB), then it's 2.5d graph representation is already part of the rnaglib release.
-To get this release you can use :
-`rnaglib download`
-* Otherwise, you can input a PDB file of the binding site. 
-You should include some context around the binding site (a margin of approximately three residues)
-
-You will also need a ligand file : a text file containing one smiles per line
-
-Then, simply run : 
-
-[//]: # (TODO : build the script)
-`python main.py --pocket {pdb_nodes}.txt --ligands {ligands_file}.txt --outname {my_results}.csv`
-
-And a csv called my_results.csv will be dumped with one line per ligand with its smile and corresponding score.
 
 ## Reproducting the results
 If you want to reproduce the results from scratch, first you need to set up the environment,
