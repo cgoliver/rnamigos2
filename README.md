@@ -69,6 +69,7 @@ We can take an example structure and ligand file from `/sample_files`, selecting
 
 ```
 python experiments/inference.py cif_path=sample_files/3ox0.cif \
+                                pdbid=3ox0 \
                                 residue_list=\[A.20,A.19,A.18,A.17,A.16\] \
                                 ligands_path=sample_files/test_smiles.txt \
                                 out_path=scores.txt
