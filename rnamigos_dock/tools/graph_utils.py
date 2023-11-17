@@ -3,10 +3,13 @@ import itertools
 import networkx as nx
 import numpy as np
 import os
+from pathlib import Path
 import pickle
 from tqdm import tqdm
 import torch
 
+import rnaglib
+from rnaglib.prepare_data import fr3d_to_graph
 from rnaglib.utils import graph_io
 from rnaglib.utils import NODE_FEATURE_MAP
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
@@ -75,11 +78,12 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings
                (nx.get_edge_attributes(pocket_graph, 'LW')).items()}
     nx.set_edge_attributes(pocket_graph, name='edge_type', values=one_hot)
 
-    _,ndata = list(pocket_graph.nodes(data=True))[0]
+    _, ndata = list(pocket_graph.nodes(data=True))[0]
     if 'nt' in ndata.keys():
-        nx.set_node_attributes(pocket_graph, name='nt_code', values={node: d['nt'] for node,d in pocket_graph.nodes(data=True)})
+        nx.set_node_attributes(pocket_graph, name='nt_code',
+                               values={node: d['nt'] for node, d in pocket_graph.nodes(data=True)})
         nx.set_node_attributes(pocket_graph, name='in_pocket', values={node: True for node in pocket_graph.nodes()})
-    
+
     one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
                     (nx.get_node_attributes(pocket_graph, 'nt_code')).items()}
 
@@ -99,6 +103,28 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings
         return pocket_graph_dgl, rings
     else:
         return pocket_graph_dgl
+
+
+def get_dgl_graph(cif_path, residue_list):
+    """
+    :param cif_path: toto/tata/1cqr.cif
+    :param residue_list: A.2,A.3..,A.85 (missing pdb, useful for inference)
+    :return:
+    """
+    ### DATA PREP
+    # convert cif to graph and keep only relevant keys
+    nx_graph = fr3d_to_graph(cif_path)
+    # This is the pdbid used by fr3d
+    pdbid = Path(cif_path).stem.lower()
+    if residue_list is not None:
+        # subset cif with given reslist
+        reslist = [f"{pdbid}.{res}" for res in residue_list]
+        expanded_reslist = rnaglib.utils.graph_utils.bfs(nx_graph, reslist, depth=4, label='LW')
+        in_pocket = {node: node in reslist for node in expanded_reslist}
+        expanded_graph = nx_graph.subgraph(expanded_reslist)
+        nx.set_node_attributes(expanded_graph, name='in_pocket', values=in_pocket)
+    dgl_graph = load_rna_graph(nx_graph)
+    return dgl_graph
 
 
 def bfs_expand(G, initial_nodes, depth=2):

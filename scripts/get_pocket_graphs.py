@@ -1,6 +1,5 @@
 import pandas as pd
 import os
-from collections import defaultdict
 import networkx as nx
 from rnaglib.config import GRAPH_KEYS, TOOL
 from rnaglib.utils import graph_from_pdbid, graph_utils, graph_io

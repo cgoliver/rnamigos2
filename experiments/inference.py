@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 from dgl.dataloading import GraphDataLoader
@@ -8,10 +6,9 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
 
-from rnaglib.prepare_data import fr3d_to_graph
 
 from rnamigos_dock.learning.loader import get_systems, InferenceDataset
-from rnamigos_dock.tools.graph_utils import load_rna_graph
+from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 
 
@@ -24,16 +21,9 @@ def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
     print('Done importing')
 
-    ### DATA PREP
-    # convert cif to graph
-    test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(cfg.cif_path).stem]})
-    graph = fr3d_to_graph(cfg.cif_path)
-    if cfg.residue_list is not None:
-        # subset cif with given reslist
-        graph = graph.subgraph([f"{cfg.pdbid.lower()}.{res}" for res in cfg.residue_list]).copy()
-        pass
+    # Get dgl graph with node expansion BFS
+    dgl_graph = get_dgl_graph(cfg.cif_path, cfg.residue_list)
     smiles_list = [s.lstrip().rstrip() for s in list(open(cfg.ligands_path).readlines())]
-    graph = load_rna_graph(graph)
     # Loader is asynchronous
     loader_args = {'shuffle': False,
                    'batch_size': 1,
@@ -53,9 +43,8 @@ def main(cfg: DictConfig):
         model = get_model_from_dirpath(model_path)
         # model = model.to(device) TODO
         model = model.to('cpu')
-        dataset = InferenceDataset(graph,
+        dataset = InferenceDataset(dgl_graph,
                                    smiles_list,
-                                   systems=test_systems,
                                    use_graphligs=model.use_graphligs,
                                    )
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)

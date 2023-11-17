@@ -330,15 +330,12 @@ class InferenceDataset(DockingDataset):
     def __init__(self,
                  pocket_graph,
                  smiles_list,
-                 systems,
-                 fp_type='MACCS',
                  use_rings=False,
                  use_graphligs=False,
                  ):
         self.pocket_graph = pocket_graph
         self.smiles = smiles_list
         self.use_graphligs = use_graphligs
-        self.use_rings = use_rings
         self.ligand_graph_encoder = MolGraphEncoder(cache=False) if use_graphligs else None
         pass
 
