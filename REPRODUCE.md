@@ -37,6 +37,11 @@ and the corresonding docking scores can be obtained directly at [Binding scores]
 
 [//]: # (TODO : check that the data is ok)
 
+To split this initial data into csvs adapted for each of our training scenarios, one can run 
+```bash
+python scripts/build_csvs.py
+```
+
 ## Pockets as 2.5d graphs, ligands as graphs and fingerprints
 
 We now want to prepare our pockets and ligands for learning our tool.
@@ -55,6 +60,10 @@ First, we need to pretrain a model, by running :
 ```bash    
 python experiments/pretrain.py name=pretrained_hungarian_64
 ```
+
+We additionally need to load optimol encoder pretrained weights 
+
+[//]: # (TODO : include optimol's weights)
 
 Then you need to train models using those pretrained models.
 Scripts are available to run all relevant trainings.
