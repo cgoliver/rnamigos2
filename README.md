@@ -6,6 +6,42 @@ Create an environment if you like and then:
 
 `pip install -r requirements.txt`
 
+## Making predictions on your targets
+
+To run RNAmigos2.0 on your own target and ligands, use the `experiments/inference.py` script.
+
+You will need to provide the following:
+
+* Path to an mmCif file
+* Path to a .txt file with one SMILES string per line
+* A list of residue identifiers 
+
+To convert the mmCif to a 2.5D graph you will need to make sure you have the latest rnaglib and an optional dependency of rnaglib:
+
+```
+pip install --upgrade rnaglib
+pip install git+https://github.com/cgoliver/fr3d-python.git
+```
+
+Now you just run the inference script to get a score for each ligand in your SMILES .txt file.
+
+We can take a structure and ligand file from `/sample_files` and select residues 16-20 of chain A as the binding site.
+
+```
+python experiments/inference.py cif_path=sample_files/3ox0.cif residue_list=\[A.20,A.19,A.18,A.17,A.16\] ligands_path=sample_files/test_smiles.txt out_path=scores.txt
+``` 
+
+Once this executes you will have `scores.txt` that looks like this:
+
+```
+CCC[S@](=O)c1ccc2[nH]/c(=N\C(=O)OC)[nH]c2c1 0.2639017701148987
+O=C(O)[C@@H](O)c1ccccc1 0.6267350912094116
+CC(=O)Oc1ccccc1C(=O)O 0.6304176449775696
+CN1[C@H]2CC[C@@H]1CC(OC(=O)[C@H](CO)c1ccccc1)C2 0.47674891352653503
+...
+```
+
+
 ## Get Data
 
 These are all tarballs that you should put in the `data/` folder at the respository root and untar.

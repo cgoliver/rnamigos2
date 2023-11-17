@@ -19,7 +19,10 @@ class MolFPEncoder:
         self.fp_type = fp_type
         script_dir = os.path.dirname(__file__)
         cashed_path = os.path.join(script_dir, f'../../data/ligands/{"maccs" if fp_type == "MACCS" else "morgan"}.p')
-        self.cashed_fps = pickle.load(open(cashed_path, 'rb'))
+        try:
+            self.cashed_fps = pickle.load(open(cashed_path, 'rb'))
+        except FileNotFoundError:
+            self.cashed_fps = {}
 
     def smiles_to_fp_one(self, smiles):
         if smiles in self.cashed_fps:

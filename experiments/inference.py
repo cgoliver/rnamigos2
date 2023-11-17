@@ -9,12 +9,15 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
 
-from rnaglib.data import graph_from_pdbid
+from rnaglib.utils import graph_from_pdbid
 from rnaglib.prepare_data import fr3d_to_graph 
 
-from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
+from rnamigos_dock.learning.loader import get_systems, InferenceDataset
+from rnamigos_dock.tools.graph_utils import load_rna_graph
 from rnamigos_dock.learning.models import Embedder, LigandGraphEncoder, LigandEncoder, Decoder, RNAmigosModel
 
+def col(x):
+    return x[0]
 
 @hydra.main(version_base=None, config_path="../conf", config_name="inference")
 def main(cfg: DictConfig):
@@ -84,29 +87,23 @@ def main(cfg: DictConfig):
 
     ### DATA PREP
 
-    if cfg.cif_path is None:
-        # load prebuilt graph and use cfg.residue_list
-        test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(cfg.pdbid)]})
-        graph = graph_from_pdbid(cfg.pdbid)
-        graph = graph.subgraph([f"{cfg.pdbid.lower()}.{res}" for res in cfg.reslist.split(";")]).copy()
-    else:
-        # convert cif to graph
-        test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(cfg.cif_path).stem]})
-        graph = fr3d_to_graph(cfg.cif_path)
-        if cfg.residue_list is not None:
-            # subset cif with given reslist
-            graph = graph.subgraph([f"{cfg.pdbid.lower()}.{res}" for res in cfg.reslist.split(";")]).copy()
-            pass
-
+    # convert cif to graph
+    test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(cfg.cif_path).stem]})
+    graph = fr3d_to_graph(cfg.cif_path)
+    if cfg.residue_list is not None:
+        # subset cif with given reslist
+        graph = graph.subgraph([f"{cfg.pdbid.lower()}.{res}" for res in cfg.residue_list]).copy()
+        pass
     
     # Loader is asynchronous
     loader_args = {'shuffle': False,
                    'batch_size': 1,
-                   'num_workers': 4,
-                   'collate_fn': lambda x: x[0]
+                   'num_workers': 0,
+                   'collate_fn': lambda x: x[0] 
                    }
 
-    smiles_list =  list(open(cfg.ligands_path).readlines())
+    smiles_list =  [s.lstrip().rstrip() for s in list(open(cfg.ligands_path).readlines())]
+    graph = load_rna_graph(graph)
     dataset = InferenceDataset(graph,
                                smiles_list,
                                systems=test_systems,

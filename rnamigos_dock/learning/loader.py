@@ -336,7 +336,10 @@ class InferenceDataset(DockingDataset):
                  use_graphligs=False,
                  ):
         self.pocket_graph = pocket_graph
-        self.smiles = smiles 
+        self.smiles = smiles_list
+        self.use_graphligs = use_graphligs
+        self.use_rings = use_rings
+        self.ligand_graph_encoder = MolGraphEncoder(cache=False) if use_graphligs else None
         pass
 
     def __len__(self):
@@ -350,6 +353,7 @@ class InferenceDataset(DockingDataset):
                 all_inputs = self.ligand_encoder.smiles_to_fp_list(self.smiles)
                 all_inputs = torch.tensor(all_inputs)
             return self.pocket_graph, all_inputs
+
         except FileNotFoundError:
             return None, None
 
