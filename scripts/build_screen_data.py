@@ -31,13 +31,13 @@ def build_actives_decoys(
                          pdb=False,
                          decoyfinder=False,
                          pdb_data_path='data/rnamigos2_dataset_consolidated.csv', 
-                         save_path='data/ligand_db',
+                         save_path='data/ligand_db_preprint',
                          ):
     """ Build active and decoy lists for every pocket in master dataset `rnamigos2_dataset_consolidated.csv`
 
     Each pocket ID gets a folder:
         pocket_id
-            [pdb|pdb+chembl|decoy_finder|robin]
+            [pdb|pdb+chembl|decoy_finder]
                 actives.txt
                 decoys.txt
     """
@@ -87,27 +87,11 @@ def build_actives_decoys(
 
 pass
 
-def build_actives_decoys_robin(robin_data="data/SMM_Target_Hits.csv", save_path="data/ligand_db"):
-    df = pd.read_csv(robin_data)
-    for target in df.columns:
-        name = target.rstrip("_hit")
-        robin_path = Path(save_path, name, 'robin')
-        robin_path.mkdir(parents=True, exist_ok=True)
-
-        actives = list(df.loc[df[target] == 1]['Smile'])
-        decoys = list(df.loc[df[target] == 0]['Smile'])
-        with open(robin_path / 'decoys.txt', 'w') as de:
-            de.write("\n".join(decoys))
-        with open(robin_path / 'actives.txt', 'w') as ac:
-            ac.write("\n".join(actives))
-    pass
-
 
 def cline():
     parser = argparse.ArgumentParser()
     parser.add_argument('--decoyfinder', action='store_true', default=False)
     parser.add_argument('--pdb', action='store_true', default=False)
-    parser.add_argument('--robin', action='store_true', default=False)
     return parser.parse_args()
 
 
