@@ -9,8 +9,7 @@ Welcome on RNAmigos 2.0 !
 - [Description](#description)
 - [Using the tool with Collab](#Using-the-tool-with-Collab)
 - [Using the tool locally](#Using-the-tool-locally)
-- [Reproducting the results](#Reproducting-the-results)
-- [Generate the figures from the results](#Generate-the-figures-from-the-results)
+- [Reproducting results and figures](#Reproducting-results-and-figures)
 
 ## Description
 
@@ -18,7 +17,7 @@ RNAmigos is a virtual screening tool : given the binding site of a target and a 
 ranks the compounds so that better ranked compounds have a higher chance to bind the target.
 It is based on a machine learning model using the PyTorch framework and was trained leveraging unsupervised and synthetic data.
 It was shown to display similar enrichment factors to docking while running in a fraction of the time.
-A detailed description of the tool is available at
+A detailed description of the tool is available at :
 
 [//]: # (**TODO : insert link to publication**)
 
@@ -33,30 +32,31 @@ If you find this tool useful, please cite
 
 The easiest way to use the tool is to use Google Colab, provided at this link
 
-[//]: # (TODO : setup link. )
+[//]: # (TODO : setup link.)
 You will need to provide a binding site, in the form of a list of binding pocket nodes. 
 If you want to use your tool on unpublished data, you can additionally provide a custom PDB file containing those files.
 
 
 ## Using the tool locally
 
-### Local environment
+### Setup
 A local use of the tool is also possible by following the next steps.
-First, create an environment if you like and then:
+First, create a conda environment:
 
-`conda create -n rnamigos2`
-`conda activate rnamigos2`
-`pip install -r requirements.txt`
-
-To convert the mmCif to a 2.5D graph you will need to make sure you have the latest rnaglib and an optional dependency of rnaglib:
-
-```
-pip install --upgrade rnaglib
-pip install git+https://github.com/cgoliver/fr3d-python.git
+```bash
+conda create -n rnamigos2
+conda activate rnamigos2
+pip install -r requirements.txt
 ```
 
+The only data needed to make predictions are the weights of the models.
+They are available at :
 
-## Making predictions on your targets
+[//]: # (TODO : get link to model weights and detail how to get them all.)
+
+and needs to be saved in `saved_models/`.
+
+### Making predictions on your targets
 
 To run RNAmigos2.0 on your own target and ligands, use the `experiments/inference.py` script.
 
@@ -66,11 +66,11 @@ You will need to provide the following:
 * Path to a .txt file with one SMILES string per line
 * A list of binding site residue identifiers 
 
+To convert the mmCif to a 2.5D graph you will need to make sure you have the latest rnaglib and an optional dependency of rnaglib.
+You can just run the inference script to get a score for each ligand in your SMILES .txt file.
 
+Taking example structure and ligand file from `/sample_files`, selecting residues `16-20` of chain `A` as the binding site, the corresponding command is :
 Now you just run the inference script to get a score for each ligand in your SMILES .txt file.
-
-We can take an example structure and ligand file from `/sample_files`, selecting residues `16-20` of chain `A` as the binding site.
-
 ```
 python experiments/inference.py cif_path=sample_files/3ox0.cif \
                                 pdbid=3ox0 \
@@ -89,79 +89,6 @@ CN1[C@H]2CC[C@@H]1CC(OC(=O)[C@H](CO)c1ccccc1)C2 0.47674891352653503
 ...
 ```
 
+## Reproducting results and figures
 
-### Getting the data
-The only data needed to make predictions are the weights of the models.
-They are available at :
-
-[//]: # (TODO : get link to model weights.)
-
-and needs to be saved in saved_models.
-
-## Reproducting the results
-If you want to reproduce the results from scratch, first you need to set up the environment,
-data and model as detailed above. 
-
-### Getting initial data
-
-[//]: # (TODO : include steps to get the original csv.)
-
-
-* [Docked pockets train set](https://drive.proton.me/urls/929Z2M4YWC#pkwIdM4TZAqR)
-* [Pretraining data](https://drive.proton.me/urls/YKNV0M1WBR#s0E0cMSTvpsH)
-* [Binding scores](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
-* [Decoy Library](https://drive.proton.me/urls/YGHQV867NG#RuVM8TLFOdKH)
-
-
-## Generate actives and decoys list
-```
-python scripts/build_screen_data.py
-```
-
-NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation. 
-The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
-To disable DecoyFinder decoys pass the ``-no-decoyfinder`` flag.
-
-Now that we are equiped with the csv.
-* [Docked pockets test set](https://drive.proton.me/urls/RSZ2V97TXG#z06rtSrHNGxU)
-
-
-
-[//]: # (Then, you need to pretrain a model that follows RNAmigos1 and one using directed graphs and )
-[//]: # (hungarian similarity function, there is a script to pretrain models in *job_scripts/*.)
-Then, you need to pretrain a model, by running :
-```bash    
-python experiments/pretrain.py name=pretrained_hungarian_64
-```
-Then you need to train models using those pretrained models. 
-Finally, once models are trained, you will need to make an inference on the test set for each trained model, resulting 
-in output csvs containing the pocket id, ligand id and predicted score.
-Scripts are available to run all relevant trainings and inferences.
-```bash
-bash job_scripts/paper_runs.sh
-# TODO add inference script and also for rdock
-```
-
-## Generate the figures from the results
-
-If you followed the previous steps, we expect the *outputs/* directory to hold paper_{fp, native, dock, rdock}_{, _raw}.csv files.
-Those files are directly available for download at :
-
-[//]: # (TODO)
-
-
-The first step is to produce ensembling results, by running 
-```bash
-cd fig_scripts
-python mixing.py
-```
-
-We now have the table of mixing results as well as the best ensemble models. 
-In addition, we have blended our models to produce csvs with mixed and mixed+rdock results.
-
-We can now run : 
-```bash
-python violins.py
-python ef_time.py
-```
-to produce the remaining Figures of the paper.
+The steps necessary to reproduce results and figures are detailed in REPRODUCE.md

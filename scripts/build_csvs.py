@@ -1,12 +1,12 @@
 import pandas as pd
 from sklearn.preprocessing import QuantileTransformer
 
-interactions_csv_original = '../data/rnamigos2_dataset_consolidated.csv'
-interactions_csv_migos1 = '../data/rnamigos_1_data/rnamigos1_dataset.csv'
+interactions_csv_original = 'data/rnamigos2_dataset_consolidated.csv'
+interactions_csv_migos1 = 'data/rnamigos_1_data/rnamigos1_dataset.csv'
 
-interactions_csv_dock = '../data/csvs/docking_data.csv'
-interactions_csv_fp = '../data/csvs/fp_data.csv'
-interactions_csv_binary = '../data/csvs/binary_data.csv'
+interactions_csv_dock = 'data/csvs/docking_data.csv'
+interactions_csv_fp = 'data/csvs/fp_data.csv'
+interactions_csv_binary = 'data/csvs/binary_data.csv'
 
 systems = pd.read_csv(interactions_csv_original)
 systems = systems.rename({'TYPE': 'SPLIT'}, axis='columns')
