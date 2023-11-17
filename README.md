@@ -46,6 +46,14 @@ First, create an environment if you like and then:
 `conda activate rnamigos2`
 `pip install -r requirements.txt`
 
+To convert the mmCif to a 2.5D graph you will need to make sure you have the latest rnaglib and an optional dependency of rnaglib:
+
+```
+pip install --upgrade rnaglib
+pip install git+https://github.com/cgoliver/fr3d-python.git
+```
+
+
 ## Making predictions on your targets
 
 To run RNAmigos2.0 on your own target and ligands, use the `experiments/inference.py` script.
@@ -56,12 +64,6 @@ You will need to provide the following:
 * Path to a .txt file with one SMILES string per line
 * A list of binding site residue identifiers 
 
-To convert the mmCif to a 2.5D graph you will need to make sure you have the latest rnaglib and an optional dependency of rnaglib:
-
-```
-pip install --upgrade rnaglib
-pip install git+https://github.com/cgoliver/fr3d-python.git
-```
 
 Now you just run the inference script to get a score for each ligand in your SMILES .txt file.
 
