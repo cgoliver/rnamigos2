@@ -1,6 +1,18 @@
 # Reproducting the results
+
 If you want to reproduce the results from scratch, first you need to set up the environment,
 data and model as detailed in the README.md. 
+
+Any data files you download with the links below should be placed at the `/data` folder at the root of this repository.
+
+If you want already pre-processed data files just run:
+
+```
+cd data
+tar -xzvf rnamigos2_data.tar.gz
+```
+
+and skip to the model training section.
 
 ## Getting initial pocket data
 
@@ -9,25 +21,25 @@ Initially, we download all pdb containing RNA + small molecule, filter them and 
 [//]: # (TODO : include steps to get the original pockets.)
 
 
+Download pocket graphs [here](https://drive.proton.me/urls/SC9AQCF2SC#JYQ3K9yNUJ4U)
+
 ## Generate actives and decoys list
 Once equiped with this initial data, we select the decoys corresponding to our actives.
 This is done by running : 
 
 ```
-python scripts/build_screen_data.py
+python scripts/build_screen_data.py --pdb --decoyfinder
 ```
 
 We save them in `data/ligand_db/`
 
 NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation. 
 The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
-To disable DecoyFinder decoys pass the ``-no-decoyfinder`` flag.
-
 DecoyFinder samples ligands from a given library. In this case we use ZINC in-vio bioactive compounds which you can download [here](https://drive.proton.me/urls/CQMXCX5MW4#YQeEEa7VHVcu)
 
 We now have pockets, native ligands and different sets of decoys.
 
-These decoys can be downloaded here : TODO [Decoy Library](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR)
+These decoys can be downloaded [here](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR)
 
 ## Get docking scores
 
@@ -36,7 +48,7 @@ The docking experiment can be launched using :
 
 [//]: # (TODO : upload docking scripts)
  
-and the corresonding docking scores can be obtained directly at [Binding scores](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
+and the corresonding docking scores can be obtained [here](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
 
 [//]: # (TODO : check that the data is ok)
 
@@ -53,10 +65,9 @@ This can be obtained using our scripts
 python scripts/get_pockets.py
 ```
 
-[//]: # (TODO : get scripts going)
 
+## Model training
 
-## Models training
 Now that we have all the necessary data, we can start training models.
 
 First, we need to pretrain a model, by running :
@@ -64,9 +75,7 @@ First, we need to pretrain a model, by running :
 python experiments/pretrain.py name=pretrained_hungarian_64
 ```
 
-We additionally need to load optimol encoder pretrained weights 
-
-[//]: # (TODO : include optimol's weights)
+We additionally need to load optimol encoder pretrained weights which are in the `saved_models/optimol` path already inclued in the repository.
 
 Then you need to train models using those pretrained models.
 Scripts are available to run all relevant trainings.
@@ -84,6 +93,7 @@ The corresponding script needs to be run :
 # Generate the figures from the results
 
 If you followed the previous steps, we expect the *outputs/* directory to hold paper_{fp, native, dock, rdock}_{, _raw}.csv files.
+
 Those files are directly available for download at :
 
 [//]: # (TODO get dl files)
