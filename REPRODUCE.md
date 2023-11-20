@@ -5,6 +5,12 @@ data and model as detailed in the README.md.
 
 Any data files you download with the links below should be placed at the `/data` folder at the root of this repository.
 
+Make sure to setup the repo:
+
+```
+pip install .
+```
+
 If you want already pre-processed data files just run:
 
 ```
@@ -68,9 +74,11 @@ python scripts/get_pockets.py
 
 ## Model training
 
-Now that we have all the necessary data, we can start training models.
+Fetch the whole RNAs for pretraining [here](https://drive.proton.me/urls/Y8TTCWKDVC#vs29rzJ1h9YN)
 
-First, we need to pretrain a model, by running :
+Pretrain a model, by running :
+
+
 ```bash    
 python experiments/pretrain.py name=pretrained_hungarian_64
 ```

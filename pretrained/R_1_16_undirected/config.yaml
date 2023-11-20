@@ -1,0 +1,61 @@
+data:
+  pocket_graphs: data/json_pockets_load
+  pretrain_graphs: data/pretrain_data/data/annotated/NR_chops_annot
+  ligand_db: data/ligand_db
+  rnamigos1_test: false
+  rnamigos1_only: false
+  undirected: true
+tokens:
+  edge_types:
+  - B53
+  - B35
+  - CWW
+  - CWH
+  - CWS
+  - CHW
+  - CHH
+  - CHS
+  - CSW
+  - CSH
+  - CSS
+  - TWW
+  - TWH
+  - TWS
+  - THW
+  - THH
+  - THS
+  - TSW
+  - TSH
+  - TSS
+  nuc_types:
+  - A
+  - U
+  - C
+  - G
+paths:
+  model_path: models/
+  pretrain_save: pretrained/
+model:
+  encoder:
+    in_dim: 4
+    hidden_dim: 16
+    num_layers: 3
+  lig_encoder:
+    in_dim: 166
+    hidden_dim: 32
+    num_layers: 3
+  decoder:
+    in_dim: 64
+    out_dim: 1
+    hidden_dim: 32
+    num_layers: 3
+    activation: sigmoid
+  pool: att
+  use_pretrained: false
+  pretrained_path: pretrained/pretrained_model_graphlet.pth
+name: R_1_16_undirected
+seed: 42
+epochs: 20
+simfunc: R_1
+depth: 2
+device: cpu

@@ -30,7 +30,7 @@ def main(cfg: DictConfig):
     graph_representation = GraphRepresentation(framework='dgl', edge_map=edge_map)
     ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
     unsupervised_dataset = rna_dataset.RNADataset(nt_features=node_features,
-                                                  graphs_path=cfg.data.pretrain_graphs,
+                                                  data_path=cfg.data.pretrain_graphs,
                                                   representations=[ring_representation, graph_representation])
     train_loader = rna_loader.get_loader(dataset=unsupervised_dataset, split=False, num_workers=cfg.num_workers)
 
