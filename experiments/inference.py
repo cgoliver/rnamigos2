@@ -1,4 +1,6 @@
 import os
+import sys
+
 import numpy as np
 import pandas as pd
 from dgl.dataloading import GraphDataLoader
@@ -6,6 +8,9 @@ from dgl.dataloading import GraphDataLoader
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
+
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from rnamigos_dock.learning.loader import get_systems, InferenceDataset
 from rnamigos_dock.tools.graph_utils import get_dgl_graph
@@ -31,9 +36,9 @@ def do_inference(cif_path, residue_list, ligands_path, out_path):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     script_dir = os.path.dirname(__file__)
     models = {
-        'dock': os.path.join(script_dir, '../results/trained_models/dock/paper_dock'),
-        'is_native': os.path.join(script_dir, '../results/trained_models/is_native/paper_native'),
-        'native_fp': os.path.join(script_dir, '../results/trained_models/native_fp/paper_fp')
+        'dock': os.path.join(script_dir, '../saved_models/paper_dock'),
+        'is_native': os.path.join(script_dir, '../saved_models/paper_native'),
+        'native_fp': os.path.join(script_dir, '../saved_models/paper_fp')
     }
     results = {}
     for model_name, model_path in models.items():
