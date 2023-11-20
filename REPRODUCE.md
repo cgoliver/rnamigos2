@@ -17,14 +17,14 @@ This is done by running :
 python scripts/build_screen_data.py
 ```
 
-We save them in data/ligand_db/.
+We save them in `data/ligand_db/`
 
 NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation. 
 The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
 To disable DecoyFinder decoys pass the ``-no-decoyfinder`` flag.
 
 We now have pockets, native ligands and different sets of decoys.
-These decoys can be downloaded here : TODO [Decoy Library](https://drive.proton.me/urls/YGHQV867NG#RuVM8TLFOdKH)
+These decoys can be downloaded here : TODO [Decoy Library](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR)
 
 ## Get docking scores
 
@@ -47,7 +47,7 @@ python scripts/build_csvs.py
 We now want to prepare our pockets and ligands for learning our tool.
 This can be obtained using our scripts 
 ```bash
-python scripts/get_pockets
+python scripts/get_pockets.py
 ```
 
 [//]: # (TODO : get scripts going)
