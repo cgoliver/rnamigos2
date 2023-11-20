@@ -36,9 +36,9 @@ def do_inference(cif_path, residue_list, ligands_path, out_path):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     script_dir = os.path.dirname(__file__)
     models = {
-        'dock': os.path.join(script_dir, '../saved_models/dock/paper_dock'),
-        'is_native': os.path.join(script_dir, '../saved_models/is_native/paper_native'),
-        'native_fp': os.path.join(script_dir, '../saved_models/native_fp/paper_fp')
+        'dock': os.path.join(script_dir, '../saved_models/paper_dock'),
+        'is_native': os.path.join(script_dir, '../saved_models/paper_native'),
+        'native_fp': os.path.join(script_dir, '../saved_models/paper_fp')
     }
     results = {}
     for model_name, model_path in models.items():
