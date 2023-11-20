@@ -32,7 +32,7 @@ If you find this tool useful, please cite
 
 The easiest way to use the tool is to use Google Colab, provided at this link
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/cgoliver/RNAmigos2.0/blob/master/rnamigos_inference.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/cgoliver/rnamigos2/blob/master/rnamigos_inference.ipynb)
 
 You will need to provide a cif file, a binding site in the form of a list of binding pocket nodes and a list of ligand smiles.
 
