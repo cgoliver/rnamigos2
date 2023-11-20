@@ -277,8 +277,6 @@ class Embedder(nn.Module):
         layers = nn.ModuleList()
         batch_norms = nn.ModuleList()
 
-        print(f"Num rgcn bases: {self.num_bases}")
-
         # input feature is just node degree
         i2h = self.build_hidden_layer(self.in_dim, self.hidden_dim)
         layers.append(i2h)
@@ -472,3 +470,4 @@ def get_model_from_dirpath(saved_model_dir):
     state_dict = torch.load(Path(saved_model_dir, 'model.pth'), map_location='cpu')['model_state_dict']
     model.load_state_dict(state_dict)
     model.eval()
+    return model

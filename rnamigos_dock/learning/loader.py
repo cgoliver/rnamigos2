@@ -326,17 +326,17 @@ class VirtualScreenDataset(DockingDataset):
         except FileNotFoundError:
             return None, None, None, None
 
-class InferenceDataset(DockingDataset):
+class InferenceDataset(Dataset):
     def __init__(self,
                  pocket_graph,
                  smiles_list,
-                 use_rings=False,
                  use_graphligs=False,
                  ):
         self.pocket_graph = pocket_graph
         self.smiles = smiles_list
         self.use_graphligs = use_graphligs
         self.ligand_graph_encoder = MolGraphEncoder(cache=False) if use_graphligs else None
+        self.ligand_encoder = MolFPEncoder() if not use_graphligs else None
         pass
 
     def __len__(self):

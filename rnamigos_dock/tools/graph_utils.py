@@ -78,12 +78,11 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings
                (nx.get_edge_attributes(pocket_graph, 'LW')).items()}
     nx.set_edge_attributes(pocket_graph, name='edge_type', values=one_hot)
 
+    # Needed for graph creation with fred, the key changed
     _, ndata = list(pocket_graph.nodes(data=True))[0]
     if 'nt' in ndata.keys():
         nx.set_node_attributes(pocket_graph, name='nt_code',
                                values={node: d['nt'] for node, d in pocket_graph.nodes(data=True)})
-        nx.set_node_attributes(pocket_graph, name='in_pocket', values={node: True for node in pocket_graph.nodes()})
-
     one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
                     (nx.get_node_attributes(pocket_graph, 'nt_code')).items()}
 
@@ -108,7 +107,7 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings
 def get_dgl_graph(cif_path, residue_list):
     """
     :param cif_path: toto/tata/1cqr.cif
-    :param residue_list: A.2,A.3..,A.85 (missing pdb, useful for inference)
+    :param residue_list: list of strings "A.2","A.3",... ,"A.85" (missing pdb, useful for inference)
     :return:
     """
     ### DATA PREP
@@ -123,7 +122,7 @@ def get_dgl_graph(cif_path, residue_list):
         in_pocket = {node: node in reslist for node in expanded_reslist}
         expanded_graph = nx_graph.subgraph(expanded_reslist)
         nx.set_node_attributes(expanded_graph, name='in_pocket', values=in_pocket)
-    dgl_graph = load_rna_graph(nx_graph)
+    dgl_graph = load_rna_graph(expanded_graph)
     return dgl_graph
 
 
