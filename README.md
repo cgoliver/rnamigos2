@@ -32,10 +32,9 @@ If you find this tool useful, please cite
 
 The easiest way to use the tool is to use Google Colab, provided at this link
 
-[//]: # (TODO : setup link.)
-You will need to provide a binding site, in the form of a list of binding pocket nodes. 
-If you want to use your tool on unpublished data, you can additionally provide a custom PDB file containing those files.
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/https://github.com/jgcarvajalp/rnamigos_tmp/tree/carlos/rnamigos_inference.ipynb)
 
+You will need to provide a cif file, a binding site in the form of a list of binding pocket nodes and a list of ligand smiles.
 
 ## Using the tool locally
 
