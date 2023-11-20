@@ -1,0 +1,9 @@
+numpy
+dgl
+biopython
+tensorboard
+hydra-core
+loguru
+rdkit
+fr3d-python @ git+https://github.com/cgoliver/fr3d-python.git
+rnaglib>=2.0.4

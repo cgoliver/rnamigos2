@@ -1,0 +1,33 @@
+encoder:
+  in_dim: 4
+  hidden_dim: 64
+  num_layers: 3
+  num_bases: -1
+  subset_pocket_nodes: True
+
+lig_encoder:
+  in_dim: 166
+  hidden_dim: 32
+  num_layers: 3
+
+graphlig_encoder:
+  use_pretrained: False
+  features_dim: 22
+  gcn_hdim: 32
+  gcn_layers: 3
+  l_size: 32 # optimol is 56
+#  cat_mu_v: False
+
+decoder:
+  in_dim: 64
+  out_dim: 1 
+  hidden_dim: 32
+  num_layers: 3
+  activation: sigmoid 
+
+pool: 'att'
+dropout: 0.2
+batch_norm: True
+use_pretrained: False
+pretrained_path: pretrained/R_1_16/model.pth
+use_graphligs: False

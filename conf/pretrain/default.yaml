@@ -1,0 +1,4 @@
+seed: 42
+epochs: 100
+simfunc: "R_1"
+depth: 2

@@ -1,0 +1,13 @@
+defaults:
+  - data: default 
+  - tokens: default
+  - model: default
+  - train: default
+
+saved_model_dir: results/trained_models/dock/final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0/
+pdbid: null
+residue_list: null
+cif_path: null
+ligands_path: null
+result_dir: outputs/
+out_path: inference.txt

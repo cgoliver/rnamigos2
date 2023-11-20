@@ -1,0 +1,12 @@
+defaults:
+  - _self_
+  - tokens: default 
+  - train: default
+  - paths: default
+  - data: default
+  - model: default
+
+debug: False
+name: 'default'
+device: 'cpu'
+verbose: False

@@ -1,0 +1,13 @@
+defaults:
+  - data: default
+  - tokens: default 
+  - paths: default
+  - model: default
+
+name: 'default' 
+seed: 42
+epochs: 100
+simfunc: "hungarian"
+depth: 2
+device: 'cpu'
+num_workers: 0
