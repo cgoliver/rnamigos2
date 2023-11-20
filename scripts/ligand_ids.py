@@ -7,7 +7,7 @@ import pandas as pd
 
 if __name__ == "__main__":
 
-    decoy_modes = ['pdb', 'pdb_chembl', 'decoy_finder', 'robin']
+    decoy_modes = ['pdb', 'pdb_chembl', 'decoy_finder']
 
     db_path = '../data/ligand_db/'
 
