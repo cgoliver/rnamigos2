@@ -23,7 +23,10 @@ NOTE: you will need to install pybel if you want DecoyFinder decoys. This depend
 The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
 To disable DecoyFinder decoys pass the ``-no-decoyfinder`` flag.
 
+DecoyFinder samples ligands from a given library. In this case we use ZINC in-vio bioactive compounds which you can download [here](https://drive.proton.me/urls/CQMXCX5MW4#YQeEEa7VHVcu)
+
 We now have pockets, native ligands and different sets of decoys.
+
 These decoys can be downloaded here : TODO [Decoy Library](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR)
 
 ## Get docking scores
