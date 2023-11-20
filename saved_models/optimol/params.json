@@ -1,0 +1,8 @@
+{
+  "features_dim": 16,
+  "num_rels": 4,
+  "l_size": 56,
+  "gcn_hdim": 32,
+  "gcn_layers": 3,
+  "batch_norm": false
+}
