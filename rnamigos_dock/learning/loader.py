@@ -17,6 +17,13 @@ from rnamigos_dock.tools.graph_utils import load_rna_graph
 
 RDLogger.DisableLog('rdApp.*')  # disable warnings
 
+ROBIN_SYSTEMS = """2GDI	TPP
+6QN3	GLN
+5BTP	AMZ
+2QWY	SAM
+3FU2	PRF
+"""
+
 
 def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
                      use_rnamigos1_train=False, use_rnamigos1_ligands=False):
@@ -59,7 +66,7 @@ def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
 
 
 def get_systems(target='dock', rnamigos1_split=-1, return_test=False,
-                use_rnamigos1_train=False, use_rnamigos1_ligands=False):
+                use_rnamigos1_train=False, use_rnamigos1_ligands=False, filter_robin=False):
     """
     :param target: The systems to load 
     :param split: None or one of 'TRAIN', 'VALIDATION', 'TEST'
@@ -84,7 +91,23 @@ def get_systems(target='dock', rnamigos1_split=-1, return_test=False,
     systems = pd.read_csv(interactions_csv, index_col=0)
     if rnamigos1_split == -1:
         split = 'TEST' if return_test else 'TRAIN'
+        # systems_train = systems.loc[systems['SPLIT'] == 'TRAIN']
+        # systems_val = systems.loc[systems['SPLIT'] == 'VALIDATION']
+        # systems_test = systems.loc[systems['SPLIT'] == 'TEST']
+        # unique_train = set(systems_train['PDB_ID_POCKET'].unique())
+        # unique_val = set(systems_val['PDB_ID_POCKET'].unique())
+        # unique_test = set(systems_test['PDB_ID_POCKET'].unique())
+        # all_sys = unique_train.union(unique_val).union(unique_test)
         systems = systems.loc[systems['SPLIT'] == split]
+        # Remove robin systems from the train
+        if filter_robin and split == 'TRAIN':
+            unique_train = set(systems['PDB_ID_POCKET'].unique())
+            shortlist_to_avoid = set()
+            for robin_sys in ROBIN_SYSTEMS.splitlines():
+                robin_pdb_id = robin_sys.split()[0]
+                to_avoid = {s for s in unique_train if s.startswith(robin_pdb_id)}
+                shortlist_to_avoid = shortlist_to_avoid.union(to_avoid)
+            systems = systems[~systems['PDB_ID_POCKET'].isin(shortlist_to_avoid)]
     else:
         systems = rnamigos_1_split(systems,
                                    rnamigos1_test_split=rnamigos1_split,
@@ -300,7 +323,7 @@ class VirtualScreenDataset(DockingDataset):
 
     def __getitem__(self, idx):
         try:
-            if self.rognan: 
+            if self.rognan:
                 pocket_id = self.all_pockets_id[np.random.randint(0, len(self.all_pockets_id))]
             else:
                 pocket_id = self.all_pockets_id[idx]
@@ -310,8 +333,10 @@ class VirtualScreenDataset(DockingDataset):
                 pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
                                                  use_rings=False)
 
-            actives_smiles = self.parse_smiles(Path(self.ligands_path, self.all_pockets_id[idx], self.decoy_mode, 'actives.txt'))
-            decoys_smiles = self.parse_smiles(Path(self.ligands_path, self.all_pockets_id[idx], self.decoy_mode, 'decoys.txt'))
+            actives_smiles = self.parse_smiles(
+                Path(self.ligands_path, self.all_pockets_id[idx], self.decoy_mode, 'actives.txt'))
+            decoys_smiles = self.parse_smiles(
+                Path(self.ligands_path, self.all_pockets_id[idx], self.decoy_mode, 'decoys.txt'))
 
             is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
             is_active[:len(actives_smiles)] = 1.
@@ -325,6 +350,7 @@ class VirtualScreenDataset(DockingDataset):
             return pocket_graph, all_inputs, torch.tensor(is_active), torch.tensor(lig_ids)
         except FileNotFoundError:
             return None, None, None, None
+
 
 class InferenceDataset(Dataset):
     def __init__(self,
@@ -353,6 +379,7 @@ class InferenceDataset(Dataset):
 
         except FileNotFoundError:
             return None, None
+
 
 if __name__ == '__main__':
     pockets_path = '../../data/json_pockets_load'

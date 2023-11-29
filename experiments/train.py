@@ -73,7 +73,8 @@ def main(cfg: DictConfig):
     train_systems = get_systems(target=cfg.train.target,
                                 rnamigos1_split=cfg.train.rnamigos1_split,
                                 use_rnamigos1_train=cfg.train.use_rnamigos1_train,
-                                use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands)
+                                use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
+                                filter_robin=cfg.train.filter_robin)
     test_systems = get_systems(target=cfg.train.target,
                                rnamigos1_split=cfg.train.rnamigos1_split,
                                use_rnamigos1_train=cfg.train.use_rnamigos1_train,
