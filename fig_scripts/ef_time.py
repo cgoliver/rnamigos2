@@ -114,17 +114,23 @@ def line_plot(df):
     plt.grid(True)
     ax = plt.gca()
     ax.set_yscale('custom')
+
+    x_cross = 0.65
+    xticks = [0, x_cross, 2, 4, 6, 8]
+    xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
+    plt.gca().set_xticks(ticks= xticks, labels=xticks_labels)
+
     yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
     plt.gca().set_yticks(yticks)
 
-    times = np.linspace(0, 20, 20)
+    times = np.linspace(0, 8.3, 20)
     # palette = PALETTE
     palette = [PALETTE[3], PALETTE[-1]]
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
 
     plt.axhline(y=0.99, color='grey', linestyle='--', alpha=0.7)
-    plt.axvline(x=1.6, color='grey', linestyle='--', alpha=0.7)
+    plt.axvline(x=x_cross, color='grey', linestyle='--', alpha=0.7)
 
     # sns.lineplot(data=df, x='time_limit', y='ef', hue='model')
     plt.ylabel(r"Mean Active Rank")
@@ -202,9 +208,9 @@ def vax_plot(df):
 
 if __name__ == "__main__":
     # Build the time df for making the figures, this can be commented then
-    build_ef_df()
+    # build_ef_df()
 
     df = pd.read_csv("time_ef.csv")
     line_plot(df)
-    vax_plot(df)
+    # vax_plot(df)
     pass
