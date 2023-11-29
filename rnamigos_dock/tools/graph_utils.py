@@ -101,7 +101,7 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings
                 rings.append(data['edge_annots'])
         return pocket_graph_dgl, rings
     else:
-        return pocket_graph_dgl
+        return pocket_graph_dgl, rings
 
 
 def get_dgl_graph(cif_path, residue_list):
@@ -122,7 +122,11 @@ def get_dgl_graph(cif_path, residue_list):
         in_pocket = {node: node in reslist for node in expanded_reslist}
         expanded_graph = nx_graph.subgraph(expanded_reslist)
         nx.set_node_attributes(expanded_graph, name='in_pocket', values=in_pocket)
-    dgl_graph = load_rna_graph(expanded_graph)
+    else:
+        expanded_graph = nx_graph
+        in_pocket = {node: True for node in nx_graph.nodes}
+        nx.set_node_attributes(expanded_graph, name='in_pocket', values=in_pocket)
+    dgl_graph, _ = load_rna_graph(expanded_graph)
     return dgl_graph
 
 
