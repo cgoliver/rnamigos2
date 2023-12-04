@@ -42,7 +42,6 @@ You will need to provide a cif file, a binding site in the form of a list of bin
 
 ## Using the tool locally
 
-### Setup
 A local use of the tool is also possible by following the next steps.
 First, create a conda environment:
 

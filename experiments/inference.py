@@ -3,7 +3,7 @@ import sys
 
 import numpy as np
 import pandas as pd
-from dgl.dataloading import GraphDataLoader
+from torch.utils.data import DataLoader
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -22,16 +22,6 @@ def col(x):
 
 
 def do_inference(cif_path, residue_list, ligands_path, out_path):
-    # Get dgl graph with node expansion BFS
-    dgl_graph = get_dgl_graph(cif_path, residue_list)
-    smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
-    # Loader is asynchronous
-    loader_args = {'shuffle': False,
-                   'batch_size': 1,
-                   'num_workers': 0,
-                   'collate_fn': lambda x: x[0]
-                   }
-
     ### MODEL LODADING
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     script_dir = os.path.dirname(__file__)
@@ -40,19 +30,30 @@ def do_inference(cif_path, residue_list, ligands_path, out_path):
         'is_native': os.path.join(script_dir, '../saved_models/paper_native'),
         'native_fp': os.path.join(script_dir, '../saved_models/paper_fp')
     }
+
+    # Get dgl graph with node expansion BFS
+    dgl_graph = get_dgl_graph(cif_path, residue_list)
+    smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
+
     results = {}
     for model_name, model_path in models.items():
         model = get_model_from_dirpath(model_path)
         # model = model.to(device) TODO
         model = model.to('cpu')
-        dataset = InferenceDataset(dgl_graph,
-                                   smiles_list,
+
+        dataset = InferenceDataset(smiles_list,
                                    use_graphligs=model.use_graphligs,
                                    )
-        dataloader = GraphDataLoader(dataset=dataset, **loader_args)
+        loader_args = {'shuffle': False,
+                       'batch_size': 64,
+                       'num_workers': 0,
+                       'collate_fn': dataset.collate
+                       }
+        dataloader = DataLoader(dataset=dataset, **loader_args)
+
         all_scores = []
-        for pocket_graph, ligands in dataloader:
-            scores = list(model.predict_ligands(pocket_graph,
+        for ligands in dataloader:
+            scores = list(model.predict_ligands(dgl_graph,
                                                 ligands,
                                                 ).squeeze().cpu().numpy())
             all_scores.extend(scores)

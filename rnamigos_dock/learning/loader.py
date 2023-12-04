@@ -1,6 +1,7 @@
 import os
 
 import pandas
+import dgl
 from dgl.dataloading import GraphCollator
 import itertools
 import numpy as np
@@ -304,14 +305,12 @@ class VirtualScreenDataset(DockingDataset):
                  use_rings=False,
                  use_graphligs=False,
                  rognan=False,
-                 lig_ids='data/lig_ids.csv'
                  ):
         super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False, use_rings=use_rings,
                          use_graphligs=use_graphligs)
         self.ligands_path = ligands_path
         self.decoy_mode = decoy_mode
         self.all_pockets_id = list(self.systems['PDB_ID_POCKET'].unique())
-        self.smiles_2_id = dict(zip(df['smiles'], df['id']))
         self.rognan = rognan
         pass
 
@@ -354,31 +353,35 @@ class VirtualScreenDataset(DockingDataset):
 
 class InferenceDataset(Dataset):
     def __init__(self,
-                 pocket_graph,
                  smiles_list,
                  use_graphligs=False,
                  ):
-        self.pocket_graph = pocket_graph
-        self.smiles = smiles_list
+        self.smiles_list = smiles_list
         self.use_graphligs = use_graphligs
         self.ligand_graph_encoder = MolGraphEncoder(cache=False) if use_graphligs else None
         self.ligand_encoder = MolFPEncoder() if not use_graphligs else None
         pass
 
     def __len__(self):
-        return 1
+        return len(self.smiles_list)
 
     def __getitem__(self, idx):
-        try:
-            if self.use_graphligs:
-                all_inputs = self.ligand_graph_encoder.smiles_to_graph_list(self.smiles)
-            else:
-                all_inputs = self.ligand_encoder.smiles_to_fp_list(self.smiles)
-                all_inputs = torch.tensor(all_inputs)
-            return self.pocket_graph, all_inputs
+        ligand = self.smiles_list[idx]
+        if self.use_graphligs:
+            encoded_ligand = self.ligand_graph_encoder.smiles_to_graph_one(ligand)
+        else:
+            encoded_ligand = self.ligand_encoder.smiles_to_fp_one(ligand)
+        return encoded_ligand
 
-        except FileNotFoundError:
-            return None, None
+    def collate(self, ligands):
+        if self.use_graphligs:
+            batch = dgl.batch(ligands)
+        else:
+            batch = np.array(ligands)
+            batch = torch.tensor(batch)
+        return batch
+
+
 
 
 if __name__ == '__main__':
