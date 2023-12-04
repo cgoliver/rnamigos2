@@ -1,8 +1,9 @@
 """ Run a virtual screen with a trained model
 """
-import numpy as np
 from dgl import DGLGraph
 from loguru import logger
+import numpy as np
+import pandas as pd
 import torch
 
 
@@ -64,16 +65,12 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
             continue
         if not i % 20:
             logger.info(f"Done {i}/{len(dataloader)}")
-
-        model = model.to('cpu')
         if ((isinstance(ligands, torch.Tensor) and len(ligands) < 10)
                 or (isinstance(ligands, DGLGraph) and ligands.batch_size < 10)):
             logger.warning(f"Skipping pocket{i}, not enough decoys")
             continue
         kwargs['frac'] = 0.01
-        scores = list(model.predict_ligands(pocket_graph,
-                                            ligands,
-                                            ).squeeze().cpu().numpy())
+        scores = list(model.predict_ligands(pocket_graph, ligands)[:, 0].numpy())
         all_scores.append(scores)
         all_smiles.append([id_to_smiles[i] for i in lig_ids])
         efs.append(metric(scores, is_active, **kwargs))

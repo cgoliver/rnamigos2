@@ -62,13 +62,17 @@ To split this initial data into csvs adapted for each of our training scenarios,
 ```bash
 python scripts/build_csvs.py
 ```
+This should take about 3 minutes.
 
 ## Pockets as 2.5d graphs, ligands as graphs and fingerprints
 
 We now want to prepare our pockets and ligands for learning our tool.
-This can be obtained using our scripts 
+This can be obtained using our scripts.
+
+[//]: # (TODO : RIGHT NOW, we need to have json_pockets/ because the node ids are broken...)
+[//]: # (TODO : This requires having rnaglib_all data, maybe we should mention how to get that)
 ```bash
-python scripts/get_pockets.py
+python scripts/get_pocket_graphs.py
 ```
 
 
