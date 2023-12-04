@@ -21,7 +21,7 @@ def col(x):
     return x[0]
 
 
-def do_inference(cif_path, residue_list, ligands_path, out_path):
+def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False):
     ### MODEL LODADING
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     script_dir = os.path.dirname(__file__)
@@ -72,8 +72,16 @@ def do_inference(cif_path, residue_list, ligands_path, out_path):
     mixed_scores = 0.44 * results['dock'] + 0.39 * results['native_fp'] + 0.17 * results['is_native']
 
     with open(out_path, 'w') as out:
-        for smiles, score in zip(smiles_list, mixed_scores):
-            out.write(f"{smiles} {score}\n")
+        if not dump_all:
+            for smiles, score in zip(smiles_list, mixed_scores):
+                out.write(f"{smiles} {score}\n")
+        else:
+            for smiles, dock_score, native_score, fp_score, mixed_score in zip(smiles_list,
+                                                                               results['dock'],
+                                                                               results['is_native'],
+                                                                               results['native_fp'],
+                                                                               mixed_scores):
+                out.write(f"{smiles} {dock_score} {native_score} {fp_score} {mixed_score}\n")
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="inference")
