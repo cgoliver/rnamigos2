@@ -354,34 +354,25 @@ class VirtualScreenDataset(DockingDataset):
 class InferenceDataset(Dataset):
     def __init__(self,
                  smiles_list,
-                 use_graphligs=False,
                  ):
         self.smiles_list = smiles_list
-        self.use_graphligs = use_graphligs
-        self.ligand_graph_encoder = MolGraphEncoder(cache=False) if use_graphligs else None
-        self.ligand_encoder = MolFPEncoder() if not use_graphligs else None
-        pass
+        self.ligand_graph_encoder = MolGraphEncoder(cache=False)
+        self.ligand_encoder = MolFPEncoder()
 
     def __len__(self):
         return len(self.smiles_list)
 
     def __getitem__(self, idx):
         ligand = self.smiles_list[idx]
-        if self.use_graphligs:
-            encoded_ligand = self.ligand_graph_encoder.smiles_to_graph_one(ligand)
-        else:
-            encoded_ligand = self.ligand_encoder.smiles_to_fp_one(ligand)
-        return encoded_ligand
+        encoded_ligand_graphs = self.ligand_graph_encoder.smiles_to_graph_one(ligand)
+        encoded_ligand_fp = self.ligand_encoder.smiles_to_fp_one(ligand)
+        return encoded_ligand_graphs, encoded_ligand_fp
 
     def collate(self, ligands):
-        if self.use_graphligs:
-            batch = dgl.batch(ligands)
-        else:
-            batch = np.array(ligands)
-            batch = torch.tensor(batch)
-        return batch
-
-
+        batch_graph = dgl.batch([x[0] for x in ligands])
+        batch_vector = np.array([x[1] for x in ligands])
+        batch_vector = torch.tensor(batch_vector)
+        return batch_graph, batch_vector
 
 
 if __name__ == '__main__':

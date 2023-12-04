@@ -134,7 +134,7 @@ class MolGraphEncoder:
                                           edge_attrs=['edge_type'])
 
             N = graph_dgl.number_of_nodes()
-            graph_dgl.ndata['h'] = torch.cat([graph_dgl.ndata[f].view(N, -1) for f in node_features], dim=1)
+            graph_dgl.ndata['node_features'] = torch.cat([graph_dgl.ndata[f].view(N, -1) for f in node_features], dim=1)
             return graph_dgl
         except Exception as e:
             print(f"Failed on smiles {smiles} with exception {e}")

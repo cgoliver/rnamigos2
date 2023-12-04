@@ -1,4 +1,4 @@
-# Reproducting the results
+# Reproducing the results
 
 If you want to reproduce the results from scratch, first you need to set up the environment,
 data and model as detailed in the README.md. 
@@ -54,7 +54,7 @@ The docking experiment can be launched using :
 
 [//]: # (TODO : upload docking scripts)
  
-and the corresonding docking scores can be obtained [here](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
+and the corresponding docking scores can be obtained [here](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
 
 [//]: # (TODO : check that the data is ok)
 

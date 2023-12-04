@@ -242,6 +242,7 @@ class LigandGraphEncoder(nn.Module):
         return ligraph_encoder
 
     def forward(self, g):
+        g.ndata['h'] = g.ndata['node_features']
         # Weird optimol pretrained_model
         if self.cut_embeddings:
             g.ndata['h'] = g.ndata['h'][:, :-6]
