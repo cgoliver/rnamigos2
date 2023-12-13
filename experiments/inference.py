@@ -15,13 +15,13 @@ from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 
 
-def inference(dgl_graph, smiles_list, out_path, model_path=None, dump_all=False):
+def inference(dgl_graph, smiles_list, out_path, models_path=None, dump_all=False):
     """
     Run inference from python objects
     """
     # Load models
     script_dir = os.path.dirname(__file__)
-    if model_path is None:
+    if models_path is None:
         models_path = {
             'dock': os.path.join(script_dir, '../saved_models/paper_dock'),
             'is_native': os.path.join(script_dir, '../saved_models/paper_native'),
