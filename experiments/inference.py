@@ -15,19 +15,19 @@ from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 
 
-def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False):
+def inference(dgl_graph, smiles_list, out_path, model_path=None, dump_all=False):
+    """
+    Run inference from python objects
+    """
     # Load models
     script_dir = os.path.dirname(__file__)
-    models_path = {
-        'dock': os.path.join(script_dir, '../saved_models/paper_dock'),
-        'is_native': os.path.join(script_dir, '../saved_models/paper_native'),
-        'native_fp': os.path.join(script_dir, '../saved_models/paper_fp')
-    }
+    if model_path is None:
+        models_path = {
+            'dock': os.path.join(script_dir, '../saved_models/paper_dock'),
+            'is_native': os.path.join(script_dir, '../saved_models/paper_native'),
+            'native_fp': os.path.join(script_dir, '../saved_models/paper_fp')
+        }
     models = {model_name: get_model_from_dirpath(model_path) for model_name, model_path in models_path.items()}
-
-    # Get dgl graph with node expansion BFS
-    dgl_graph = get_dgl_graph(cif_path, residue_list)
-    smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
 
     # Get ready to loop through ligands
     dataset = InferenceDataset(smiles_list)
@@ -81,6 +81,16 @@ def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False)
                 out.write(f"{smiles} {dock_score} {native_score} {fp_score} {mixed_score}\n")
 
 
+def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False):
+    """
+    Run inference from files
+    """
+    # Get dgl graph with node expansion BFS
+    dgl_graph = get_dgl_graph(cif_path, residue_list)
+    smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
+    inference(dgl_graph=dgl_graph, smiles_list=smiles_list, out_path=out_path, dump_all=dump_all)
+
+
 @hydra.main(version_base=None, config_path="../conf", config_name="inference")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
@@ -93,9 +103,9 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     pass
-    # main()
-    do_inference(cif_path="sample_files/3ox0.cif",
-                 residue_list="A.25,A.26,A.7,A.8".split(','),
-                 ligands_path="sample_files/test_smiles.txt",
-                 out_path="test.out",
-                 dump_all=True)
+    main()
+    # do_inference(cif_path="sample_files/3ox0.cif",
+    #              residue_list="A.25,A.26,A.7,A.8".split(','),
+    #              ligands_path="sample_files/test_smiles.txt",
+    #              out_path="test.out",
+    #              dump_all=True)

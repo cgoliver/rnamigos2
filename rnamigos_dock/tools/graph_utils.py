@@ -67,6 +67,9 @@ def to_undirected(edge_map):
 
 
 def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings=False):
+    """
+    NetworkX Graph or path to a json => DGL graph
+    """
     if isinstance(rna_path, str):
         pocket_graph = graph_io.load_json(rna_path)
     if isinstance(rna_path, nx.Graph):
