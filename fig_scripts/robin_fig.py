@@ -1,7 +1,8 @@
-import pandas as pd
-import numpy as np
-import seaborn as sns
+from collections import defaultdict
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from rnaglib.drawing import rna_draw
 from rnaglib.utils import load_json
 
@@ -62,17 +63,69 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
 
 import os
 
-out_dir = 'outputs/robin'
 pocket_names = [
     "2GDI_Y_TPP_100",
     "5BTP_A_AMZ_106",
     "2QWY_A_SAM_100",
     "3FU2_C_PRF_101",
 ]
-names = ['smiles', 'dock', 'is_native', 'native_fp', 'merged']
-all_efs = list()
-fig, axs = plt.subplots(4)
-for i, (pocket_name) in enumerate(pocket_names):
+ligand_names = [
+    "TPP",
+    "ZTP",
+    "SAM_ll",
+    "PreQ1",
+]
+
+
+def get_dfs_docking(ligand_name):
+    out_dir = 'outputs/robin'
+
+    # Get relevant mapping smiles : normalized score
+    docking_df = pd.read_csv(os.path.join(out_dir, "robin_targets_docking.csv"))
+    docking_df = docking_df[docking_df["TARGET"] == ligand_name]
+    scores = -docking_df[["TOTAL"]].values.squeeze()
+    # ma = np.nanmax(scores)
+    # mi = np.nanmin(scores)
+    # print(ma, mi)
+    # normalized_scores = (scores - np.nanmin(scores)) / (np.nanmax(scores) - np.nanmin(scores))
+    # normalized_scores = scores
+    normalized_scores = scores / 80
+    mapping = {}
+    for smiles, score in zip(docking_df[["SMILE"]].values, normalized_scores):
+        mapping[smiles[0]] = score
+    mapping = defaultdict(int, mapping)
+
+    # Use this mapping to create our actives/inactives distribution dataframe
+    active_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
+    # out_path = os.path.join(out_dir, f"{pocket_name}_actives.txt")
+    smiles_list = [s.lstrip().rstrip() for s in list(open(active_ligands_path).readlines())]
+    actives_df = pd.DataFrame({"docking_score": [mapping[sm] for sm in smiles_list]})
+    actives_df['split'] = 'actives'
+
+    # scores = actives_df[["docking_score"]].values.squeeze()
+    # ma = np.nanmax(scores)
+    # mi = np.nanmin(scores)
+    # print("actives", ma, mi, np.sum(scores > 200), len(scores))
+
+    inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
+    # out_path = os.path.join(out_dir, f"{pocket_name}_inactives.txt")
+    smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
+    inactives_df = pd.DataFrame({"docking_score": [mapping[sm] for sm in smiles_list]})
+    inactives_df['split'] = 'inactives'
+
+    # scores = inactives_df[["docking_score"]].values.squeeze()
+    # ma = np.nanmax(scores)
+    # mi = np.nanmin(scores)
+    # print("inactives", ma, mi, np.sum(scores > 200), len(scores))
+    # print()
+
+    merged = pd.concat([actives_df, inactives_df]).reset_index()
+    return merged
+
+
+def get_dfs_migos(pocket_name):
+    names = ['smiles', 'dock', 'is_native', 'native_fp', 'merged']
+    out_dir = 'outputs/robin'
     actives_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_actives.txt"), names=names, sep=' ')
     actives_df['split'] = 'actives'
     inactives_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_inactives.txt"), names=names, sep=' ')
@@ -82,32 +135,45 @@ for i, (pocket_name) in enumerate(pocket_names):
     # merged = pd.concat([actives_df, inactives_df, decoys_df])
     # merged = pd.concat([actives_df, decoys_df])
     merged = pd.concat([actives_df, inactives_df])
-    # score_to_use = 'dock'
-    # score_to_use = 'is_native'
-    # score_to_use = 'native_fp'
-    score_to_use = 'merged'
+    return merged
 
-    ax = axs[i]
-    sns.kdeplot(data=merged, x=score_to_use, hue='split', common_norm=False, clip=(0, 1), ax=ax)
-    ax.set_title(pocket_name)
-    #     g = load_json(f"data/robin_graphs_x3dna/{name}.json")
-    #     g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
-    #     print(g.nodes(data=True))
-    #     rna_draw(g,
-    #              node_colors=[colors[d[nt_key]] for n,d in g.nodes(data=True)],
-    #              ax=axs[i][1])
-    scores = merged[score_to_use]
-    actives = merged['split'].isin(['actives'])
-    ef = enrichment_factor(scores=scores, is_active=actives,
-                           lower_is_better=False, frac=0.001)
-    print(pocket_name, ef)
-    all_efs.append(ef)
-    # mar = mean_active_rank(df['raw_score'], df['is_active'], lower_is_better=True)
-#     #ef = f"EF@1\% {list(ef_df.loc[ef_df['pocket_id'] == name]['score'])[0]:.3f}"
-#     axs[i][0].text(0, 0, f"{name} EF: {ef:.3} MAR: {mar:.3}")
-#     axs[i][0].axis("off")
-#     axs[i][1].axis("off")
-#     sns.despine()
-#
-print(np.mean(all_efs))
-plt.show()
+
+if __name__ == '__main__':
+
+    all_efs = list()
+    fig, axs = plt.subplots(4)
+    for i, (pocket_name, ligand_name) in enumerate(zip(pocket_names, ligand_names)):
+        # FOR DOCKING
+        merged = get_dfs_docking(ligand_name=ligand_name)
+        score_to_use = 'docking_score'
+
+        # FOR MIGOS
+        # merged = get_dfs_migos(pocket_name=pocket_name)
+        # score_to_use = 'merged'
+        # score_to_use = 'dock'
+        # score_to_use = 'is_native'
+        # score_to_use = 'native_fp'
+        ax = axs[i]
+        sns.kdeplot(data=merged, x=score_to_use, hue='split', common_norm=False, clip=(0, 1), ax=ax)
+        ax.set_title(pocket_name)
+        #     g = load_json(f"data/robin_graphs_x3dna/{name}.json")
+        #     g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
+        #     print(g.nodes(data=True))
+        #     rna_draw(g,
+        #              node_colors=[colors[d[nt_key]] for n,d in g.nodes(data=True)],
+        #              ax=axs[i][1])
+        scores = merged[score_to_use]
+        actives = merged['split'].isin(['actives'])
+        ef = enrichment_factor(scores=scores, is_active=actives,
+                               lower_is_better=False, frac=0.01)
+        print(pocket_name, ef)
+        all_efs.append(ef)
+        # mar = mean_active_rank(df['raw_score'], df['is_active'], lower_is_better=True)
+    #     #ef = f"EF@1\% {list(ef_df.loc[ef_df['pocket_id'] == name]['score'])[0]:.3f}"
+    #     axs[i][0].text(0, 0, f"{name} EF: {ef:.3} MAR: {mar:.3}")
+    #     axs[i][0].axis("off")
+    #     axs[i][1].axis("off")
+    #     sns.despine()
+    #
+    print(np.mean(all_efs))
+    plt.show()
