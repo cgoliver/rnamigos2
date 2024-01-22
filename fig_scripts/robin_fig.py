@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sklearn import metrics
+
 from rnaglib.drawing import rna_draw
 from rnaglib.utils import load_json
 
@@ -82,10 +84,19 @@ def get_dfs_docking(ligand_name):
 
     # Get relevant mapping smiles : normalized score
     docking_df = pd.read_csv(os.path.join(out_dir, "robin_targets_docking.csv"))
+    # docking_df = pd.read_csv(os.path.join(out_dir, "robin_targets_docking_consolidated.csv"))
     docking_df = docking_df[docking_df["TARGET"] == ligand_name]
     scores = -docking_df[["TOTAL"]].values.squeeze()
-    # ma = np.nanmax(scores)
+
+    # DEAL WITH NANS, ACTUALLY WHEN SORTING NANS, THEY GO THE END
+    # count = np.count_nonzero(np.isnan(scores))
+    # scores = np.sort(scores)
+    # cropped_scores = np.concatenate((scores[:10], scores[-10:]))
+    # print(cropped_scores)
+
+    scores = np.nan_to_num(scores, nan=np.nanmin(scores))
     # mi = np.nanmin(scores)
+    # ma = np.nanmax(scores)
     # print(ma, mi)
     # normalized_scores = (scores - np.nanmin(scores)) / (np.nanmax(scores) - np.nanmin(scores))
     # normalized_scores = scores
@@ -105,7 +116,9 @@ def get_dfs_docking(ligand_name):
     # scores = actives_df[["docking_score"]].values.squeeze()
     # ma = np.nanmax(scores)
     # mi = np.nanmin(scores)
-    # print("actives", ma, mi, np.sum(scores > 200), len(scores))
+    # count = np.count_nonzero(np.isnan(scores))
+    # print(f"actives max/min : {ma} {mi}, nancount : {count} "
+    #       f"scores over 200 : {np.sum(scores > 200)} length : {len(scores)} ")
 
     inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
     # out_path = os.path.join(out_dir, f"{pocket_name}_inactives.txt")
@@ -116,8 +129,9 @@ def get_dfs_docking(ligand_name):
     # scores = inactives_df[["docking_score"]].values.squeeze()
     # ma = np.nanmax(scores)
     # mi = np.nanmin(scores)
-    # print("inactives", ma, mi, np.sum(scores > 200), len(scores))
-    # print()
+    # count = np.count_nonzero(np.isnan(scores))
+    # print(f"inactives max/min : {ma} {mi}, nancount : {count} "
+    #       f"scores over 200 : {np.sum(scores > 200)} length : {len(scores)} ")
 
     merged = pd.concat([actives_df, inactives_df]).reset_index()
     return merged
@@ -141,11 +155,13 @@ def get_dfs_migos(pocket_name):
 if __name__ == '__main__':
 
     all_efs = list()
+    all_aurocs = list()
     fig, axs = plt.subplots(4)
     for i, (pocket_name, ligand_name) in enumerate(zip(pocket_names, ligand_names)):
         # FOR DOCKING
         merged = get_dfs_docking(ligand_name=ligand_name)
         score_to_use = 'docking_score'
+        # break
 
         # FOR MIGOS
         # merged = get_dfs_migos(pocket_name=pocket_name)
@@ -164,11 +180,23 @@ if __name__ == '__main__':
         #              ax=axs[i][1])
         scores = merged[score_to_use]
         actives = merged['split'].isin(['actives'])
+
+        # GET EFS
+        frac = 0.01
         ef = enrichment_factor(scores=scores, is_active=actives,
-                               lower_is_better=False, frac=0.01)
-        print(pocket_name, ef)
+                               lower_is_better=False, frac=frac)
         all_efs.append(ef)
-        # mar = mean_active_rank(df['raw_score'], df['is_active'], lower_is_better=True)
+        print(f'EF@{frac} : ', pocket_name, ef)
+
+        # GET AUROC
+        fpr, tpr, thresholds = metrics.roc_curve(actives, scores)
+        auroc = metrics.auc(fpr, tpr)
+        all_aurocs.append(auroc)
+        # print('AuROC : ', pocket_name, auroc)
+        # print()
+
+        # mar = mean_active_rank(scores, actives, lower_is_better=False)
+        # print(mar)
     #     #ef = f"EF@1\% {list(ef_df.loc[ef_df['pocket_id'] == name]['score'])[0]:.3f}"
     #     axs[i][0].text(0, 0, f"{name} EF: {ef:.3} MAR: {mar:.3}")
     #     axs[i][0].axis("off")
@@ -176,4 +204,5 @@ if __name__ == '__main__':
     #     sns.despine()
     #
     print(np.mean(all_efs))
+    print(np.mean(all_aurocs))
     plt.show()
