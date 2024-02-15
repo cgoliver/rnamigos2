@@ -28,19 +28,22 @@ def flatten_values(systems):
     """
     all_pockets = set(systems['PDB_ID_POCKET'].unique())
     all_values = list()
-    for pocket in all_pockets:
-        pocket_values = systems.loc[systems['PDB_ID_POCKET'] == pocket][['TOTAL']]
+    for i, pocket in enumerate(all_pockets):
+        print(f'Processing pocket {i}/{len(all_pockets)}')
+        pocket_values = systems.loc[systems['PDB_ID_POCKET'] == pocket][['INTER']]
         qt = QuantileTransformer(random_state=0, n_quantiles=50)
         transformed_values = qt.fit_transform(pocket_values)
+        # This is not equivalent to directly using transformed values since we keep the index
         pocket_values['normalized_values'] = transformed_values
         pocket_values = pocket_values[["normalized_values"]]
         all_values.append(pocket_values)
     all_new_values = pd.concat(all_values)
+    # Since this concatenation takes the index into account, order is preserved.
     new_systems = pd.concat((systems, all_new_values), axis=1)
     return new_systems
 
 
-systems_dock = systems[['PDB_ID_POCKET', 'LIGAND_SMILES', 'TOTAL', 'SPLIT']]
+systems_dock = systems[['PDB_ID_POCKET', 'LIGAND_SMILES', 'INTER', 'SPLIT']]
 systems_dock_quantiles = flatten_values(systems_dock)
 systems_dock_quantiles.to_csv(interactions_csv_dock)
 

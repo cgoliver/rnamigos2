@@ -227,7 +227,7 @@ class DockingDataset(Dataset):
             target = ligand_fp
         elif self.target == 'dock':
             if not self.use_normalized_score:
-                target = row['TOTAL'] / 40
+                target = row['INTER'] / 40
             else:
                 target = row['normalized_values']
                 if self.stretch_scores:
