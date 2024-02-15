@@ -10,6 +10,7 @@ runs = [
     'paper_native.csv',
     'paper_dock.csv',
     'rdock.csv',
+    # 'rdock_total.csv',
     'mixed.csv',
     'mixed_rdock.csv',
 ]
@@ -17,11 +18,13 @@ names = [
     r'\texttt{fp}',
     r'\texttt{native}',
     r'\texttt{dock}',
-    r'\texttt{rDock}',
+    r'\texttt{rDock\newline INTER}',
+    # r'\texttt{rDock\newline TOTAL}',
     r'\texttt{mixed}',
     r'\texttt{mixed\newline+ rDock}',
 ]
 decoy_mode = 'chembl'
+# decoy_mode = 'pdb_chembl'
 
 # Parse ef data for the runs and gather them in a big database
 dfs = (pd.read_csv(f"../outputs/{f}") for f in runs)

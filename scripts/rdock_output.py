@@ -31,14 +31,15 @@ df = pd.read_csv("../data/rnamigos2_dataset_consolidated.csv")
 df = df.loc[df['TYPE'] == 'TEST']
 decoy_db = Path("../data/ligand_db")
 
-
 # ,score,metric,data_idx,decoys,pocket_id
 # ,raw_score,is_active,pocket_id
 
 ef_rows = []
 raw_rows = []
-for pocket_id, pocket in df.groupby('PDB_ID_POCKET'):
-    for decoy_set in ['pdb', 'pdb_chembl']:
+grouped_by_pocket = df.groupby('PDB_ID_POCKET')
+for i, (pocket_id, pocket) in enumerate(grouped_by_pocket):
+    print("Processing", i, len(grouped_by_pocket))
+    for decoy_set in ['pdb', 'pdb_chembl', 'chembl']:
         try:
             actives = open(decoy_db / pocket_id / decoy_set / 'actives.txt', 'r').readlines()
             decoys = open(decoy_db / pocket_id / decoy_set / 'decoys.txt', 'r').readlines()
@@ -48,6 +49,7 @@ for pocket_id, pocket in df.groupby('PDB_ID_POCKET'):
             scores, is_active, all_smiles = [], [], []
             for sm in actives:
                 s = list(pocket.loc[pocket['LIGAND_SMILES'] == sm.strip()]['INTER'])[0]
+                # s = list(pocket.loc[pocket['LIGAND_SMILES'] == sm.strip()]['TOTAL'])[0]
                 scores.append(s)
                 is_active.append(1)
                 all_smiles.append(sm)
@@ -62,17 +64,17 @@ for pocket_id, pocket in df.groupby('PDB_ID_POCKET'):
                 all_smiles.append(sm)
                 try:
                     s = list(pocket.loc[pocket['LIGAND_SMILES'] == sm.strip()]['INTER'])[0]
+                    # s = list(pocket.loc[pocket['LIGAND_SMILES'] == sm.strip()]['TOTAL'])[0]
                     scores.append(s)
                 except IndexError:
                     s = np.nan
-                    
+
                 raw_rows.append({'raw_score': s,
                                  'is_active': 0,
                                  'smiles': sm.lstrip().rstrip(),
                                  'pocket_id': pocket_id,
                                  'decoys': decoy_set})
 
-            print(scores)
             ef = mean_active_rank(scores, is_active)
             ef_rows.append({'score': ef,
                             'metric': 'MAR',
@@ -84,3 +86,5 @@ for pocket_id, pocket in df.groupby('PDB_ID_POCKET'):
 
 pd.DataFrame(ef_rows).to_csv("../outputs/rdock.csv")
 pd.DataFrame(raw_rows).to_csv("../outputs/rdock_raw.csv")
+# pd.DataFrame(ef_rows).to_csv("../outputs/rdock_total.csv")
+# pd.DataFrame(raw_rows).to_csv("../outputs/rdock_total_raw.csv")
