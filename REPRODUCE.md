@@ -75,6 +75,19 @@ This can be obtained using our scripts.
 python scripts/get_pocket_graphs.py
 ```
 
+## Splitting the data
+
+We first need to compute RMScores and then to split the data according to the RMscores.
+
+[//]: # (TODO : Add RMscores computations)
+
+Now that we have the file data/rmscore_normalized_by_average_length_complete_dataset.csv, we can obtain our
+final splits. Simply run:
+
+```bash
+python scripts/split.py
+```
+
 
 ## Model training
 

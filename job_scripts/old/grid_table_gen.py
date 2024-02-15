@@ -9,7 +9,7 @@ from yaml import safe_load
 # fp_native_grid-true-0.0--1-bce-true-1e-4
 
 if __name__ == "__main__":
-    RESULTS_DIR = Path('..', 'results', 'trained_models', 'native_fp')
+    RESULTS_DIR = Path('../..', 'results', 'trained_models', 'native_fp')
 
 
     # name=migos1_grid2-undirected_${undirected}-migos1_${migos1}-loss_${lossfunc}-lr_${lr}-split_${split}"

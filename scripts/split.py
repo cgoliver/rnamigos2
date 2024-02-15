@@ -89,14 +89,19 @@ for value in unique_values:
     label_value_to_rep[value] = group_rep
 # '''
 
-
+different_ligs = 0
 for name, group in groups.items():
+    ligands = [s.split('_')[2] for s in group]
+    if len(np.unique(ligands)) > 1:
+        print(name, len(np.unique(ligands)), len(ligands), ligands)
+    different_ligs += len(np.unique(ligands))
     # print(name, len(group))
-    if 'SAM' in name:
-        print(group)
+    # if 'SAM' in name:
+    #     print(group)
 # plt.hist([len(group) for group in groups.values()])
 # plt.show()
 # print(groups)
+print("Different", different_ligs, len(groups))
 
 # Handle robin systems:
 robin_pdb_names = ["2GDI", "5BTP", "2QWY", "3FU2"]
@@ -127,7 +132,7 @@ print("Number of examples", len(train_names), len(test_names))
 
 # print(sorted(train_names))
 # print()
-print(sorted(test_names))
+# print(sorted(test_names))
 
 def compute_max_train_test(train_names, test_names):
     train_ids = [indices[name] for name in train_names]

@@ -8,6 +8,7 @@ import numpy as np
 from numpy import random
 from pathlib import Path
 import pandas as pd
+import pickle
 from rdkit import RDLogger
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
 import torch
@@ -66,8 +67,8 @@ def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
     return systems
 
 
-def get_systems(target='dock', rnamigos1_split=-1, return_test=False,
-                use_rnamigos1_train=False, use_rnamigos1_ligands=False, filter_robin=False):
+def get_systems(target='dock', rnamigos1_split=-1, return_test=False, use_rnamigos1_train=False,
+                use_rnamigos1_ligands=False, filter_robin=False, group_pockets=False):
     """
     :param target: The systems to load 
     :param split: None or one of 'TRAIN', 'VALIDATION', 'TEST'
@@ -75,11 +76,13 @@ def get_systems(target='dock', rnamigos1_split=-1, return_test=False,
     :param rnamigos1_split: For fp, and following RNAmigos1, there is a special splitting procedure that uses 10 fixed
      splits.
     :param get_rnamigos1_train: For a given fp split, the test systems have a one label. Set this param to False to get test
-    systems. 
+    systems.
+    :param group_pockets: When using RMScores, we end up with redundant clusters. Should we train on all elements of
+     the clusters ?
     :return:
     """
     # Can't split twice
-    assert rnamigos1_split in {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+    assert rnamigos1_split in {-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
     script_dir = os.path.dirname(__file__)
     if target == 'dock':
         interactions_csv = os.path.join(script_dir, '../../data/csvs/docking_data.csv')
@@ -90,7 +93,17 @@ def get_systems(target='dock', rnamigos1_split=-1, return_test=False,
     else:
         raise ValueError("train.target should be in {dock, native_fp, is_native}, received : " + target)
     systems = pd.read_csv(interactions_csv, index_col=0)
-    if rnamigos1_split == -1:
+    if rnamigos1_split == -2:
+        splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
+        train_names, test_names, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+        if group_pockets:
+            train_names = train_names_grouped
+            test_names = test_names_grouped
+        if return_test:
+            systems = systems[systems['PDB_ID_POCKET'].isin(train_names)]
+        else:
+            systems = systems[systems['PDB_ID_POCKET'].isin(test_names)]
+    elif rnamigos1_split == -1:
         split = 'TEST' if return_test else 'TRAIN'
         # systems_train = systems.loc[systems['SPLIT'] == 'TRAIN']
         # systems_val = systems.loc[systems['SPLIT'] == 'VALIDATION']

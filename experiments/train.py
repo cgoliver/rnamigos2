@@ -28,6 +28,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import pandas as pd
 
+
 from rnamigos_dock.learning.loader import get_systems, DockingDataset, NativeSampler, RingCollater, VirtualScreenDataset
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEncoder, Decoder, RNAmigosModel
@@ -74,11 +75,13 @@ def main(cfg: DictConfig):
                                 rnamigos1_split=cfg.train.rnamigos1_split,
                                 use_rnamigos1_train=cfg.train.use_rnamigos1_train,
                                 use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
+                                group_pockets=cfg.train.group_pockets,
                                 filter_robin=cfg.train.filter_robin)
     test_systems = get_systems(target=cfg.train.target,
                                rnamigos1_split=cfg.train.rnamigos1_split,
                                use_rnamigos1_train=cfg.train.use_rnamigos1_train,
                                use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
+                               group_pockets=cfg.train.group_pockets,
                                return_test=True)
 
     if cfg.train.simfunc not in {'R_iso', 'R_1', 'hungarian'}:
