@@ -123,8 +123,8 @@ test_groups = {key: groups[key] for key in test_groups_keys}
 test_groups.update(robin_groups)
 print("Number of groups", len(train_groups), len(test_groups))
 
-train_names_grouped = list(train_groups.keys())
-test_names_grouped = list(test_groups.keys())
+train_names_grouped = train_groups
+test_names_grouped = test_groups
 train_names = set(chain.from_iterable([[name for name in group] for group in train_groups.values()]))
 test_names = set(chain.from_iterable([[name for name in group] for group in test_groups.values()]))
 print("Number of examples", len(train_names), len(test_names))

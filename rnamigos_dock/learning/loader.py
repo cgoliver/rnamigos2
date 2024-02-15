@@ -97,12 +97,12 @@ def get_systems(target='dock', rnamigos1_split=-1, return_test=False, use_rnamig
         splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
         train_names, test_names, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
         if group_pockets:
-            train_names = train_names_grouped
-            test_names = test_names_grouped
+            train_names = list(train_names_grouped.keys())
+            test_names = list(test_names_grouped.keys())
         if return_test:
-            systems = systems[systems['PDB_ID_POCKET'].isin(train_names)]
-        else:
             systems = systems[systems['PDB_ID_POCKET'].isin(test_names)]
+        else:
+            systems = systems[systems['PDB_ID_POCKET'].isin(train_names)]
     elif rnamigos1_split == -1:
         split = 'TEST' if return_test else 'TRAIN'
         # systems_train = systems.loc[systems['SPLIT'] == 'TRAIN']
@@ -314,21 +314,18 @@ class VirtualScreenDataset(DockingDataset):
                  ligands_path,
                  systems,
                  decoy_mode='pdb',
-                 fp_type='MACCS',
-                 use_rings=False,
-                 use_graphligs=False,
                  rognan=False,
+                 **kwargs
                  ):
-        super().__init__(pockets_path, systems=systems, fp_type=fp_type, shuffle=False, use_rings=use_rings,
-                         use_graphligs=use_graphligs)
+        super().__init__(pockets_path, systems=systems, shuffle=False, **kwargs)
         self.ligands_path = ligands_path
         self.decoy_mode = decoy_mode
-        self.all_pockets_id = list(self.systems['PDB_ID_POCKET'].unique())
+        self.all_pockets_names = list(self.systems['PDB_ID_POCKET'].unique())
         self.rognan = rognan
         pass
 
     def __len__(self):
-        return len(self.all_pockets_id)
+        return len(self.all_pockets_names)
 
     def parse_smiles(self, smiles_path):
         return list(open(smiles_path).readlines())
@@ -336,19 +333,19 @@ class VirtualScreenDataset(DockingDataset):
     def __getitem__(self, idx):
         try:
             if self.rognan:
-                pocket_id = self.all_pockets_id[np.random.randint(0, len(self.all_pockets_id))]
+                pocket_name = self.all_pockets_names[np.random.randint(0, len(self.all_pockets_names))]
             else:
-                pocket_id = self.all_pockets_id[idx]
+                pocket_name = self.all_pockets_names[idx]
             if self.cache_graphs:
-                pocket_graph, _ = self.all_pockets[pocket_id]
+                pocket_graph, _ = self.all_pockets[pocket_name]
             else:
-                pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
+                pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_name}.json"),
                                                  use_rings=False)
 
             actives_smiles = self.parse_smiles(
-                Path(self.ligands_path, self.all_pockets_id[idx], self.decoy_mode, 'actives.txt'))
+                Path(self.ligands_path, self.all_pockets_names[idx], self.decoy_mode, 'actives.txt'))
             decoys_smiles = self.parse_smiles(
-                Path(self.ligands_path, self.all_pockets_id[idx], self.decoy_mode, 'decoys.txt'))
+                Path(self.ligands_path, self.all_pockets_names[idx], self.decoy_mode, 'decoys.txt'))
 
             is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
             is_active[:len(actives_smiles)] = 1.
@@ -358,10 +355,10 @@ class VirtualScreenDataset(DockingDataset):
             else:
                 all_inputs = self.ligand_encoder.smiles_to_fp_list(actives_smiles + decoys_smiles)
                 all_inputs = torch.tensor(all_inputs)
-            lig_ids = [self.smiles_2_id(s) for s in actives_smiles + decoys_smiles]
-            return pocket_graph, all_inputs, torch.tensor(is_active), torch.tensor(lig_ids)
+            all_smiles = actives_smiles + decoys_smiles
+            return pocket_name, pocket_graph, all_inputs, torch.tensor(is_active), all_smiles
         except FileNotFoundError:
-            return None, None, None, None
+            return None, None, None, None, None
 
 
 class InferenceDataset(Dataset):
