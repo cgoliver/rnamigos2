@@ -11,12 +11,9 @@ from rdkit.Chem import MACCSkeys
 from rdkit.Chem import AllChem
 from tqdm import tqdm
 
-if __name__ == '__main__':
-    sys.path.append('..')
-
 from rnamigos_dock.learning.ligand_encoding import MolGraphEncoder
 
-interactions_csv_dock = '../data/csvs/docking_data.csv'
+interactions_csv_dock = 'data/csvs/docking_data.csv'
 systems = pd.read_csv(interactions_csv_dock)
 
 ligands = set(systems['LIGAND_SMILES'].unique())
@@ -24,8 +21,8 @@ ligands = set(systems['LIGAND_SMILES'].unique())
 # GET FPs
 morgan_map = {}
 maccs_map = {}
-morgan_path = '../data/ligands/morgan.p'
-maccs_path = '../data/ligands/maccs.p'
+morgan_path = 'data/ligands/morgan.p'
+maccs_path = 'data/ligands/maccs.p'
 failed_smiles = 0
 failed_maccs = 0
 failed_morgan = 0
@@ -59,7 +56,7 @@ pickle.dump(maccs_map, open(maccs_path, 'wb'))
 
 # GET GRAPHS
 lig_graphs_map = {}
-lig_graphs = '../data/ligands/lig_graphs.p'
+lig_graphs = 'data/ligands/lig_graphs.p'
 failed = 0
 mol_graph_encoder = MolGraphEncoder(cache=False)
 for i, sm in enumerate(tqdm(ligands)):
