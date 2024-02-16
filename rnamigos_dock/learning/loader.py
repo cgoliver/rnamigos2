@@ -346,16 +346,16 @@ class VirtualScreenDataset(DockingDataset):
                 Path(self.ligands_path, self.all_pockets_names[idx], self.decoy_mode, 'actives.txt'))
             decoys_smiles = self.parse_smiles(
                 Path(self.ligands_path, self.all_pockets_names[idx], self.decoy_mode, 'decoys.txt'))
+            all_smiles = actives_smiles + decoys_smiles
 
-            is_active = np.zeros((len(actives_smiles) + len(decoys_smiles)))
+            is_active = np.zeros(len(all_smiles))
             is_active[:len(actives_smiles)] = 1.
 
             if self.use_graphligs:
-                all_inputs = self.ligand_graph_encoder.smiles_to_graph_list(actives_smiles + decoys_smiles)
+                all_inputs = self.ligand_graph_encoder.smiles_to_graph_list(all_smiles)
             else:
-                all_inputs = self.ligand_encoder.smiles_to_fp_list(actives_smiles + decoys_smiles)
+                all_inputs = self.ligand_encoder.smiles_to_fp_list(all_smiles)
                 all_inputs = torch.tensor(all_inputs)
-            all_smiles = actives_smiles + decoys_smiles
             return pocket_name, pocket_graph, all_inputs, torch.tensor(is_active), all_smiles
         except FileNotFoundError:
             return None, None, None, None, None
