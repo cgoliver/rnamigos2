@@ -315,6 +315,7 @@ class VirtualScreenDataset(DockingDataset):
                  systems,
                  decoy_mode='pdb',
                  rognan=False,
+                 group_ligands=False,
                  **kwargs
                  ):
         super().__init__(pockets_path, systems=systems, shuffle=False, **kwargs)
@@ -322,6 +323,14 @@ class VirtualScreenDataset(DockingDataset):
         self.decoy_mode = decoy_mode
         self.all_pockets_names = list(self.systems['PDB_ID_POCKET'].unique())
         self.rognan = rognan
+        self.group_ligands = group_ligands
+        if self.group_ligands:
+            script_dir = os.path.dirname(__file__)
+            splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
+            _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+            self.groups = {**train_names_grouped, **test_names_grouped}
+            self.reverse_groups = {group_member: group_rep for group_rep, group_members in self.groups.items()
+                                   for group_member in group_members}
         pass
 
     def __len__(self):
@@ -329,6 +338,19 @@ class VirtualScreenDataset(DockingDataset):
 
     def parse_smiles(self, smiles_path):
         return list(open(smiles_path).readlines())
+
+    def get_ligands(self, pocket_name):
+        actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_name, self.decoy_mode, 'actives.txt'))
+        decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_name, self.decoy_mode, 'decoys.txt'))
+        # We need to return all actives and ensure they are not in the inactives of a pocket
+        if self.group_ligands:
+            group_pockets = self.groups[self.reverse_groups[pocket_name]]
+            group_list = [self.parse_smiles(Path(self.ligands_path, pocket, self.decoy_mode, 'actives.txt'))[0]
+                          for pocket in group_pockets]
+            group_actives = set(group_list)
+            decoys_smiles = [smile for smile in decoys_smiles if smile not in group_actives]
+            actives_smiles = list(group_actives)
+        return actives_smiles, decoys_smiles
 
     def __getitem__(self, idx):
         try:
@@ -342,10 +364,9 @@ class VirtualScreenDataset(DockingDataset):
                 pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_name}.json"),
                                                  use_rings=False)
 
-            actives_smiles = self.parse_smiles(
-                Path(self.ligands_path, self.all_pockets_names[idx], self.decoy_mode, 'actives.txt'))
-            decoys_smiles = self.parse_smiles(
-                Path(self.ligands_path, self.all_pockets_names[idx], self.decoy_mode, 'decoys.txt'))
+            # Now we don't Rognan anymore for ligands
+            pocket_name = self.all_pockets_names[idx]
+            actives_smiles, decoys_smiles = self.get_ligands(pocket_name)
             all_smiles = actives_smiles + decoys_smiles
 
             is_active = np.zeros(len(all_smiles))
