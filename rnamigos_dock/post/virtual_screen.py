@@ -4,6 +4,7 @@ from dgl import DGLGraph
 from loguru import logger
 import numpy as np
 import pandas as pd
+from sklearn import metrics
 import torch
 
 
@@ -26,13 +27,21 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
     >>> 1.0
 
     """
-    is_active_sorted = sorted(zip(scores, is_active), reverse=lower_is_better)
-    return (np.mean([rank for rank, (score, is_active) in enumerate(is_active_sorted) if is_active]) + 1) / len(scores)
+    scores = (scores - scores.min()) / (scores.max() - scores.min())
+    if lower_is_better:
+        scores = 1 - scores
+    fpr, tpr, thresholds = metrics.roc_curve(is_active, scores, drop_intermediate=True)
+    auroc = metrics.auc(fpr, tpr)
+
+    # is_active_sorted = sorted(zip(scores, is_active))
+    # mar = (np.mean([rank for rank, (_, is_active) in enumerate(is_active_sorted) if is_active]) + 1) / len(scores)
+
+    return auroc
 
 
-def enrichment_factor(scores, is_active, lower_is_better=True, **kwargs):
+def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_actives = np.sum(is_active.numpy())
-    n_screened = int(kwargs['frac'] * len(scores))
+    n_screened = int(frac * len(scores))
     is_active_sorted = [a for _, a in sorted(zip(scores, is_active), reverse=lower_is_better)]
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
     return (n_actives_screened / n_screened) / (n_actives / len(scores))
@@ -49,14 +58,11 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     :returns scores: list of scores, one for each graph in the dataset 
     :returns inds: list of indices in the dataloader for which the score computation was successful
     """
-    efs, inds, all_scores, status, all_smiles, pocket_ids = [], [], [], [], [], []
-    id_to_smiles = pd.read_csv("data/lig_id.csv")
-    id_to_smiles = dict(zip(id_to_smiles['id'], id_to_smiles['smiles']))
+    efs, all_scores, status, all_smiles, pocket_names = [], [], [], [], []
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
     failed_set = set()
     failed = 0
-    for i, (pocket_graph, ligands, is_active, lig_ids) in enumerate(dataloader):
-        pocket_id = dataloader.dataset.all_pockets_id[i]
+    for i, (pocket_name, pocket_graph, ligands, is_active, smiles) in enumerate(dataloader):
         if pocket_graph is None:
             failed_set.add(pocket_graph)
             logger.trace(pocket_graph)
@@ -69,15 +75,14 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
                 or (isinstance(ligands, DGLGraph) and ligands.batch_size < 10)):
             logger.warning(f"Skipping pocket{i}, not enough decoys")
             continue
-        kwargs['frac'] = 0.01
-        scores = list(model.predict_ligands(pocket_graph, ligands)[:, 0].numpy())
-        all_scores.append(scores)
-        all_smiles.append([id_to_smiles[i] for i in lig_ids])
+        scores = model.predict_ligands(pocket_graph, ligands)[:, 0].numpy()
+        is_active = is_active.numpy()
         efs.append(metric(scores, is_active, **kwargs))
-        status.append(list(is_active.numpy()))
-        inds.append(i)
-        pocket_ids.append(pocket_id)
+        all_scores.append(list(scores))
+        status.append(list(is_active))
+        pocket_names.append(pocket_name)
+        all_smiles.append(smiles)
     logger.debug(f"VS failed on {failed_set}")
     print(failed)
     print(efs)
-    return efs, inds, all_scores, status, pocket_ids, all_smiles
+    return efs, all_scores, status, pocket_names, all_smiles

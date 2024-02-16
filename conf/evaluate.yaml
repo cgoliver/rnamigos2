@@ -4,7 +4,7 @@ defaults:
   - model: default
   - train: default
 decoys: all 
-saved_model_dir: results/trained_models/dock/final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0/
+saved_model_dir: results/trained_models/native_fp/paper_fp/
 result_dir: outputs/
 csv_name: default.csv
 custom_dir: false

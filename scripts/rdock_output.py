@@ -78,7 +78,6 @@ for i, (pocket_id, pocket) in enumerate(grouped_by_pocket):
             ef = mean_active_rank(scores, is_active)
             ef_rows.append({'score': ef,
                             'metric': 'MAR',
-                            'data_idx': 0,
                             'decoys': decoy_set,
                             'pocket_id': pocket_id
                             }

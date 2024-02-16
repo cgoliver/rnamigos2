@@ -90,9 +90,7 @@ def main(cfg: DictConfig):
                                    rnamigos1_split=params['train']['rnamigos1_split'],
                                    use_rnamigos1_train=params['train']['use_rnamigos1_train'],
                                    use_rnamigos1_ligands=False,
-                                   return_test=True,
-                                   )
-
+                                   return_test=True)
     # Loader is asynchronous
     loader_args = {'shuffle': False,
                    'batch_size': 1,
@@ -102,13 +100,14 @@ def main(cfg: DictConfig):
 
     rows, raw_rows = [], []
     if cfg.decoys == 'all':
-        decoys = ['pdb', 'pdb_chembl', 'decoy_finder']
+        decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder']
     else:
         decoys = [cfg.decoys]
 
     for decoy_mode in decoys:
         pocket_path = cfg.data.pocket_graphs if cfg.custom_dir else params['data']['pocket_graphs']
         dataset = VirtualScreenDataset(pocket_path,
+                                       cache_graphs=False,
                                        ligands_path=params['data']['ligand_db'],
                                        systems=test_systems,
                                        decoy_mode=decoy_mode,
@@ -124,20 +123,20 @@ def main(cfg: DictConfig):
         Experiment Setup
         '''
         lower_is_better = params['train']['target'] in ['dock', 'native_fp']
-        efs, inds, scores, status, pocket_ids, all_smiles = run_virtual_screen(model,
-                                                                               dataloader,
-                                                                               metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank,
-                                                                               lower_is_better=lower_is_better,
-                                                                              )
-        for pocket_id, score_list, status_list, smiles_list in zip(pocket_ids, scores, status, all_smiles):
+        efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
+                                                                           dataloader,
+                                                                           metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank,
+                                                                           lower_is_better=lower_is_better,
+                                                                           )
+        for pocket_id, score_list, status_list, smiles_list in zip(pocket_names, scores, status, all_smiles):
             for score, status, smiles in zip(score_list, status_list, smiles_list):
-                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id, 'smiles': smiles, 'decoys': decoy_mode})
+                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id, 'smiles': smiles,
+                                 'decoys': decoy_mode})
 
-        for ef, score, ind, pocket_id in zip(efs, scores, inds, pocket_ids):
+        for ef, score, pocket_id in zip(efs, scores, pocket_names):
             rows.append({
                 'score': ef,
                 'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
-                'data_idx': ind,
                 'decoys': decoy_mode,
                 'pocket_id': pocket_id})
         print('Mean EF :', np.mean(efs))
