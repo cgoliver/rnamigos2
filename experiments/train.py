@@ -207,8 +207,8 @@ def main(cfg: DictConfig):
     '''
     num_epochs = cfg.train.num_epochs
     save_path = Path(result_folder, 'model.pth')
-    # model = model.from_pretrained(save_path)
-    # model.eval()
+    model = model.from_pretrained(save_path)
+    model.eval()
 
     print("training...")
     learn.train_dock(model=model,
