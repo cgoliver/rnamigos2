@@ -28,7 +28,6 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import pandas as pd
 
-
 from rnamigos_dock.learning.loader import get_systems, DockingDataset, NativeSampler, RingCollater, VirtualScreenDataset
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEncoder, Decoder, RNAmigosModel
@@ -211,41 +210,67 @@ def main(cfg: DictConfig):
     model.eval()
 
     print("training...")
-    learn.train_dock(model=model,
-                     criterion=criterion,
-                     optimizer=optimizer,
-                     device=device,
-                     train_loader=train_loader,
-                     val_loader=val_loader,
-                     save_path=save_path,
-                     writer=writer,
-                     num_epochs=num_epochs,
-                     early_stop_threshold=cfg.train.early_stop,
-                     pretrain_weight=cfg.train.pretrain_weight)
+    _, best_model = learn.train_dock(model=model,
+                                     criterion=criterion,
+                                     optimizer=optimizer,
+                                     device=device,
+                                     train_loader=train_loader,
+                                     val_loader=val_loader,
+                                     save_path=save_path,
+                                     writer=writer,
+                                     num_epochs=num_epochs,
+                                     early_stop_threshold=cfg.train.early_stop,
+                                     pretrain_weight=cfg.train.pretrain_weight)
 
     logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
     logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")
 
-    dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
-                                   ligands_path=cfg.data.ligand_db,
-                                   systems=test_systems,
-                                   decoy_mode='pdb',
-                                   fp_type='MACCS',
-                                   use_graphligs=cfg.model.use_graphligs)
-    # Loader is asynchronous
-    loader_args = {'shuffle': False,
-                   'batch_size': 1,
-                   'num_workers': 4,
-                   'collate_fn': lambda x: x[0]
-                   }
-    dataloader = GraphDataLoader(dataset=dataset, **loader_args)
+    # %%%%%%%%%%%%%%%%%%%%%%%
+    model = model.to('cpu')
+    rows, raw_rows = [], []
+    decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder']
+    for decoy_mode in decoys:
+        pocket_path = cfg.data.pocket_graphs
+        dataset = VirtualScreenDataset(pocket_path,
+                                       cache_graphs=False,
+                                       ligands_path=cfg.data.ligand_db,
+                                       systems=test_systems,
+                                       decoy_mode=decoy_mode,
+                                       fp_type='MACCS',
+                                       use_graphligs=cfg.model.use_graphligs,
+                                       rognan=cfg.rognan,
+                                       group_ligands=True)
+        dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
-    lower_is_better = cfg.train.target in ['dock', 'native_fp']
-    efs, inds, scores, pocket_ids = run_virtual_screen(model, dataloader, metric=mean_active_rank,
-                                                       lower_is_better=lower_is_better)
+        print('Created data loader')
 
-    df = pd.DataFrame({'ef': efs, 'inds': inds})
-    df.to_csv(Path(result_folder, 'ef.csv'))
+        '''
+        Experiment Setup
+        '''
+        lower_is_better = cfg.train.target in ['dock', 'native_fp']
+        efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
+                                                                           dataloader,
+                                                                           metric=mean_active_rank,
+                                                                           lower_is_better=lower_is_better,
+                                                                           )
+        for pocket_id, score_list, status_list, smiles_list in zip(pocket_names, scores, status, all_smiles):
+            for score, status, smiles in zip(score_list, status_list, smiles_list):
+                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id, 'smiles': smiles,
+                                 'decoys': decoy_mode})
+
+        for ef, score, pocket_id in zip(efs, scores, pocket_names):
+            rows.append({
+                'score': ef,
+                'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
+                'decoys': decoy_mode,
+                'pocket_id': pocket_id})
+        print('Mean EF :', np.mean(efs))
+
+    df = pd.DataFrame(rows)
+    d = Path(cfg.result_dir, parents=True, exist_ok=True)
+    df.to_csv(d / cfg.name)
+    df_raw = pd.DataFrame(raw_rows)
+    df_raw.to_csv(d / Path(cfg.name.split(".")[0] + "_raw.csv"))
     logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
 
 

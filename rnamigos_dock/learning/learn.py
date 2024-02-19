@@ -218,7 +218,10 @@ def train_dock(model,
             if time_elapsed * (1 + 1 / (epoch + 1)) > .95 * wall_time * 3600:
                 break
         del test_loss
-    return best_loss
+    best_state_dict = torch.load(save_path)['model_state_dict']
+    model.load_state_dict(best_state_dict)
+    model.eval()
+    return best_loss, model
 
 
 if __name__ == "__main__":

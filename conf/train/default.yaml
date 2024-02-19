@@ -24,4 +24,5 @@ pretrain_weight: 0.
 simfunc: None
 simfunc_depth: 2
 max_kernel: 20
+result_dir: outputs/
 

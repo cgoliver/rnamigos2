@@ -30,7 +30,8 @@ def main(cfg: DictConfig):
         print(params['train'])
 
     # torch.multiprocessing.set_sharing_strategy('file_system')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu'
 
     rna_encoder = Embedder(in_dim=params['model']['encoder']['in_dim'],
                            hidden_dim=params['model']['encoder']['hidden_dim'],
@@ -80,9 +81,7 @@ def main(cfg: DictConfig):
     state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'), map_location=device)['model_state_dict']
     model.load_state_dict(state_dict)
     model.eval()
-
     model = model.to(device)
-
     if cfg.custom_dir:
         test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(g).stem for g in os.listdir(cfg.data.pocket_graphs)]})
     else:
