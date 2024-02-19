@@ -6,9 +6,12 @@ from plot_utils import PALETTE
 
 # TEST SET
 runs = [
-    'paper_fp.csv',
-    'paper_native.csv',
-    'paper_dock.csv',
+    # 'paper_fp.csv',
+    # 'paper_native.csv',
+    # 'paper_dock.csv',
+    'fp_split_grouped1.csv',
+    'native_split_grouped1.csv',
+    'dock_split_grouped1.csv',
     'rdock.csv',
     # 'rdock_total.csv',
     'mixed.csv',
@@ -20,9 +23,34 @@ names = [
     r'\texttt{dock}',
     r'\texttt{rDock\newline INTER}',
     # r'\texttt{rDock\newline TOTAL}',
-    r'\texttt{mixed}',
-    r'\texttt{mixed\newline+ rDock}',
+    r'\texttt{mixedold}',
+    r'\texttt{mixedold\newline+ rDock}',
 ]
+#
+# runs = [
+#     # 'dock_split_grouped0.csv',
+#     'dock_split_grouped1.csv',
+#     'paper_dock.csv',
+#     # 'fp_split_grouped0.csv',
+#     'fp_split_grouped1.csv',
+#     'paper_fp.csv',
+#     # 'native_split_grouped0.csv',
+#     'native_split_grouped1.csv',
+#     'paper_native.csv',
+#
+# ]
+# names = [
+#     # r'\texttt{dock0}',
+#     r'\texttt{dock1}',
+#     r'\texttt{dockold}',
+#     # r'\texttt{fp0}',
+#     r'\texttt{fp1}',
+#     r'\texttt{fpold}',
+#     # r'\texttt{native0}',
+#     r'\texttt{native1}',
+#     r'\texttt{nativeold}',
+# ]
+# decoy_mode = 'pdb'
 decoy_mode = 'chembl'
 # decoy_mode = 'pdb_chembl'
 
@@ -52,7 +80,10 @@ violin_palette = PALETTE
 
 plt.gca().set_yscale('custom')
 # yticks= np.arange(0.6, 1)
+lower = 0.6
 yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
+# lower = 0.
+# yticks = [0.4, 0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
 plt.gca().set_yticks(yticks)
 
 # ADD WHISKERS
@@ -71,7 +102,7 @@ sns.boxplot(x="name",
             )
 
 # ADD POINTS
-big_df[['score']] = big_df[['score']].clip(lower=0.6)
+big_df[['score']] = big_df[['score']].clip(lower=lower)
 sns.stripplot(x="name",
               y="score",
               order=names,
