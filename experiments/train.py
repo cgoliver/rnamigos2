@@ -28,7 +28,8 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import pandas as pd
 
-from rnamigos_dock.learning.loader import get_systems, DockingDataset, NativeSampler, RingCollater, VirtualScreenDataset
+from rnamigos_dock.learning.loader import get_systems, DockingDataset, GroupedSampler, RingCollater, \
+    VirtualScreenDataset
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
@@ -103,8 +104,10 @@ def main(cfg: DictConfig):
     train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
     validation_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
     # These one cannot be a shared object
-    train_sampler = NativeSampler(train_systems) if cfg.train.target == 'is_native' else None
-    validation_sampler = NativeSampler(validation_systems) if cfg.train.target == 'is_native' else None
+    train_sampler = GroupedSampler(train_systems,
+                                   group_sampling=cfg.group_sample) if cfg.train.target == 'is_native' else None
+    validation_sampler = GroupedSampler(validation_systems,
+                                        group_sampling=cfg.group_sample) if cfg.train.target == 'is_native' else None
     # Cannot collect empty rings...
     train_collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=cfg.train.max_kernel)
     val_collater = RingCollater(node_simfunc=None)
@@ -196,7 +199,6 @@ def main(cfg: DictConfig):
     name = f"{cfg.name}"
     print(name)
     result_folder, save_path = mkdirs(name, prefix=cfg.train.target)
-    print(save_path)
     writer = SummaryWriter(result_folder)
     print(f'Saving result in {result_folder}/{name}')
     OmegaConf.save(cfg, Path(result_folder, "config.yaml"))
@@ -206,8 +208,6 @@ def main(cfg: DictConfig):
     '''
     num_epochs = cfg.train.num_epochs
     save_path = Path(result_folder, 'model.pth')
-    model = model.from_pretrained(save_path)
-    model.eval()
 
     print("training...")
     _, best_model = learn.train_dock(model=model,

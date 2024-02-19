@@ -241,25 +241,67 @@ class DockingDataset(Dataset):
                 'rings': rings,
                 'idx': [idx]}
 
-
-class NativeSampler(Sampler):
-    def __init__(self, systems_dataframe):
+# FOR NATIVE, KEEP AS POSITIVE ALL IN GROUP
+# TODO: FOR FP TOO, ONLY LOOP ON GROUP BUT ITER ON LIGANDS
+class GroupedSampler(Sampler):
+    def __init__(self, systems_dataframe, group_sampling=True):
         super().__init__(data_source=None)
-        positive = (systems_dataframe['IS_NATIVE'] == 1).values
-        self.positive_rows = np.where(positive)[0]
-        self.negative_rows = np.where(1 - positive)[0]
-        self.num_pos = len(self.positive_rows)
+        self.group_sampling = group_sampling
+        positives = (systems_dataframe['IS_NATIVE'] == 1).values
+        negatives = 1 - positives
+        if not group_sampling:
+            self.positive_rows = np.where(positives)[0]
+            self.negative_rows = np.where(negatives)[0]
+            self.num_pos_examples = len(self.positive_rows)
+        else:
+            script_dir = os.path.dirname(__file__)
+            splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
+            _, _, train_names_grouped, _ = pickle.load(open(splits_file, 'rb'))
+            self.num_pos_examples = len(train_names_grouped)
+            #  Build positive and negative rows for each group as the list of positive and negative indices
+            # Useful for sampling, also keep track of the amount of positive and negative for each group
+            self.all_positives = list()
+            self.all_negatives = list()
+            num_pos, num_neg = [], []
+            for group_rep, group in train_names_grouped.items():
+                in_group = (systems_dataframe['PDB_ID_POCKET'].isin(group)).values
+                group_positive = np.logical_and(in_group, positives)
+                group_negative = np.logical_and(in_group, negatives)
+                positive_rows = np.where(group_positive)[0]
+                # This can happen (rarely) if all positives are in validation.
+                if len(positive_rows) == 0:
+                    continue
+                negative_rows = np.where(group_negative)[0]
+                self.all_positives.append(positive_rows)
+                self.all_negatives.append(negative_rows)
+                num_pos.append(len(positive_rows))
+                num_neg.append(len(negative_rows))
+            self.num_pos = np.array(num_pos)
+            self.num_neg = np.array(num_neg)
+            a=1
 
     def __iter__(self):
-        selected_neg_rows = np.random.choice(self.negative_rows,
-                                             self.num_pos,
-                                             replace=False)
-        systems = np.concatenate((selected_neg_rows, self.positive_rows))
+        if not self.group_sampling:
+            selected_neg_rows = np.random.choice(self.negative_rows,
+                                                 self.num_pos,
+                                                 replace=False)
+            selected_positive_rows = self.positive_rows
+        else:
+            selected_pos = np.random.randint(0, self.num_pos)
+            selected_neg = np.random.randint(0, self.num_neg)
+            selected_positive_rows = []
+            selected_neg_rows = []
+            for i, (group_pos, group_neg) in enumerate(zip(self.all_positives, self.all_negatives)):
+                selected_positive_rows.append(group_pos[selected_pos[i]])
+                selected_neg_rows.append(group_neg[selected_neg[i]])
+            selected_positive_rows = np.array(selected_positive_rows)
+            selected_neg_rows = np.array(selected_neg_rows)
+        systems = np.concatenate((selected_neg_rows, selected_positive_rows))
         np.random.shuffle(systems)
         yield from systems
 
     def __len__(self) -> int:
-        return self.num_pos * 2
+        return self.num_pos_examples * 2
 
 
 class RingCollater():

@@ -19,6 +19,7 @@ use_rnamigos1_ligands: False
 filter_robin: False
 rnamigos1_split: -1
 group_pockets: False
+group_sample: False
 learning_rate: 1e-3
 pretrain_weight: 0.
 simfunc: None
