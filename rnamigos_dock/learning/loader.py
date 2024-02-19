@@ -241,9 +241,11 @@ class DockingDataset(Dataset):
                 'rings': rings,
                 'idx': [idx]}
 
+
 # FOR NATIVE, KEEP AS POSITIVE ALL IN GROUP
 # TODO: FOR FP TOO, ONLY LOOP ON GROUP BUT ITER ON LIGANDS
-class GroupedSampler(Sampler):
+
+class IsNativeSampler(Sampler):
     def __init__(self, systems_dataframe, group_sampling=True):
         super().__init__(data_source=None)
         self.group_sampling = group_sampling
@@ -257,7 +259,6 @@ class GroupedSampler(Sampler):
             script_dir = os.path.dirname(__file__)
             splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
             _, _, train_names_grouped, _ = pickle.load(open(splits_file, 'rb'))
-            self.num_pos_examples = len(train_names_grouped)
             #  Build positive and negative rows for each group as the list of positive and negative indices
             # Useful for sampling, also keep track of the amount of positive and negative for each group
             self.all_positives = list()
@@ -278,7 +279,8 @@ class GroupedSampler(Sampler):
                 num_neg.append(len(negative_rows))
             self.num_pos = np.array(num_pos)
             self.num_neg = np.array(num_neg)
-            a=1
+            # Computing length now avoids problem with empty examples
+            self.num_pos_examples = len(self.num_pos)
 
     def __iter__(self):
         if not self.group_sampling:
@@ -302,6 +304,47 @@ class GroupedSampler(Sampler):
 
     def __len__(self) -> int:
         return self.num_pos_examples * 2
+
+
+class NativeFPSampler(Sampler):
+    def __init__(self, systems_dataframe, group_sampling=True):
+        super().__init__(data_source=None)
+        self.group_sampling = group_sampling
+        if not group_sampling:
+            self.num_examples = len(systems_dataframe)
+        else:
+            script_dir = os.path.dirname(__file__)
+            splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
+            _, _, train_names_grouped, _ = pickle.load(open(splits_file, 'rb'))
+            #  Build positive and negative rows for each group as the list of positive and negative indices
+            # Useful for sampling, also keep track of the amount of positive and negative for each group
+            self.grouped_rows = list()
+            num_group = []
+            for group_rep, group in train_names_grouped.items():
+                in_group = (systems_dataframe['PDB_ID_POCKET'].isin(group)).values
+                group_rows = np.where(in_group)[0]
+                # This can happen (rarely) if all positives are in validation.
+                if len(group_rows) == 0:
+                    continue
+                self.grouped_rows.append(group_rows)
+                num_group.append(len(group_rows))
+            self.num_group = np.array(num_group)
+            self.num_examples = len(self.num_group)
+
+    def __iter__(self):
+        if not self.group_sampling:
+            systems = np.arange(self.num_examples)
+        else:
+            selected = np.random.randint(0, self.num_group)
+            selected_rows = []
+            for i, group_selected in enumerate(self.grouped_rows):
+                selected_rows.append(group_selected[selected[i]])
+            systems = np.array(selected_rows)
+        np.random.shuffle(systems)
+        yield from systems
+
+    def __len__(self) -> int:
+        return self.num_examples
 
 
 class RingCollater():

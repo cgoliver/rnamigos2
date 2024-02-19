@@ -28,8 +28,8 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import pandas as pd
 
-from rnamigos_dock.learning.loader import get_systems, DockingDataset, GroupedSampler, RingCollater, \
-    VirtualScreenDataset
+from rnamigos_dock.learning.loader import (get_systems, DockingDataset, IsNativeSampler, NativeFPSampler,
+                                           RingCollater, VirtualScreenDataset)
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
@@ -104,10 +104,15 @@ def main(cfg: DictConfig):
     train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
     validation_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
     # These one cannot be a shared object
-    train_sampler = GroupedSampler(train_systems,
-                                   group_sampling=cfg.group_sample) if cfg.train.target == 'is_native' else None
-    validation_sampler = GroupedSampler(validation_systems,
-                                        group_sampling=cfg.group_sample) if cfg.train.target == 'is_native' else None
+    if cfg.train.target == 'is_native':
+        train_sampler = IsNativeSampler(train_systems, group_sampling=cfg.train.group_sample)
+        validation_sampler = IsNativeSampler(validation_systems, group_sampling=cfg.train.group_sample)
+    elif cfg.train.target == 'native_fp':
+        train_sampler = NativeFPSampler(train_systems, group_sampling=cfg.train.group_sample)
+        validation_sampler = NativeFPSampler(validation_systems, group_sampling=cfg.train.group_sample)
+    else:
+        train_sampler, validation_sampler = None, None
+
     # Cannot collect empty rings...
     train_collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=cfg.train.max_kernel)
     val_collater = RingCollater(node_simfunc=None)
