@@ -285,7 +285,7 @@ class IsNativeSampler(Sampler):
     def __iter__(self):
         if not self.group_sampling:
             selected_neg_rows = np.random.choice(self.negative_rows,
-                                                 self.num_pos,
+                                                 self.num_pos_examples,
                                                  replace=False)
             selected_positive_rows = self.positive_rows
         else:
