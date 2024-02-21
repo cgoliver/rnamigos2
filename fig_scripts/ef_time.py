@@ -1,7 +1,11 @@
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sklearn import metrics
+import pickle
+import random
 
 from plot_utils import PALETTE, CustomScale
 
@@ -10,18 +14,26 @@ def virtual_screen(df, sort_up_to=0, score_column='rdock'):
     df = df.reset_index(drop=True)
     sort_up_to = int(sort_up_to)
     df[:sort_up_to] = df[:sort_up_to].sort_values(score_column, ascending=False).values
-    native_ind = df.loc[df['is_active'] == 1].index[0]
-    enrich = 1 - (native_ind / len(df))
+    fpr, tpr, thresholds = metrics.roc_curve(df['is_active'], 1 - np.linspace(0, 1, num=len(df)),
+                                             drop_intermediate=True)
+    enrich = metrics.auc(fpr, tpr)
     return enrich
 
 
 def build_ef_df():
+    # runs = ['rdock',
+    #         'paper_dock',
+    #         'paper_fp',
+    #         'paper_native',
+    #         'mixed',
+    #         'mixed_rdock',
+    #         ]
     runs = ['rdock',
-            'paper_dock',
-            'paper_native',
-            'paper_fp'
-            'mixed'
-            'mixed_rdock'
+            'dock_split_grouped1',
+            'fp_split_grouped1',
+            'native_split_grouped1',
+            'mixed',
+            'mixed_rdock',
             ]
     decoy = 'chembl'
     raw_dfs = [pd.read_csv(f"../outputs/{r}_raw.csv") for r in runs]
@@ -37,6 +49,13 @@ def build_ef_df():
     big_df_raw['mixed'] = raw_dfs[4]['combined'].values
     big_df_raw['mixed_rdock'] = raw_dfs[5]['combined'].values
 
+    grouped = True
+    if grouped:
+        script_dir = os.path.dirname(__file__)
+        splits_file = os.path.join(script_dir, '../data/train_test_75.p')
+        _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+        group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
+        big_df_raw = big_df_raw.loc[big_df_raw['pocket_id'].isin(group_reps)]
     pockets = big_df_raw['pocket_id'].unique()
     ef_df_rows = []
     nsteps = 20
@@ -118,7 +137,7 @@ def line_plot(df):
     x_cross = 0.65
     xticks = [0, x_cross, 2, 4, 6, 8]
     xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
-    plt.gca().set_xticks(ticks= xticks, labels=xticks_labels)
+    plt.gca().set_xticks(ticks=xticks, labels=xticks_labels)
 
     yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
     plt.gca().set_yticks(yticks)
@@ -208,9 +227,9 @@ def vax_plot(df):
 
 if __name__ == "__main__":
     # Build the time df for making the figures, this can be commented then
-    # build_ef_df()
+    build_ef_df()
 
     df = pd.read_csv("time_ef.csv")
     line_plot(df)
-    # vax_plot(df)
+    vax_plot(df)
     pass

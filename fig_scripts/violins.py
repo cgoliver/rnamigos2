@@ -21,8 +21,8 @@ runs = [
     'dock_split_grouped1.csv',
     'rdock.csv',
     # 'rdock_total.csv',
-    # 'mixed.csv',
-    # 'mixed_rdock.csv',
+    'mixed.csv',
+    'mixed_rdock.csv',
 ]
 names = [
     # r'\texttt{fp_old}',
@@ -33,8 +33,8 @@ names = [
     r'\texttt{dock}',
     r'\texttt{rDock\newline INTER}',
     # r'\texttt{rDock\newline TOTAL}',
-    # r'\texttt{mixedold}',
-    # r'\texttt{mixedold\newline+ rDock}',
+    r'\texttt{mixed}',
+    r'\texttt{mixed\newline+ rDock}',
 ]
 #
 # runs = [
