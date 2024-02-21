@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
 import seaborn as sns
+from sklearn import metrics
 
 
 # Normalize
@@ -20,11 +21,8 @@ def get_one(df, score):
     all_efs = []
     for pi, p in enumerate(pockets):
         pocket_df = df.loc[df['pocket_id'] == p]
-        pocket_df = pocket_df.reset_index(drop=True)
-        sorted_df = pocket_df.sort_values(by=score)
-        sorted_df = sorted_df.reset_index(drop=True)
-        native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
-        enrich = native_ind / (len(sorted_df) - 1)
+        fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df[score], drop_intermediate=True)
+        enrich = metrics.auc(fpr, tpr)
         all_efs.append(enrich)
     pocket_ef = np.mean(all_efs)
     return pocket_ef
@@ -49,10 +47,9 @@ def get_mix_pair(df, score1, score2, all_thresh, verbose=True):
             # pocket_df['combined'] = -(mixed * np.exp(- normalized_docking / 3) +
             #                           (1 - mixed) * np.exp(-normalized_new / 3))
             # pocket_df['combined'] = (mixed * normalized_docking ** 4 + (1 - mixed) * normalized_new ** 4).values
-            sorted_df = pocket_df.sort_values(by='combined')
-            sorted_df = sorted_df.reset_index(drop=True)
-            native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
-            enrich = native_ind / (len(sorted_df) - 1)
+            fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df['combined'],
+                                                     drop_intermediate=True)
+            enrich = metrics.auc(fpr, tpr)
             all_efs.append(enrich)
         pocket_ef = np.mean(all_efs)
         if verbose:
@@ -126,12 +123,16 @@ def mix_three(df, coeffs=(0.5, 0.5, 0), score1='dock', score2='fp', score3='nati
         # pocket_df['combined'] = -(x * np.exp(- normalized_docking / 3) +
         #                           y * np.exp(-normalized_fp / 3) +
         #                           z * np.exp(-normalized_native / 3))
-        sorted_df = pocket_df.sort_values(by='combined')
-        sorted_df = sorted_df.reset_index(drop=True)
-        native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
-        enrich = native_ind / (len(sorted_df) - 1)
+
+        fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df['combined'], drop_intermediate=True)
+        enrich = metrics.auc(fpr, tpr)
+
+        # sorted_df = pocket_df.sort_values(by='combined')
+        # sorted_df = sorted_df.reset_index(drop=True)
+        # native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
+        # enrich = native_ind / (len(sorted_df) - 1)
         if dump_df:
-            return all_efs.append((pocket_df[['pocket_id', 'smiles', 'is_active', 'combined']], p, enrich))
+            all_efs.append((pocket_df[['pocket_id', 'smiles', 'is_active', 'combined']], p, enrich))
         else:
             all_efs.append(enrich)
     return all_efs
@@ -166,7 +167,7 @@ def mix_all(df):
 
     all_thresh_res = []
     for x, y, z in coeffs:
-        all_efs = mix_three(df=df, coeffs=coeffs, dump_df=False)
+        all_efs = mix_three(df=df, coeffs=(x, y, z), dump_df=False)
         pocket_ef = np.mean(all_efs)
         print(x, y, z, pocket_ef)
         all_thresh_res.append(pocket_ef)
@@ -192,7 +193,8 @@ def get_mix(df, coeffs, score1='dock', score2='fp', score3='native', outname_col
 
     # Merge df and add decoys value
     mixed_df_raw = pd.concat([mixed[0] for mixed in mixed_df])
-    mixed_df_raw[['decoys']] = ['chembl' for _ in range(len(mixed_df_raw))]
+    dumb_decoy = [DECOY for _ in range(len(mixed_df_raw))]
+    mixed_df_raw.insert(len(mixed_df_raw.columns), "decoys", dumb_decoy)
     mixed_df = pd.DataFrame({"pocket_id": [mixed[1] for mixed in mixed_df],
                              'decoys': ['chembl' for _ in mixed_df],
                              'score': [mixed[2] for mixed in mixed_df]})
@@ -203,14 +205,19 @@ def get_mix(df, coeffs, score1='dock', score2='fp', score3='native', outname_col
 
 if __name__ == "__main__":
     # FIRST LET'S PARSE INFERENCE CSVS AND MIX THEM
+    # runs = ['rdock',
+    #         'paper_dock',
+    #         'paper_fp',
+    #         'paper_native',
+    #         ]
     runs = ['rdock',
-            'paper_dock',
-            'paper_fp',
-            'paper_native',
+            'dock_split_grouped1',
+            'fp_split_grouped1',
+            'native_split_grouped1',
             ]
-    decoy = 'chembl'
+    DECOY = 'chembl'
     raw_dfs = [pd.read_csv(f"../outputs/{r}_raw.csv") for r in runs]
-    raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
+    raw_dfs = [df.loc[df['decoys'] == DECOY] for df in raw_dfs]
     raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
     big_df_raw = raw_dfs[0][['pocket_id', 'smiles', 'is_active']]
 
@@ -221,22 +228,25 @@ if __name__ == "__main__":
     big_df_raw['native'] = raw_dfs[3]['raw_score'].values
 
     # Find the best mix, and then dump it
-    # best_mix = mix_all(big_df_raw)
-    best_mix = [(0.44, 0.39, 0.17)]
-    get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
-            outname_col='combined', outname='mixed')
+    best_mix = mix_all(big_df_raw)
+    # best_mix_old = [0.44, 0.39, 0.17]
+    best_mix = [0.36841931, 0.26315665, 0.36841931]
 
-    raw_df_combined = pd.read_csv('../outputs/mixed_raw.csv').sort_values(by=['pocket_id', 'smiles', 'is_active'])
-    big_df_raw['combined'] = raw_df_combined[4]['combined'].values
-    big_df_raw.to_csv('outputs/big_df_raw.csv')
+    # Now dump this best mixed and add it to big_df
+    # get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
+    #         outname_col='combined', outname='mixed')
+    # raw_df_combined = pd.read_csv('../outputs/mixed_raw.csv').sort_values(by=['pocket_id', 'smiles', 'is_active'])
+    # big_df_raw['combined'] = raw_df_combined['combined'].values
+    # big_df_raw.to_csv('../outputs/big_df_raw.csv')
 
     # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs and get the rdock+mixed
-    # big_df_raw= pd.read_csv("../outputs/big_df_raw.csv")
+    big_df_raw = pd.read_csv("../outputs/big_df_raw.csv")
 
-    plot_pairs(big_df_raw)
-    get_table_mixing(big_df_raw)
+    # plot_pairs(big_df_raw)
+
+    # get_table_mixing(big_df_raw)
 
     # # To dump rdock_combined
-    coeffs = [(0.5, 0.5, 0.)]
+    coeffs = (0.8, 0.2, 0.)
     get_mix(big_df_raw, score1='combined', score2='rdock', coeffs=coeffs,
             outname_col='combined', outname='mixed_rdock')
