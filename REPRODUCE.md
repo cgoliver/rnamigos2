@@ -105,19 +105,24 @@ We additionally need to load optimol encoder pretrained weights which are in the
 Then you need to train models using those pretrained models.
 Scripts are available to run all relevant trainings.
 ```bash
-bash job_scripts/paper_runs.sh
+bash job_scripts/split_paper_runs.sh
 ```
+ 
+This will train three models and save them in results/trained_models.
+Moreover, this will compute the prediction of those models on the test set and different decoy sets.
+The result of these predictions are dumped in outputs. 
+You will get a {model_name}.csv containing the pocket id and AuRoc score for different decoy sets.
+You will also get a {model_name}_raw.csv containing the pocket id, ligand id, ligand source (different decoys sources) 
+and predicted score.
 
-Finally, once models are trained, you will need to make an inference on the test set for each trained model, resulting 
-in output csvs containing the pocket id, ligand id and predicted score.
-The corresponding script needs to be run : 
-
-[//]: # (TODO CARLOS add inference script)
-[//]: # (TODO script for rdock to get it as csv)
+To get results in a similar format for rDock, please run: 
+```bash
+python job_scripts/rdock_output.py
+```
 
 # Generate the figures from the results
 
-If you followed the previous steps, we expect the *outputs/* directory to hold paper_{fp, native, dock, rdock}_{, _raw}.csv files.
+If you followed the previous steps, we expect the *outputs/* directory to hold split_paper_{fp, native, dock, rdock}_{, _raw}.csv files.
 
 Those files are directly available for download at :
 
@@ -126,8 +131,7 @@ Those files are directly available for download at :
 
 The first step is to produce ensembling results, by running 
 ```bash
-cd fig_scripts
-python mixing.py
+python fig_scripts/mixing.py
 ```
 
 We now have the table of mixing results as well as the best ensemble models. 
@@ -135,7 +139,19 @@ In addition, we have blended our models to produce csvs with mixed and mixed+rdo
 
 We can now run : 
 ```bash
-python violins.py
-python ef_time.py
+python fig_scripts/violins.py
+python fig_scripts/ef_time.py
 ```
 to produce the remaining Figures of the paper.
+
+For the ROBIN experiment, we will first need to produce predictions for four ROBIN targets.
+To get these predictions, please run (takes about 20 minutes):
+
+```
+python scripts/robin_inference.py
+```
+
+Finally, you will obtain the ROBIN plot with :
+```
+python fig_scripts/robin_fig.py
+```

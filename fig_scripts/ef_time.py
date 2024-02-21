@@ -20,7 +20,7 @@ def virtual_screen(df, sort_up_to=0, score_column='rdock'):
     return enrich
 
 
-def build_ef_df():
+def build_ef_df(out_csv='fig_script/time_ef.csv'):
     # runs = ['rdock',
     #         'paper_dock',
     #         'paper_fp',
@@ -36,7 +36,7 @@ def build_ef_df():
             'mixed_rdock',
             ]
     decoy = 'chembl'
-    raw_dfs = [pd.read_csv(f"../outputs/{r}_raw.csv") for r in runs]
+    raw_dfs = [pd.read_csv(f"outputs/{r}_raw.csv") for r in runs]
     raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
     raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
     big_df_raw = raw_dfs[0][['pocket_id', 'is_active']]
@@ -52,7 +52,7 @@ def build_ef_df():
     grouped = True
     if grouped:
         script_dir = os.path.dirname(__file__)
-        splits_file = os.path.join(script_dir, '../data/train_test_75.p')
+        splits_file = os.path.join(script_dir, 'data/train_test_75.p')
         _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
         group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
         big_df_raw = big_df_raw.loc[big_df_raw['pocket_id'].isin(group_reps)]
@@ -100,7 +100,7 @@ def build_ef_df():
                    'seed': 0}
             ef_df_rows.append(res)
     df = pd.DataFrame(ef_df_rows)
-    df.to_csv("time_ef.csv")
+    df.to_csv(out_csv)
     return df
 
 
@@ -227,9 +227,10 @@ def vax_plot(df):
 
 if __name__ == "__main__":
     # Build the time df for making the figures, this can be commented then
-    build_ef_df()
+    out_csv = 'fig_script/time_ef.csv'
+    build_ef_df(out_csv=out_csv)
 
-    df = pd.read_csv("time_ef.csv")
+    df = pd.read_csv(out_csv)
     line_plot(df)
     vax_plot(df)
     pass

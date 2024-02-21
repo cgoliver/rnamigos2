@@ -6,7 +6,7 @@ import seaborn as sns
 import random
 import pickle
 
-from plot_utils import PALETTE
+from fig_scripts.plot_utils import PALETTE
 
 random.seed(42)
 np.random.seed(42)
@@ -71,7 +71,7 @@ decoy_mode = 'chembl'
 grouped = True
 
 # Parse ef data for the runs and gather them in a big database
-dfs = (pd.read_csv(f"../outputs/{f}") for f in runs)
+dfs = (pd.read_csv(f"outputs/{f}") for f in runs)
 dfs = (df.assign(name=names[i]) for i, df in enumerate(dfs))
 big_df = pd.concat(dfs)
 if grouped:
@@ -184,5 +184,5 @@ plt.ylabel("Mean Active Rank")
 plt.grid(True, which='both', axis='y')
 plt.vlines(3.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
 # plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
-plt.savefig("violins_mixed.pdf", bbox_inches='tight')
+plt.savefig("fig_scripts/violins_mixed.pdf", bbox_inches='tight')
 plt.show()
