@@ -144,8 +144,8 @@ def get_dfs_migos(pocket_name):
     actives_df['split'] = 'actives'
     inactives_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_inactives.txt"), names=names, sep=' ')
     inactives_df['split'] = 'inactives'
-    decoys_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_decoys.txt"), names=names, sep=' ')
-    decoys_df['split'] = 'decoys'
+    # decoys_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_decoys.txt"), names=names, sep=' ')
+    # decoys_df['split'] = 'decoys'
     # merged = pd.concat([actives_df, inactives_df, decoys_df])
     # merged = pd.concat([actives_df, decoys_df])
     merged = pd.concat([actives_df, inactives_df])
@@ -159,13 +159,13 @@ if __name__ == '__main__':
     fig, axs = plt.subplots(4)
     for i, (pocket_name, ligand_name) in enumerate(zip(pocket_names, ligand_names)):
         # FOR DOCKING
-        merged = get_dfs_docking(ligand_name=ligand_name)
-        score_to_use = 'docking_score'
+        # merged = get_dfs_docking(ligand_name=ligand_name)
+        # score_to_use = 'docking_score'
         # break
 
         # FOR MIGOS
-        # merged = get_dfs_migos(pocket_name=pocket_name)
-        # score_to_use = 'merged'
+        merged = get_dfs_migos(pocket_name=pocket_name)
+        score_to_use = 'merged'
         # score_to_use = 'dock'
         # score_to_use = 'is_native'
         # score_to_use = 'native_fp'

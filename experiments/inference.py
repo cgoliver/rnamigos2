@@ -15,7 +15,8 @@ from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 
 
-def inference(dgl_graph, smiles_list, out_path, models_path=None, dump_all=False):
+def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.44, 0.39, 0.17), models_path=None, dump_all=False):
+    # TODO update coeff but don't break colab
     """
     Run inference from python objects
     """
@@ -66,7 +67,9 @@ def inference(dgl_graph, smiles_list, out_path, models_path=None, dump_all=False
         return out_scores
 
     results = {model_name: normalize(result) for model_name, result in results.items()}
-    mixed_scores = 0.44 * results['dock'] + 0.39 * results['native_fp'] + 0.17 * results['is_native']
+    mixed_scores = (mixing_coeffs[0] * results['dock']
+                    + mixing_coeffs[1] * results['native_fp']
+                    + mixing_coeffs[2] * results['is_native'])
 
     with open(out_path, 'w') as out:
         if not dump_all:
