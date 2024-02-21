@@ -104,7 +104,7 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER', **kwar
             if len(relevant_row) == 0:
                 pass
             else:
-                score = relevant_row[score_to_use].values
+                score = float(relevant_row[score_to_use].values)
                 scores.append(score)
                 selected_actives.append(is_active[i])
                 selected_smiles.append(sm)
@@ -112,7 +112,7 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER', **kwar
         scores = np.array(scores)
         efs.append(mean_active_rank(scores, selected_actives, **kwargs))
         all_scores.append(list(scores))
-        status.append(list(is_active))
+        status.append(list(selected_actives))
         pocket_names.append(pocket_name)
         all_smiles.append(selected_smiles)
     print(f"VS failed on {failed} systems")
