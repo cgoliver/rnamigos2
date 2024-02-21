@@ -81,7 +81,6 @@ def main(cfg: DictConfig):
                                rnamigos1_split=cfg.train.rnamigos1_split,
                                use_rnamigos1_train=cfg.train.use_rnamigos1_train,
                                use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
-                               group_pockets=cfg.train.group_pockets,
                                return_test=True)
 
     if cfg.train.simfunc not in {'R_iso', 'R_1', 'hungarian'}:
@@ -243,7 +242,7 @@ def main(cfg: DictConfig):
                                        decoy_mode=decoy_mode,
                                        fp_type='MACCS',
                                        use_graphligs=cfg.model.use_graphligs,
-                                       rognan=cfg.rognan,
+                                       rognan=False,
                                        group_ligands=True)
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
