@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
 
     actives = pd.read_csv("outputs/robin/2GDI_Y_TPP_100_actives.txt", delimiter=' ')
-    actives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
+    actives.columns = ['smiles', 'dock', 'native', 'fp', 'mixed']
     inactives = pd.read_csv("outputs/robin/2GDI_Y_TPP_100_inactives.txt", delimiter=' ')
     inactives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
 

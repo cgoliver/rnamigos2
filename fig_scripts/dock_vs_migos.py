@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -36,24 +37,43 @@ if __name__ == "__main__":
         dock_scores = dock_df.loc[dock_df['TARGET']  == robin_ids[robin]]
 
         actives = pd.read_csv(f"outputs/robin/{robin}_actives.txt", delimiter=' ')
-        actives.columns = ['SMILE', 'score_1', 'score_2', 'score_3', 'score_4']
+        actives.columns = ['SMILE', 'dock', 'native', 'fp', 'mixed']
         inactives = pd.read_csv(f"outputs/robin/{robin}_inactives.txt", delimiter=' ')
-        inactives.columns = ['SMILE', 'score_1', 'score_2', 'score_3', 'score_4']
+        inactives.columns = ['SMILE', 'dock', 'native', 'fp', 'mixed']
 
         true_actives = set(actives['SMILE'])
-
 
         migos_df = pd.concat([actives, inactives])
         migos_df['is_active'] = ([1] * len(actives)) + ([0] * len(inactives))
 
+        migos_df['random'] = [random.random() for _ in range(len(migos_df))]
+
         N_migos = len(migos_df)
         N_dock = len(dock_scores)
         
-        migos_df['rank'] = ss.rankdata(migos_df['score_4']) / N_migos
-        dock_scores['rank'] = 1 - (ss.rankdata(dock_scores['INTER']) / N_dock)
+        hmap_lists = []
+        accs = []
 
-        migos_actives_pred = set(migos_df.loc[migos_df['rank'] > 0.95]['SMILE'])
-        dock_actives_pred = set(dock_scores.loc[dock_scores['rank'] > 0.95]['SMILE'])
+        modes = ['RDOCK', 'random', 'dock', 'native', 'fp', 'mixed']
+        for mode in modes:
+            if mode == 'RDOCK':
+                dock_scores['rank'] = 1 - (ss.rankdata(dock_scores['INTER']) / N_dock)
+                dock_actives_pred = set(dock_scores.loc[dock_scores['rank'] > 0.95]['SMILE'])
+                dock_correct = true_actives & dock_actives_pred
+                dock_list = [1 if lig in dock_correct else 0 for lig in true_actives]
+                dock_acc = np.sum(dock_list) / len(true_actives)
+                accs.append(dock_acc)
+                hmap_lists.append(dock_list)
+            else:
+                migos_df[f'rank_{mode}'] = ss.rankdata(migos_df[mode]) / N_migos
+
+                actives_pred = set(migos_df.loc[migos_df[f'rank_{mode}'] > 0.95]['SMILE'])
+                migos_correct = true_actives & actives_pred
+                
+                migos_list = [1 if lig in migos_correct else 0 for lig in true_actives]
+                migos_acc = np.sum(migos_list) / len(true_actives)
+                hmap_lists.append(migos_list)
+                accs.append(migos_acc)
 
         """
         sns.kdeplot(data=dock_scores, hue='TYPE', x='rank', common_norm=False)
@@ -64,9 +84,11 @@ if __name__ == "__main__":
         plt.show()
         """
 
-        migos_correct = true_actives & migos_actives_pred
-        dock_correct = true_actives & dock_actives_pred
 
+        sns.heatmap(hmap_lists, yticklabels=[f"{m} ({a*100:.1f}%)" for m, a in zip(modes, accs)], ax=axs[i], cmap='inferno')
+        axs[i].set_title(robin)
+
+        """
         print("--"*20)
         fps = np.array(get_fps(true_actives))
 
@@ -97,7 +119,9 @@ if __name__ == "__main__":
                        Line2D([0], [0], linestyle='none', marker='.', color='green', markersize=20, label=f'RNAmigos only'),
                        Line2D([0], [0], linestyle='none', marker='.', color='grey', markersize=20, label=f'none'),
                        ]
-    fig.legend(handles=legend_elements, loc='lower center')
+        """
+    #fig.legend(handles=legend_elements, loc='lower center')
+    # plt.title("Hits @ 1%")
     plt.show()
  
     pass
