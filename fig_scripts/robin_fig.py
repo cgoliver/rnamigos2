@@ -8,6 +8,9 @@ from sklearn import metrics
 from rnaglib.drawing import rna_draw
 from rnaglib.utils import load_json
 
+import scienceplots
+
+plt.style.use('nature')
 
 def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_actives = np.sum(is_active)
@@ -170,7 +173,7 @@ if __name__ == '__main__':
         # score_to_use = 'is_native'
         # score_to_use = 'native_fp'
         ax = axs[i]
-        sns.kdeplot(data=merged, x=score_to_use, hue='split', common_norm=False, clip=(0, 1), ax=ax)
+        sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', common_norm=False, clip=(0, 1), ax=ax)
         ax.set_title(pocket_name)
         #     g = load_json(f"data/robin_graphs_x3dna/{name}.json")
         #     g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
@@ -205,4 +208,6 @@ if __name__ == '__main__':
     #
     print(np.mean(all_efs))
     print(np.mean(all_aurocs))
+    plt.tight_layout()
+    plt.savefig("figs/fig_3a.pdf", format="pdf")
     plt.show()

@@ -45,7 +45,7 @@ if __name__ == "__main__":
                       init='pca').fit_transform(fps)
 
 
-    fig, axarr = plt.subplots(2, 2)
+    fig, axarr = plt.subplots(4, 1)
     axs = axarr.flatten()
     
     for i, robin in enumerate(robins):

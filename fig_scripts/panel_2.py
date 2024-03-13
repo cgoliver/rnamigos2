@@ -3,6 +3,7 @@ Plot relationship between dissimilarity from train set and performance
 """
 import pickle
 import itertools
+from collections import Counter 
 
 from joblib import Parallel, delayed
 import numpy as np
@@ -78,6 +79,7 @@ def sims():
 
     pd.DataFrame(rows).to_csv("outputs/pred_mixed_overlap.csv")
     """
+
 
     corrs = list(pd.read_csv("outputs/pred_mixed_overlap.csv")['overlap'])
                         
@@ -197,11 +199,14 @@ def sims():
 
 def tsne():
 
-    df = pd.read_csv("data/csvs/fp_data.csv")
+    df_fp = pd.read_csv("data/csvs/fp_data.csv")
     df = pd.read_csv("outputs/mixed_raw.csv")
 
+    decoys = 'pdb'
+
     smiles_list = sorted(list(set(df['smiles'])))
-    natives = set(list(df.loc[(df['is_active'] == 1) & (df['decoys'] == 'chembl')]['smiles']))
+    # smiles_list = sorted(list(set(df_fp['LIGAND_SMILES'])))
+    # natives = set(list(df.loc[(df['is_active'] == 1) & (df['decoys'] == 'chembl')]['smiles']))
 
     print(f"Making fps {len(smiles_list)}")
     mols = [Chem.MolFromSmiles(s) for s in smiles_list]
@@ -230,6 +235,11 @@ def tsne():
     #pocket_list = df.loc[df['PDB_ID_POCKET'].isin(keep)]['PDB_ID_POCKET']
     pocket_list = df.loc[df['pocket_id'].isin(keep)]['pocket_id']
     pocket_list = sorted(list(set(pocket_list)))
+
+    c = Counter([p.split("_")[2] for p in pocket_list])
+    print(c)
+
+
 
     pocket_pairs = list(itertools.combinations(pocket_list, 2))
     dists = [1 - rm_scores.loc[p1, p2] for p1, p2 in pocket_pairs]
@@ -280,31 +290,33 @@ def tsne():
     ax.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1] + offset, c=clustering_ligs.labels_, alpha=.7, s=3, cmap='Set2')
     #ax2.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1], [-2] * X_embedded_lig.shape[0], c=clustering_ligs.labels_, alpha=.7, s=1, cmap='Set2')
 
-        # pred links
-    preds = pd.read_csv("outputs/dock_split_grouped1_raw.csv")
+    # pred links
+    preds = pd.read_csv("outputs/mixed_raw.csv")
     preds['smiles'] = preds['smiles'].apply(lambda x: x.rstrip("\n"))
     
     corrects = []
     for i, pocket in enumerate(pocket_list):
         scores = preds.loc[(preds['decoys'] == 'chembl') & (preds['pocket_id'] == pocket) & (preds['smiles'].isin(smiles_to_ind))]
-        scores['rank'] = scores['raw_score'].rank(method='average', ascending=False, pct=True)
+        scores['rank'] = scores['combined'].rank(method='average', ascending=False, pct=False)
         scores = scores.sort_values(by='rank')
+        print(scores)
         try:
             for row in scores.itertuples():
-                if row.rank < 0.95:
+                #if row.rank < 0.98:
+                if row.rank > 3:
                     continue
                 lig_ind = smiles_to_ind[row.smiles]
                 if row.is_active:
                     ax.plot([X_embedded_pocket[i][0], X_embedded_lig[lig_ind][0] ],
                              [X_embedded_pocket[i][1], X_embedded_lig[lig_ind][1] + offset],
-                            linestyle='-', color='blue', lw=1, alpha=.7)
+                            linestyle='-', color='green', lw=1, alpha=.7)
                     corrects.append(i)
 
                 else:
-                    pass
-                    #ax.plot([X_embedded_pocket[i][0], X_embedded_lig[lig_ind][0] ],
-                    #         [X_embedded_pocket[i][1], X_embedded_lig[lig_ind][1] + offset],
-                    #        linestyle=':', color='green', lw=1, alpha=0.5)
+                    print("YO")
+                    ax.plot([X_embedded_pocket[i][0], X_embedded_lig[lig_ind][0] ],
+                             [X_embedded_pocket[i][1], X_embedded_lig[lig_ind][1] + offset],
+                            linestyle='-', color='grey', lw=1, alpha=0.3)
         except KeyError:
             print("MISSING ", i)
             continue
@@ -313,10 +325,10 @@ def tsne():
     print(corrects, len(pocket_list))
     for i, pocket in enumerate(pocket_list):
         if i in corrects: 
-            print(i)
             continue
 
         try:
+            print("YO")
             #lig_ind = smiles_to_ind[df.loc[df['PDB_ID_POCKET'] == pocket]['LIGAND_SMILES'].iloc[0]]
             lig_ind = smiles_to_ind[df.loc[(df['pocket_id'] == pocket) & (df['is_active'] == 1)]['smiles'].iloc[0]]
             ax.plot([X_embedded_pocket[i][0], X_embedded_lig[lig_ind][0] ],
@@ -335,6 +347,7 @@ def tsne():
     plt.savefig("fig_2a.pdf", format="pdf")
     plt.show()
 
+
 if __name__ == "__main__":
-    sims()
-    #tsne()
+    #sims()
+    tsne()
