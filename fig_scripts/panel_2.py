@@ -257,13 +257,6 @@ def tsne():
     #X_embedded_pocket -= np.mean(X_embedded_pocket)
     #X_embedded_lig -= np.mean(X_embedded_lig)
 
-    # Plane data
-    x_plane = np.linspace(-1, 1, 100)
-    y_plane = np.linspace(-1, 1, 100)
-    x_plane, y_plane = np.meshgrid(x_plane, y_plane)
-    z_plane = np.zeros_like(x_plane)  # Plane at z=0
-    z_plane_lig = np.zeros_like(x_plane) - 2  # Plane at z=0
-
     # Create a 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -281,13 +274,16 @@ def tsne():
 
     offset = -10
 
-    print(clustering_ligs.labels_)
+    active_smiles = set(df.loc[df['is_active'] == 1]['smiles'].unique())
+    print(active_smiles)
     
     ax.scatter(X_embedded_pocket[:,0], X_embedded_pocket[:,1],  marker='^', alpha=1, c='black', s=25)
     #ax2.scatter(X_embedded_pocket[:,0], X_embedded_pocket[:,1],  alpha=.8, c='red', s=10)
     #ax.scatter(X_embedded_pocket[:,0], X_embedded_pocket[:,1], [0] * X_embedded_pocket.shape[0], alpha=.8, c=clustering_pockets.labels_, cmap='Set2', s=5)
     #ax1.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1], [-2] * X_embedded_lig.shape[0], c=clustering_ligs.labels_, alpha=.7, s=1, cmap='Set2')
-    ax.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1] + offset, c=clustering_ligs.labels_, alpha=.7, s=3, cmap='Set2')
+    #ax.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1] + offset, c=clustering_ligs.labels_, alpha=.7, s=3, cmap='Set2')
+    ax.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1] + offset, c=['blue' if sm in active_smiles else 'grey' for sm in clean_smiles], 
+               alpha=.7, s=[20 if sm in active_smiles else 0.5 for sm in clean_smiles])
     #ax2.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1], [-2] * X_embedded_lig.shape[0], c=clustering_ligs.labels_, alpha=.7, s=1, cmap='Set2')
 
     # pred links
@@ -297,13 +293,12 @@ def tsne():
     corrects = []
     for i, pocket in enumerate(pocket_list):
         scores = preds.loc[(preds['decoys'] == 'chembl') & (preds['pocket_id'] == pocket) & (preds['smiles'].isin(smiles_to_ind))]
-        scores['rank'] = scores['combined'].rank(method='average', ascending=False, pct=False)
-        scores = scores.sort_values(by='rank')
+        scores['rank'] = scores['combined'].rank(method='average', ascending=True, pct=True)
+        counts = scores['smiles'].value_counts()
         print(scores)
         try:
             for row in scores.itertuples():
-                #if row.rank < 0.98:
-                if row.rank > 3:
+                if row.rank < 0.995:
                     continue
                 lig_ind = smiles_to_ind[row.smiles]
                 if row.is_active:
