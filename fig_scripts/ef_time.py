@@ -52,7 +52,7 @@ def build_ef_df(out_csv='fig_script/time_ef.csv'):
     grouped = True
     if grouped:
         script_dir = os.path.dirname(__file__)
-        splits_file = os.path.join(script_dir, 'data/train_test_75.p')
+        splits_file = os.path.join(script_dir, '../data/train_test_75.p')
         _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
         group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
         big_df_raw = big_df_raw.loc[big_df_raw['pocket_id'].isin(group_reps)]
@@ -89,6 +89,17 @@ def build_ef_df(out_csv='fig_script/time_ef.csv'):
                        'seed': 0}
                 ef_df_rows.append(res)
 
+        # Presort mixed
+        pocket_df = pocket_df.sort_values(by='mixed', ascending=False)
+        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+            s = virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+            res = {'sort_up_to': i,
+                   'pocket': pocket,
+                   'ef': s,
+                   'model': "presort_mixed",
+                   'seed': 0}
+            ef_df_rows.append(res)
+
         # Best
         pocket_df = pocket_df.sort_values(by='mixed', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
@@ -120,6 +131,8 @@ def plot_mean_std(ax, times, means, stds, label, color):
 def line_plot(df):
     # all_models = ['dock', 'fp', 'native', 'rdock']
     # names = [r'\texttt{fp}', r'\texttt{native}', r'\texttt{dock}', r'\texttt{rDock}', ]
+    # all_models = ['rdock', 'presort_mixed', 'mixed']
+    # names = [r'\texttt{rDock}', r'\texttt{presort+rDock}', r'\texttt{mixed+rDock}']
     all_models = ['rdock', 'mixed']
     names = [r'\texttt{rDock}', r'\texttt{mixed+rDock}']
     model_res = []
@@ -134,29 +147,30 @@ def line_plot(df):
     ax = plt.gca()
     ax.set_yscale('custom')
 
-    x_cross = 0.65
-    xticks = [0, x_cross, 2, 4, 6, 8]
-    xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
+    # x_cross = 0.65
+    # xticks = [0, x_cross, 2, 4, 6, 8]
+    # xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
+    xticks = [0, 2, 4, 6, 8]
+    # plt.axvline(x=x_cross, color='grey', linestyle='--', alpha=0.7)
+    xticks_labels = ["0", "2", "4", "6", "8"]
     plt.gca().set_xticks(ticks=xticks, labels=xticks_labels)
 
-    yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
+    yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
     plt.gca().set_yticks(yticks)
+    plt.axhline(y=0.957, color='grey', linestyle='--', alpha=0.7)
 
     times = np.linspace(0, 8.3, 20)
     # palette = PALETTE
-    palette = [PALETTE[3], PALETTE[-1]]
+    palette = [PALETTE[3], PALETTE[-1], PALETTE[-1]]
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
 
-    plt.axhline(y=0.99, color='grey', linestyle='--', alpha=0.7)
-    plt.axvline(x=x_cross, color='grey', linestyle='--', alpha=0.7)
-
     # sns.lineplot(data=df, x='time_limit', y='ef', hue='model')
-    plt.ylabel(r"Mean Active Rank")
+    plt.ylabel(r"AuROC")
     plt.xlabel(r"Time Limit (hours)")
     plt.legend(loc='center left')
-    plt.ylim(0.45, 1.001)
-    plt.savefig("line.pdf", format="pdf", bbox_inches='tight')
+    plt.ylim(0.4, 1.001)
+    plt.savefig("fig_scripts/line.pdf", format="pdf", bbox_inches='tight')
     plt.show()
     pass
 
@@ -220,15 +234,15 @@ def vax_plot(df):
     ax.set_xlim([-100, 100])
     ax.set_yticks([])
     ax.grid(True)
-    plt.savefig("box.pdf", format="pdf", bbox_inches='tight')
+    plt.savefig("fig_scripts/box.pdf", format="pdf", bbox_inches='tight')
     plt.show()
     pass
 
 
 if __name__ == "__main__":
     # Build the time df for making the figures, this can be commented then
-    out_csv = 'fig_script/time_ef.csv'
-    build_ef_df(out_csv=out_csv)
+    out_csv = 'fig_scripts/time_ef.csv'
+    # build_ef_df(out_csv=out_csv)
 
     df = pd.read_csv(out_csv)
     line_plot(df)

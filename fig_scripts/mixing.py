@@ -228,7 +228,7 @@ if __name__ == "__main__":
     big_df_raw['native'] = raw_dfs[3]['raw_score'].values
 
     # Find the best mix, and then dump it
-    best_mix = mix_all(big_df_raw)
+    # best_mix = mix_all(big_df_raw)
     # best_mix_old = [0.44, 0.39, 0.17]
     best_mix = [0.36841931, 0.26315665, 0.36841931]
 
@@ -244,9 +244,9 @@ if __name__ == "__main__":
 
     # plot_pairs(big_df_raw)
 
-    # get_table_mixing(big_df_raw)
+    get_table_mixing(big_df_raw)
 
     # # To dump rdock_combined
-    coeffs = (0.8, 0.2, 0.)
-    get_mix(big_df_raw, score1='combined', score2='rdock', coeffs=coeffs,
-            outname_col='combined', outname='mixed_rdock')
+    # coeffs = (0.8, 0.2, 0.)
+    # get_mix(big_df_raw, score1='combined', score2='rdock', coeffs=coeffs,
+    #         outname_col='combined', outname='mixed_rdock')

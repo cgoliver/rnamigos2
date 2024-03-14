@@ -31,7 +31,7 @@ names = [
     r'\texttt{native}',
     # r'\texttt{dock_old}',
     r'\texttt{dock}',
-    r'\texttt{rDock\newline INTER}',
+    r'\texttt{rDock}',
     # r'\texttt{rDock\newline TOTAL}',
     r'\texttt{mixed}',
     r'\texttt{mixed\newline+ rDock}',
@@ -89,6 +89,7 @@ big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
 
 # Gather means and std in another df
 means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+medians = big_df.groupby(by=['name', 'decoys'])['score'].median().reset_index()
 stds = list(big_df.groupby(by=['name', 'decoys'])['score'].std().reset_index()['score'])
 means['std'] = stds
 means['Mean Active Rank'] = means['score'].map('{:,.3f}'.format) + r' $\pm$ ' + means['std'].map('{:,.3f}'.format)
@@ -180,7 +181,7 @@ sns.stripplot(x="name",
 
 plt.ylim(lower - 0.02, 1.001)
 plt.xlabel("")
-plt.ylabel("Mean Active Rank")
+plt.ylabel("AuROC")
 plt.grid(True, which='both', axis='y')
 plt.vlines(3.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
 # plt.savefig("../outputs/violins.pdf", bbox_inches='tight')

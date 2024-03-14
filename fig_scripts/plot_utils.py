@@ -26,7 +26,7 @@ class CustomScale(mscale.ScaleBase):
 
     def __init__(self, axis):
         mscale.ScaleBase.__init__(self, axis=axis)
-        self.offset = 0.01
+        self.offset = 0.03
         self.thresh = None
 
     def get_transform(self):
