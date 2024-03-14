@@ -1,3 +1,4 @@
+import sys
 import itertools
 import os
 import matplotlib.pyplot as plt
@@ -215,7 +216,8 @@ if __name__ == "__main__":
             'fp_split_grouped1',
             'native_split_grouped1',
             ]
-    DECOY = 'chembl'
+    #DECOY = 'chembl'
+    DECOY = 'pdb'
     raw_dfs = [pd.read_csv(f"../outputs/{r}_raw.csv") for r in runs]
     raw_dfs = [df.loc[df['decoys'] == DECOY] for df in raw_dfs]
     raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
@@ -233,8 +235,8 @@ if __name__ == "__main__":
     best_mix = [0.36841931, 0.26315665, 0.36841931]
 
     # Now dump this best mixed and add it to big_df
-    # get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
-    #         outname_col='combined', outname='mixed')
+    get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
+            outname_col='combined', outname='mixed_pdb')
     # raw_df_combined = pd.read_csv('../outputs/mixed_raw.csv').sort_values(by=['pocket_id', 'smiles', 'is_active'])
     # big_df_raw['combined'] = raw_df_combined['combined'].values
     # big_df_raw.to_csv('../outputs/big_df_raw.csv')
