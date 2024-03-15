@@ -34,7 +34,7 @@ rm_scores.index = columns
 
 def get_score(pocket_id, sm, df):
     try:
-        return scores.loc[(df['pocket_id'] == pocket_id) & (df['smiles'] == sm)]['combined'].iloc[0] 
+        return scores.loc[(df['pocket_id'] == pocket_id) & (df['smiles'] == sm)]['mixed'].iloc[0]
     except IndexError:
         return np.nan
 
@@ -293,7 +293,7 @@ def tsne():
     corrects = []
     for i, pocket in enumerate(pocket_list):
         scores = preds.loc[(preds['decoys'] == 'chembl') & (preds['pocket_id'] == pocket) & (preds['smiles'].isin(smiles_to_ind))]
-        scores['rank'] = scores['combined'].rank(method='average', ascending=True, pct=True)
+        scores['rank'] = scores['mixed'].rank(method='average', ascending=True, pct=True)
         counts = scores['smiles'].value_counts()
         print(scores)
         try:

@@ -43,11 +43,11 @@ def get_mix_pair(df, score1, score2, all_thresh, verbose=True):
             normalized_docking = normalize(docking_scores)
             normalized_new = normalize(new_scores)
 
-            pocket_df['combined'] = (mixed * normalized_docking + (1 - mixed) * normalized_new).values
-            # pocket_df['combined'] = -(mixed * np.exp(- normalized_docking / 3) +
+            pocket_df['mixed'] = (mixed * normalized_docking + (1 - mixed) * normalized_new).values
+            # pocket_df['mixed'] = -(mixed * np.exp(- normalized_docking / 3) +
             #                           (1 - mixed) * np.exp(-normalized_new / 3))
-            # pocket_df['combined'] = (mixed * normalized_docking ** 4 + (1 - mixed) * normalized_new ** 4).values
-            fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df['combined'],
+            # pocket_df['mixed'] = (mixed * normalized_docking ** 4 + (1 - mixed) * normalized_new ** 4).values
+            fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df['mixed'],
                                                      drop_intermediate=True)
             enrich = metrics.auc(fpr, tpr)
             all_efs.append(enrich)
@@ -56,62 +56,6 @@ def get_mix_pair(df, score1, score2, all_thresh, verbose=True):
             print(i, pocket_ef)
         all_thresh_res.append(pocket_ef)
     return all_thresh_res
-
-
-def get_table_mixing(df):
-    all_methods = ['fp', 'native', 'dock', 'rdock']
-    n_intervals = 10
-    all_thresh = np.linspace(0, 1, n_intervals)
-    all_res = {}
-    # Do singletons
-    for method in all_methods:
-        result = get_ef_one(df, score=method)
-        print(method, result)
-        all_res[method] = result
-    # Do pairs
-    for pair in itertools.combinations(all_methods, 2):
-        all_results = get_mix_pair(df, score1=pair[0], score2=pair[1], all_thresh=all_thresh, verbose=False)
-        best_idx = np.argmax(np.array(all_results))
-        best_perf = all_results[best_idx]
-        print(pair, f"{best_idx}/{n_intervals}", best_perf)
-        all_res[pair] = best_perf
-
-    # Add mixed results
-    result_mixed = get_ef_one(df, score='combined')
-    all_res['mixed'] = result_mixed
-
-    pair = ('combined', 'rdock')
-    all_results = get_mix_pair(df, score1=pair[0], score2=pair[1], all_thresh=all_thresh, verbose=False)
-    best_idx = np.argmax(np.array(all_results))
-    best_perf = all_results[best_idx]
-    print(pair, f"{best_idx}/{n_intervals}", best_perf)
-    all_res[pair] = best_perf
-
-    for k, v in all_res.items():
-        print(k, v)
-
-
-def plot_pairs(df):
-    score1 = 'rdock'
-    # score1 = 'dock'
-    # score1 = 'fp'
-    # scores_2 = ['dock']
-    # scores_2 = ['fp']
-    # scores_2 = ['native']
-    scores_2 = ['combined']
-    # scores_2 = ['native']
-    # scores_2 = ['fp', 'native']
-    # scores_2 = ['dock', 'fp', 'native']
-
-    all_thresh = np.linspace(0, 1, 30)
-    for score2 in scores_2:
-        all_thresh_res = get_mix_pair(df, score1, score2, all_thresh=all_thresh)
-        plt.plot(all_thresh, all_thresh_res, label=score2)
-
-    # plt.ylim(0.98, 1)
-    plt.legend()
-    plt.show()
-    return df
 
 
 def mix_three(df, coeffs=(0.5, 0.5, 0), score1='dock', score2='fp', score3='native', return_dfs=False):
@@ -132,22 +76,22 @@ def mix_three(df, coeffs=(0.5, 0.5, 0), score1='dock', score2='fp', score3='nati
         normalized_fp = normalize(fp_scores)
         normalized_native = normalize(native_scores)
 
-        pocket_df['combined'] = (x * normalized_docking
+        pocket_df['mixed'] = (x * normalized_docking
                                  + y * normalized_fp
                                  + z * normalized_native).values
-        # pocket_df['combined'] = -(x * np.exp(- normalized_docking / 3) +
+        # pocket_df['mixed'] = -(x * np.exp(- normalized_docking / 3) +
         #                           y * np.exp(-normalized_fp / 3) +
         #                           z * np.exp(-normalized_native / 3))
 
-        fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df['combined'], drop_intermediate=True)
+        fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df['mixed'], drop_intermediate=True)
         enrich = metrics.auc(fpr, tpr)
 
-        # sorted_df = pocket_df.sort_values(by='combined')
+        # sorted_df = pocket_df.sort_values(by='mixed')
         # sorted_df = sorted_df.reset_index(drop=True)
         # native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
         # enrich = native_ind / (len(sorted_df) - 1)
         if return_dfs:
-            all_efs.append((pocket_df[['pocket_id', 'smiles', 'is_active', 'combined']], p, enrich))
+            all_efs.append((pocket_df[['pocket_id', 'smiles', 'is_active', 'mixed']], p, enrich))
         else:
             all_efs.append(enrich)
     return all_efs
@@ -202,19 +146,19 @@ def mix_all(df):
     return coeffs[best_i]
 
 
-def get_mix(df, coeffs, score1='dock', score2='fp', score3='native', outname_col='combined', outname="default"):
+def get_mix(df, coeffs, score1='dock', score2='fp', score3='native', outname_col='mixed', outname="default"):
     # Mixed df contains df_raw, pocket, enrichment
     mixed_df = mix_three(df, coeffs=coeffs, score1=score1, score2=score2, score3=score3, return_dfs=True)
 
     # Merge df and add decoys value
     mixed_df_raw = pd.concat([mixed[0] for mixed in mixed_df])
+    mixed_df_raw = mixed_df_raw.rename(columns={'mixed': outname_col})
+    mixed_df_raw.to_csv(f"outputs/{outname}_raw.csv")
     dumb_decoy = [DECOY for _ in range(len(mixed_df_raw))]
     mixed_df_raw.insert(len(mixed_df_raw.columns), "decoys", dumb_decoy)
     mixed_df = pd.DataFrame({"pocket_id": [mixed[1] for mixed in mixed_df],
                              'decoys': ['chembl' for _ in mixed_df],
                              'score': [mixed[2] for mixed in mixed_df]})
-    mixed_df_raw.rename({'combined': outname_col})
-    mixed_df_raw.to_csv(f"outputs/{outname}_raw.csv")
     mixed_df.to_csv(f"outputs/{outname}.csv")
 
 
@@ -243,13 +187,70 @@ def find_best_mix(runs, grouped=True, decoy='chembl'):
 
     # Now dump this best mixed as a csv
     get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
-            outname_col='combined', outname=f'mixed{"_grouped" if GROUPED else ""}')
+            outname_col='mixed', outname=f'mixed{"_grouped" if GROUPED else ""}')
 
     # Get the best mixed and add it to the combined results df
     raw_df_combined = pd.read_csv(f'outputs/mixed{"_grouped" if GROUPED else ""}_raw.csv')
     raw_df_combined = raw_df_combined.sort_values(by=['pocket_id', 'smiles', 'is_active'])
-    big_df_raw['combined'] = raw_df_combined['combined'].values
+    big_df_raw['mixed'] = raw_df_combined['mixed'].values
     big_df_raw.to_csv(f'outputs/big_df{"_grouped" if GROUPED else ""}_raw.csv')
+
+
+def get_table_mixing(df):
+    all_methods = ['fp', 'native', 'dock', 'rdock']
+    n_intervals = 10
+    all_thresh = np.linspace(0, 1, n_intervals)
+    all_res = {}
+    # Do singletons
+    for method in all_methods:
+        result = get_ef_one(df, score=method)
+        print(method, result)
+        all_res[method] = result
+    # Do pairs
+    for pair in itertools.combinations(all_methods, 2):
+        all_results = get_mix_pair(df, score1=pair[0], score2=pair[1], all_thresh=all_thresh, verbose=False)
+        best_idx = np.argmax(np.array(all_results))
+        best_perf = all_results[best_idx]
+        print(pair, f"{best_idx}/{n_intervals}", best_perf)
+        all_res[pair] = best_perf
+
+    # Add mixed results
+    result_mixed = get_ef_one(df, score='mixed')
+    all_res['mixed'] = result_mixed
+
+    pair = ('mixed', 'rdock')
+    all_results = get_mix_pair(df, score1=pair[0], score2=pair[1], all_thresh=all_thresh, verbose=False)
+    best_idx = np.argmax(np.array(all_results))
+    best_perf = all_results[best_idx]
+    print(pair, f"{best_idx}/{n_intervals}", best_perf)
+    all_res[pair] = best_perf
+
+    for k, v in all_res.items():
+        print(k, v)
+
+
+def plot_pairs(df):
+    score1 = 'rdock'
+    # score1 = 'dock'
+    # score1 = 'fp'
+    # scores_2 = ['dock']
+    # scores_2 = ['fp']
+    # scores_2 = ['native']
+    scores_2 = ['mixed']
+    # scores_2 = ['native']
+    # scores_2 = ['fp', 'native']
+    # scores_2 = ['dock', 'fp', 'native']
+
+    all_thresh = np.linspace(0, 1, 30)
+    for score2 in scores_2:
+        all_thresh_res = get_mix_pair(df, score1, score2, all_thresh=all_thresh)
+        plt.plot(all_thresh, all_thresh_res, label=score2)
+
+    # plt.ylim(0.98, 1)
+    plt.legend()
+    plt.show()
+    return df
+
 
 if __name__ == "__main__":
     # Fix groups
@@ -269,9 +270,9 @@ if __name__ == "__main__":
     # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs and get the rdock+mixed
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if GROUPED else ""}_raw.csv')
     # plot_pairs(big_df_raw)
-    get_table_mixing(big_df_raw)
+    # get_table_mixing(big_df_raw)
 
     # To dump rdock_combined
     coeffs = (0.7, 0.3, 0.)
-    get_mix(big_df_raw, score1='combined', score2='rdock', coeffs=coeffs,
-            outname_col='combined', outname='mixed_rdock')
+    get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
+            outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}')

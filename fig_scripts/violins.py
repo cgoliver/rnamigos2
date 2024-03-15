@@ -59,7 +59,7 @@ means = means.sort_values(by='score', ascending=False)
 sorterIndex = dict(zip(names, range(len(names))))
 means['name_rank'] = means['name'].map(sorterIndex)
 means = means.sort_values(['name_rank'], ascending=[True])
-# print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
+print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
 
 main_palette = PALETTE + PALETTE # useful extra colors for debug plotting more items
 violin_palette = PALETTE + PALETTE

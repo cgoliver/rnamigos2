@@ -19,7 +19,7 @@ def get_groups():
     group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
     group_reps_path = os.path.join(script_dir, '../data/group_reps_75.p')
     pickle.dump(group_reps, open(group_reps_path, 'wb'))
-    
+
 
 def group_df(df):
     """
@@ -55,13 +55,14 @@ PALETTE = setup_plot()
 class CustomScale(mscale.ScaleBase):
     name = 'custom'
 
-    def __init__(self, axis):
+    def __init__(self, axis, offset=0.03, sup_lim=1):
         mscale.ScaleBase.__init__(self, axis=axis)
-        self.offset = 0.03
+        self.offset = offset
+        self.sup_lim = sup_lim
         self.thresh = None
 
     def get_transform(self):
-        return self.CustomTransform(thresh=self.thresh, offset=self.offset)
+        return self.CustomTransform(thresh=self.thresh, offset=self.offset, sup_lim=self.sup_lim)
 
     def set_default_locators_and_formatters(self, axis):
         pass
@@ -71,32 +72,36 @@ class CustomScale(mscale.ScaleBase):
         output_dims = 1
         is_separable = True
 
-        def __init__(self, offset, thresh):
+        def __init__(self, offset, thresh, sup_lim):
             mtransforms.Transform.__init__(self)
             self.thresh = thresh
             self.offset = offset
+            self.sup_lim = sup_lim
 
         def transform_non_affine(self, a):
-            return - np.log(1 + self.offset - a)
+            return - np.log(self.sup_lim + self.offset - a)
 
         def inverted(self):
-            return CustomScale.InvertedCustomTransform(thresh=self.thresh, offset=self.offset)
+            return CustomScale.InvertedCustomTransform(thresh=self.thresh, offset=self.offset, sup_lim=self.sup_lim)
 
     class InvertedCustomTransform(mtransforms.Transform):
         input_dims = 1
         output_dims = 1
         is_separable = True
 
-        def __init__(self, offset, thresh):
+        def __init__(self, offset, thresh, sup_lim):
             mtransforms.Transform.__init__(self)
             self.offset = offset
             self.thresh = thresh
+            self.sup_lim = sup_lim
 
         def transform_non_affine(self, a):
-            return 1 - np.exp(-a) + self.offset
+            return self.sup_lim - np.exp(-a) + self.offset
 
         def inverted(self):
-            return CustomScale.CustomTransform(offset=self.offset, thresh=self.thresh)
+            return CustomScale.CustomTransform(offset=self.offset, thresh=self.thresh, sup_lim=self.sup_lim)
 
+
+# X = type('CustomScale', (object,), dict(offset=0.01, name = 'custom'))
 
 mscale.register_scale(CustomScale)

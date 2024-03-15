@@ -21,36 +21,13 @@ def virtual_screen(df, sort_up_to=0, score_column='rdock'):
 
 
 def build_ef_df(out_csv='fig_script/time_ef.csv', grouped=True):
-    # runs = ['rdock',
-    #         'paper_dock',
-    #         'paper_fp',
-    #         'paper_native',
-    #         'mixed',
-    #         'mixed_rdock',
-    #         ]
-    runs = ['rdock',
-            'dock_split_grouped1',
-            'fp_split_grouped1',
-            'native_split_grouped1',
-            'mixed',
-            'mixed_rdock',
-            ]
     decoy = 'chembl'
-    raw_dfs = [pd.read_csv(f"outputs/{r}_raw.csv") for r in runs]
-    raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
-    raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
-    big_df_raw = raw_dfs[0][['pocket_id', 'is_active']]
-
-    # Now add score and flip docking scores, dock scores and distances for which low is better
-    big_df_raw['rdock'] = -raw_dfs[0]['raw_score'].values
-    big_df_raw['dock'] = -raw_dfs[1]['raw_score'].values
-    big_df_raw['fp'] = -raw_dfs[2]['raw_score'].values
-    big_df_raw['native'] = raw_dfs[3]['raw_score'].values
-    big_df_raw['mixed'] = raw_dfs[4]['combined'].values
-    big_df_raw['mixed_rdock'] = raw_dfs[5]['combined'].values
-
-    if grouped:
-        big_df_raw = group_df(big_df_raw)
+    big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_raw.csv')
+    big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles', 'is_active'])
+    # Combined is not present in big_df_raw
+    combined = pd.read_csv(f'outputs/mixed_rdock{"_grouped" if grouped else ""}_raw.csv')
+    combined = combined.sort_values(by=['pocket_id', 'smiles', 'is_active'])
+    big_df_raw['combined'] = combined['combined'].values
     pockets = big_df_raw['pocket_id'].unique()
     ef_df_rows = []
     nsteps = 20
@@ -73,7 +50,7 @@ def build_ef_df(out_csv='fig_script/time_ef.csv', grouped=True):
                 ef_df_rows.append(res)
 
         # Presort
-        for sort_col in ['dock', 'fp', 'native']:
+        for sort_col in ['dock', 'fp', 'native', 'mixed']:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
                 s = virtual_screen(pocket_df, sort_up_to, score_column='rdock')
@@ -84,25 +61,14 @@ def build_ef_df(out_csv='fig_script/time_ef.csv', grouped=True):
                        'seed': 0}
                 ef_df_rows.append(res)
 
-        # Presort mixed
-        pocket_df = pocket_df.sort_values(by='mixed', ascending=False)
-        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            s = virtual_screen(pocket_df, sort_up_to, score_column='rdock')
-            res = {'sort_up_to': i,
-                   'pocket': pocket,
-                   'ef': s,
-                   'model': "presort_mixed",
-                   'seed': 0}
-            ef_df_rows.append(res)
-
         # Best
         pocket_df = pocket_df.sort_values(by='mixed', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            s = virtual_screen(pocket_df, sort_up_to, score_column='mixed_rdock')
+            s = virtual_screen(pocket_df, sort_up_to, score_column='combined')
             res = {'sort_up_to': i,
                    'pocket': pocket,
                    'ef': s,
-                   'model': "mixed",
+                   'model': "combined",
                    'seed': 0}
             ef_df_rows.append(res)
     df = pd.DataFrame(ef_df_rows)
@@ -124,17 +90,16 @@ def plot_mean_std(ax, times, means, stds, label, color):
 
 
 def line_plot(df):
-    # all_models = ['dock', 'fp', 'native', 'rdock']
-    # names = [r'\texttt{fp}', r'\texttt{native}', r'\texttt{dock}', r'\texttt{rDock}', ]
-    # all_models = ['rdock', 'presort_mixed', 'mixed']
-    # names = [r'\texttt{rDock}', r'\texttt{presort+rDock}', r'\texttt{mixed+rDock}']
-    all_models = ['rdock', 'mixed']
+    # Get results
     names = [r'\texttt{rDock}', r'\texttt{mixed+rDock}']
+    palette = [PALETTE[3], PALETTE[-1]]
     model_res = []
+    all_models = ['rdock', 'combined']
     for model in all_models:
         means, stds = get_means_stds(df, model)
         model_res.append((means, stds))
 
+    # Set plot hparams
     plt.rcParams.update({'font.size': 16})
     plt.rcParams['text.usetex'] = True
     plt.rc('grid', color='grey', alpha=0.2)
@@ -142,30 +107,32 @@ def line_plot(df):
     ax = plt.gca()
     ax.set_yscale('custom')
 
-    # x_cross = 0.65
-    # xticks = [0, x_cross, 2, 4, 6, 8]
-    # xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
-    xticks = [0, 2, 4, 6, 8]
-    # plt.axvline(x=x_cross, color='grey', linestyle='--', alpha=0.7)
-    xticks_labels = ["0", "2", "4", "6", "8"]
-    plt.gca().set_xticks(ticks=xticks, labels=xticks_labels)
-
-    yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
-    plt.gca().set_yticks(yticks)
-    plt.axhline(y=0.957, color='grey', linestyle='--', alpha=0.7)
-
     times = np.linspace(0, 8.3, 20)
-    # palette = PALETTE
-    palette = [PALETTE[3], PALETTE[-1], PALETTE[-1]]
+    # Add sole mixed performance
+    mixed_means = [0.983] * 20
+    ax.plot(times, mixed_means, label=r'\texttt{mixed}', linewidth=2, color=PALETTE[-2], linestyle='--')
+
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
 
-    # sns.lineplot(data=df, x='time_limit', y='ef', hue='model')
+    # Manage ticks
+    # xticks = [0, x_cross, 2, 4, 6, 8]
+    # xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
+    xticks = [0, 2, 4, 6, 8]
+    xticks_labels = ["0", "2", "4", "6", "8"]
+    plt.gca().set_xticks(ticks=xticks, labels=xticks_labels)
+
+    # Possible plot: Set y_lim to 0.99 and CustomScale to: offset=0.03, sup_lim=1
+    # This shows how fast we go from mixed to mixed+rdock performance
+    yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
+    plt.gca().set_yticks(yticks)
+    plt.ylim(0.4, 1)
+
     plt.ylabel(r"AuROC")
     plt.xlabel(r"Time Limit (hours)")
     plt.legend(loc='center left')
-    plt.ylim(0.4, 1.001)
-    plt.savefig("fig_scripts/line.pdf", format="pdf", bbox_inches='tight')
+    plt.savefig("figs/efficiency_line.pdf", format="pdf", bbox_inches='tight')
+    # plt.savefig("figs/efficiency_line_ylim.pdf", format="pdf", bbox_inches='tight')
     plt.show()
     pass
 
@@ -229,7 +196,7 @@ def vax_plot(df):
     ax.set_xlim([-100, 100])
     ax.set_yticks([])
     ax.grid(True)
-    plt.savefig("fig_scripts/box.pdf", format="pdf", bbox_inches='tight')
+    plt.savefig("figs/efficiency_vax.pdf", format="pdf", bbox_inches='tight')
     plt.show()
     pass
 
@@ -241,5 +208,5 @@ if __name__ == "__main__":
 
     df = pd.read_csv(out_csv)
     line_plot(df)
-    vax_plot(df)
+    # vax_plot(df)
     pass
