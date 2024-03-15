@@ -9,7 +9,7 @@ from scipy.signal import savgol_filter
 import seaborn as sns
 from sklearn import metrics
 
-from plot_utils import group_df
+from plot_utils import get_groups, group_df
 
 
 # Normalize
@@ -218,20 +218,9 @@ def get_mix(df, coeffs, score1='dock', score2='fp', score3='native', outname_col
     mixed_df.to_csv(f"outputs/{outname}.csv")
 
 
-if __name__ == "__main__":
-    # FIRST LET'S PARSE INFERENCE CSVS AND MIX THEM
-    runs = ['rdock',
-            'dock_split_grouped1',
-            'fp_split_grouped1',
-            'native_split_grouped1',
-            ]
-    DECOY = 'chembl'
-    # DECOY = 'pdb'
-
-    GROUPED = True
-
+def find_best_mix(runs, grouped=True, decoy='chembl'):
     raw_dfs = [pd.read_csv(f"outputs/{r}_raw.csv") for r in runs]
-    raw_dfs = [df.loc[df['decoys'] == DECOY] for df in raw_dfs]
+    raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
     raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
     big_df_raw = raw_dfs[0][['pocket_id', 'smiles', 'is_active']]
 
@@ -241,32 +230,45 @@ if __name__ == "__main__":
     big_df_raw['fp'] = -raw_dfs[2]['raw_score'].values
     big_df_raw['native'] = raw_dfs[3]['raw_score'].values
 
-    if GROUPED:
+    if grouped:
         big_df_raw = group_df(big_df_raw)
 
     # Find the best mix, and then dump it
-    # best_mix = mix_all(big_df_raw)
+    best_mix = mix_all(big_df_raw)
     # best_mix = [0.44, 0.39, 0.17]  # OLD
     # best_mix = [0.36841931, 0.26315665, 0.36841931]  # UNGROUPED
-    best_mix = [0.3529, 0.2353, 0.4118]  # UNGROUPED value of AuROC :  0.9827
-    print("best perf", np.mean(mix_three(df=big_df_raw, coeffs=(0.3, 0.3, 0.3))))
-    print("balanced perf", np.mean(mix_three(df=big_df_raw, coeffs=best_mix)))
+    # best_mix = [0.3529, 0.2353, 0.4118]  # UNGROUPED value of AuROC :  0.9827
+    print("balanced perf", np.mean(mix_three(df=big_df_raw, coeffs=(0.3, 0.3, 0.3))))
+    print("best perf", np.mean(mix_three(df=big_df_raw, coeffs=best_mix)))
 
-    # # Now dump this best mixed as a csv
-    # get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
-    #         outname_col='combined', outname=f'mixed{"_grouped" if GROUPED else ""}')
-    #
-    # # Get the best mixed and add it to the combined results df
-    # raw_df_combined = pd.read_csv(f'outputs/mixed{"_grouped" if GROUPED else ""}_raw.csv')
-    # raw_df_combined = raw_df_combined.sort_values(by=['pocket_id', 'smiles', 'is_active'])
-    # big_df_raw['combined'] = raw_df_combined['combined'].values
-    # big_df_raw.to_csv(f'outputs/big_df{"_grouped" if GROUPED else ""}_raw.csv')
+    # Now dump this best mixed as a csv
+    get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
+            outname_col='combined', outname=f'mixed{"_grouped" if GROUPED else ""}')
+
+    # Get the best mixed and add it to the combined results df
+    raw_df_combined = pd.read_csv(f'outputs/mixed{"_grouped" if GROUPED else ""}_raw.csv')
+    raw_df_combined = raw_df_combined.sort_values(by=['pocket_id', 'smiles', 'is_active'])
+    big_df_raw['combined'] = raw_df_combined['combined'].values
+    big_df_raw.to_csv(f'outputs/big_df{"_grouped" if GROUPED else ""}_raw.csv')
+
+if __name__ == "__main__":
+    # Fix groups
+    # get_groups()
+
+    # FIRST LET'S PARSE INFERENCE CSVS AND MIX THEM
+    RUNS = ['rdock',
+            'dock_split_grouped1',
+            'fp_split_grouped1',
+            'native_split_grouped1',
+            ]
+    DECOY = 'chembl'
+    # DECOY = 'pdb'
+    GROUPED = True
+    find_best_mix(runs=RUNS, grouped=GROUPED, decoy=DECOY)
 
     # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs and get the rdock+mixed
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if GROUPED else ""}_raw.csv')
-
     # plot_pairs(big_df_raw)
-
     get_table_mixing(big_df_raw)
 
     # To dump rdock_combined

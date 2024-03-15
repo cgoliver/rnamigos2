@@ -12,14 +12,22 @@ random.seed(42)
 np.random.seed(42)
 
 
+def get_groups():
+    script_dir = os.path.dirname(__file__)
+    splits_file = os.path.join(script_dir, '../data/train_test_75.p')
+    _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+    group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
+    group_reps_path = os.path.join(script_dir, '../data/group_reps_75.p')
+    pickle.dump(group_reps, open(group_reps_path, 'wb'))
+    
+
 def group_df(df):
     """
     Subset rows of a df to only keep one representative for each pocket.
     """
     script_dir = os.path.dirname(__file__)
-    splits_file = os.path.join(script_dir, '../data/train_test_75.p')
-    _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
-    group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
+    splits_file = os.path.join(script_dir, '../data/group_reps_75.p')
+    group_reps = pickle.load(open(splits_file, 'rb'))
     df = df.loc[df['pocket_id'].isin(group_reps)]
     return df
 
