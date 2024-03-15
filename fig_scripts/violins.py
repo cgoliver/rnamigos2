@@ -1,69 +1,35 @@
-import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import random
-import pickle
 
-from fig_scripts.plot_utils import PALETTE
+from fig_scripts.plot_utils import PALETTE, group_df
 
-random.seed(42)
-np.random.seed(42)
+
 
 # TEST SET
-runs = [
-    # 'paper_fp.csv',
-    'fp_split_grouped1.csv',
-    # 'paper_native.csv',
-    'native_split_grouped1.csv',
-    # 'paper_dock.csv',
-    'dock_split_grouped1.csv',
-    'rdock.csv',
-    # 'rdock_total.csv',
-    'mixed.csv',
-    'mixed_rdock.csv',
-]
-names = [
-    # r'\texttt{fp_old}',
-    r'\texttt{fp}',
-    # r'\texttt{native_old}',
-    r'\texttt{native}',
-    # r'\texttt{dock_old}',
-    r'\texttt{dock}',
-    r'\texttt{rDock}',
-    # r'\texttt{rDock\newline TOTAL}',
-    r'\texttt{mixed}',
-    r'\texttt{mixed\newline+ rDock}',
-]
-#
-# runs = [
-#     'dock_split_grouped0.csv',
-#     'dock_split_grouped1.csv',
-#     'paper_dock.csv',
-#     # 'fp_split_grouped0.csv',
-#     # 'fp_split_grouped1.csv',
-#     # 'fp_split_grouped2.csv',
-#     # 'paper_fp.csv',
-#     'native_split_grouped0.csv',
-#     'native_split_grouped1.csv',
-#     'native_split_grouped2.csv',
-#     'paper_native.csv',
-#
-# ]
-# names = [
-#     r'\texttt{dock0}',
-#     r'\texttt{dock1}',
-#     r'\texttt{dockold}',
-#     # r'\texttt{fp0}',
-#     # r'\texttt{fp1}',
-#     # r'\texttt{fp2}',
-#     # r'\texttt{fpold}',
-#     r'\texttt{native0}',
-#     r'\texttt{native1}',
-#     r'\texttt{native2}',
-#     r'\texttt{nativeold}',
-# ]
+name_runs = {
+    # r"\texttt{fp_old}": "paper_fp.csv",
+    # r"\texttt{fp_0}": "fp_split_grouped0.csv",
+    r"\texttt{fp}": "fp_split_grouped1.csv",
+    # r"\texttt{fp_2}": "fp_split_grouped2.csv",
+    # r"\texttt{native_old}": "paper_native.csv",
+    # r"\texttt{native0}": "native_split_grouped0.csv",
+    r"\texttt{native}": "native_split_grouped1.csv",
+    # r"\texttt{native2}": "native_split_grouped2.csv",
+    # r"\texttt{dock_old}": "paper_dock.csv",
+    # r"\texttt{dock0}": "dock_split_grouped0.csv",
+    r"\texttt{dock}": "dock_split_grouped1.csv",
+    # r"\texttt{dock2}": "dock_split_grouped2.csv",
+    r"\texttt{rDock}": "rdock.csv",
+    # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
+    r"\texttt{mixed}": "mixed.csv",
+    r"\texttt{mixed\newline+ rDock}": "mixed_rdock.csv",
+}
+
+names = list(name_runs.keys())
+runs = list(name_runs.values())
+
 # decoy_mode = 'pdb'
 decoy_mode = 'chembl'
 # decoy_mode = 'pdb_chembl'
@@ -74,14 +40,10 @@ grouped = True
 dfs = (pd.read_csv(f"outputs/{f}") for f in runs)
 dfs = (df.assign(name=names[i]) for i, df in enumerate(dfs))
 big_df = pd.concat(dfs)
-if grouped:
-    script_dir = os.path.dirname(__file__)
-    splits_file = os.path.join(script_dir, '../data/train_test_75.p')
-    _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
-    group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
-    print(group_reps)
-    big_df = big_df.loc[big_df['pocket_id'].isin(group_reps)]
 big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
+
+if grouped:
+    big_df = group_df(big_df)
 
 # For a detailed score per pocket
 # table = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by=['pocket_id', 'name'])
@@ -94,16 +56,16 @@ stds = list(big_df.groupby(by=['name', 'decoys'])['score'].std().reset_index()['
 means['std'] = stds
 means['Mean Active Rank'] = means['score'].map('{:,.3f}'.format) + r' $\pm$ ' + means['std'].map('{:,.3f}'.format)
 means = means.sort_values(by='score', ascending=False)
-print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
 sorterIndex = dict(zip(names, range(len(names))))
 means['name_rank'] = means['name'].map(sorterIndex)
 means = means.sort_values(['name_rank'], ascending=[True])
+# print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
 
-main_palette = PALETTE + PALETTE
+main_palette = PALETTE + PALETTE # useful extra colors for debug plotting more items
 violin_palette = PALETTE + PALETTE
 
 plt.gca().set_yscale('custom')
-yticks= np.arange(0.6, 1)
+yticks = np.arange(0.6, 1)
 lower = 0.6
 yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
 # lower = 0.
@@ -114,8 +76,6 @@ plt.gca().set_yticks(yticks)
 sns.boxplot(x="name",
             y="score",
             order=names,
-            # hue="name",
-            # legend=False,
             data=big_df,
             width=.5,
             fill=False,
@@ -130,8 +90,6 @@ big_df[['score']] = big_df[['score']].clip(lower=lower)
 sns.stripplot(x="name",
               y="score",
               order=names,
-              # hue="name",
-              # legend=False,
               jitter=0.07,
               size=5,
               palette=main_palette,
@@ -144,8 +102,6 @@ violin_alpha = 0.4
 sns.violinplot(x="name",
                y="score",
                order=names,
-               # hue="name",
-               # legend=False,
                data=big_df,
                width=.6,
                palette=main_palette,
@@ -156,6 +112,9 @@ sns.violinplot(x="name",
 
 
 def patch_violinplot(palette):
+    """
+    Correct the border to have it in the same color as whisker plot
+    """
     from matplotlib.collections import PolyCollection
     ax = plt.gca()
     violins = [art for art in ax.get_children() if isinstance(art, PolyCollection)]
@@ -169,8 +128,6 @@ patch_violinplot(main_palette)
 sns.stripplot(x="name",
               y="score",
               order=names,
-              # hue="name",
-              # legend=False,
               jitter=0,
               size=6,
               palette=main_palette,

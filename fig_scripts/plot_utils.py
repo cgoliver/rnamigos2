@@ -1,24 +1,47 @@
-import matplotlib.ticker as ticker
+import matplotlib.pyplot
+import matplotlib.pyplot as plt
 from matplotlib import scale as mscale
 from matplotlib import transforms as mtransforms
-import matplotlib.pyplot as plt
-import matplotlib.pyplot
 import numpy as np
+import os
+import pickle
+import random
 import seaborn as sns
 
-# SETUP PLOT
-plt.rcParams['text.usetex'] = True
-matplotlib.rcParams['mathtext.fontset'] = 'stix'
-matplotlib.rcParams['font.family'] = 'STIXGeneral'
-plt.rc('font', size=16)  # fontsize of the tick labels
-plt.rc('ytick', labelsize=13)  # fontsize of the tick labels
-plt.rc('xtick', labelsize=13)  # fontsize of the tick labels
-plt.rc('grid', color='grey', alpha=0.2)
+random.seed(42)
+np.random.seed(42)
 
-# raw_hex = ["#61C6E7", "#4F7BF0", "#6183E7", "#FA4828"]
-raw_hex = ["#3180e0", "#2ba9ff", "#2957d8", "#FA4828", "#0a14db", "#803b96"]
-hex_plt = [f"{raw}" for raw in raw_hex]
-PALETTE = sns.color_palette(hex_plt)
+
+def group_df(df):
+    """
+    Subset rows of a df to only keep one representative for each pocket.
+    """
+    script_dir = os.path.dirname(__file__)
+    splits_file = os.path.join(script_dir, '../data/train_test_75.p')
+    _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+    group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
+    df = df.loc[df['pocket_id'].isin(group_reps)]
+    return df
+
+
+def setup_plot():
+    # SETUP PLOT
+    plt.rcParams['text.usetex'] = True
+    matplotlib.rcParams['mathtext.fontset'] = 'stix'
+    matplotlib.rcParams['font.family'] = 'STIXGeneral'
+    plt.rc('font', size=16)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=13)  # fontsize of the tick labels
+    plt.rc('xtick', labelsize=13)  # fontsize of the tick labels
+    plt.rc('grid', color='grey', alpha=0.2)
+
+    # raw_hex = ["#61C6E7", "#4F7BF0", "#6183E7", "#FA4828"]
+    raw_hex = ["#3180e0", "#2ba9ff", "#2957d8", "#FA4828", "#0a14db", "#803b96"]
+    hex_plt = [f"{raw}" for raw in raw_hex]
+    palette = sns.color_palette(hex_plt)
+    return palette
+
+
+PALETTE = setup_plot()
 
 
 class CustomScale(mscale.ScaleBase):

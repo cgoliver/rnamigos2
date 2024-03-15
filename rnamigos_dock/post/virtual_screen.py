@@ -32,10 +32,8 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
         scores = 1 - scores
     fpr, tpr, thresholds = metrics.roc_curve(is_active, scores, drop_intermediate=True)
     auroc = metrics.auc(fpr, tpr)
-
     # is_active_sorted = sorted(zip(scores, is_active))
     # mar = (np.mean([rank for rank, (_, is_active) in enumerate(is_active_sorted) if is_active]) + 1) / len(scores)
-
     return auroc
 
 

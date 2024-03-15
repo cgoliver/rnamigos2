@@ -7,7 +7,7 @@ from sklearn import metrics
 import pickle
 import random
 
-from plot_utils import PALETTE, CustomScale
+from plot_utils import PALETTE, CustomScale, group_df
 
 
 def virtual_screen(df, sort_up_to=0, score_column='rdock'):
@@ -20,7 +20,7 @@ def virtual_screen(df, sort_up_to=0, score_column='rdock'):
     return enrich
 
 
-def build_ef_df(out_csv='fig_script/time_ef.csv'):
+def build_ef_df(out_csv='fig_script/time_ef.csv', grouped=True):
     # runs = ['rdock',
     #         'paper_dock',
     #         'paper_fp',
@@ -49,13 +49,8 @@ def build_ef_df(out_csv='fig_script/time_ef.csv'):
     big_df_raw['mixed'] = raw_dfs[4]['combined'].values
     big_df_raw['mixed_rdock'] = raw_dfs[5]['combined'].values
 
-    grouped = True
     if grouped:
-        script_dir = os.path.dirname(__file__)
-        splits_file = os.path.join(script_dir, '../data/train_test_75.p')
-        _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
-        group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
-        big_df_raw = big_df_raw.loc[big_df_raw['pocket_id'].isin(group_reps)]
+        big_df_raw = group_df(big_df_raw)
     pockets = big_df_raw['pocket_id'].unique()
     ef_df_rows = []
     nsteps = 20

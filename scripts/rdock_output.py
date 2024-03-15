@@ -7,10 +7,6 @@ import pandas as pd
 import pickle
 import torch
 
-import sys
-
-sys.path.append('../')
-
 from rnamigos_dock.post.virtual_screen import mean_active_rank
 from rnamigos_dock.learning.loader import get_systems
 
@@ -134,7 +130,6 @@ script_dir = os.path.dirname(__file__)
 
 decoys = ['chembl', 'pdb', 'pdb_chembl']
 for decoy_mode in decoys:
-
     dataset = VirtualScreenDatasetDocking(ligands_path=os.path.join(script_dir, '../data/ligand_db'),
                                           systems=test_systems,
                                           decoy_mode=decoy_mode,
