@@ -52,9 +52,7 @@ class MolFPEncoder:
         return np.array(fps)
 
 
-def smiles_to_nx(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-
+def mol_to_nx(mol):
     mol_graph = nx.Graph()
 
     for atom in mol.GetAtoms():
@@ -72,6 +70,10 @@ def smiles_to_nx(smiles):
     return mol_graph
 
 
+def smiles_to_nx(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    return mol_to_nx(mol)
+    
 def oh_tensor(category, n):
     # One-hot float tensor construction
     t = torch.zeros(n, dtype=torch.float)
@@ -112,12 +114,31 @@ class MolGraphEncoder:
         self.set_as_one_hot_feat(graph_nx, edge_map=self.chi_map, node_label='is_aromatic', default_value=0)
         self.set_as_one_hot_feat(graph_nx, edge_map=self.chi_map, node_label='chiral_tag', default_value=0)
 
-    def smiles_to_graph_one(self, smiles):
-        if smiles in self.cashed_graphs:
-            return self.cashed_graphs[smiles]
-        try:
-            graph_nx = smiles_to_nx(smiles)
+    def mol2_to_graph_one(self, mol2_path):
+        mol = Chem.MolFromMol2File(mol2_path, sanitize=False)
 
+        atom_names = []
+        in_section = False
+        with open(mol2_path) as mol2:
+            for row in mol2:
+                if row.startswith("@<TRIPOS>ATOM"):
+                    in_section = True
+                    continue
+                elif row.startswith("@<TRIPOS>BOND"):
+                    break
+                if in_section: 
+                    atom_names.append(row.split()[1])
+                else:
+                    continue
+        graph_nx = mol_to_nx(mol)
+        for node,i  in enumerate(graph_nx.nodes()):
+            graph_nx.nodes[node]['atom_name'] = atom_names[i]
+        graph_dgl = self.nx_mol_to_dgl(graph_nx)
+        return graph_dgl, graph_nx
+
+
+    def nx_mol_to_dgl(self, graph_nx):
+        try:
             # Get edges as one hot
             edge_type = {edge: torch.tensor(self.edge_map[label]) for edge, label in
                          (nx.get_edge_attributes(graph_nx, 'bond_type')).items()}
@@ -137,9 +158,14 @@ class MolGraphEncoder:
             graph_dgl.ndata['node_features'] = torch.cat([graph_dgl.ndata[f].view(N, -1) for f in node_features], dim=1)
             return graph_dgl
         except Exception as e:
-            print(f"Failed on smiles {smiles} with exception {e}")
+            print(f"Failed with exception {e}")
             return dgl.graph(([], []))
 
+    def smiles_to_graph_one(self, smiles):
+        if smiles in self.cashed_graphs:
+            return self.cashed_graphs[smiles]
+        return self.nx_mol_to_dgl(graph_nx)
+        
     def smiles_to_graph_list(self, smiles_list):
         graphs = []
         for i, sm in enumerate(smiles_list):
