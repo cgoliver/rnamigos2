@@ -4,9 +4,11 @@ from matplotlib import scale as mscale
 from matplotlib import transforms as mtransforms
 import numpy as np
 import os
+import pandas as pd
 import pickle
 import random
 import seaborn as sns
+from sklearn.manifold import TSNE, MDS
 
 random.seed(42)
 np.random.seed(42)
@@ -30,6 +32,20 @@ def group_df(df):
     group_reps = pickle.load(open(splits_file, 'rb'))
     df = df.loc[df['pocket_id'].isin(group_reps)]
     return df
+
+
+def get_rmscores():
+    rm_scores = pd.read_csv("data/rmscores.csv", index_col=0)
+    return rm_scores
+
+
+def get_smooth_order(rmscores):
+    distance_symmetrized = (1 - rmscores + (1 - rmscores).T)/2
+    # sim_error = distance_symmetrized - (distance_symmetrized).T
+    new_coords = TSNE(n_components=1, learning_rate='auto', metric='precomputed', init='random').fit_transform(
+        distance_symmetrized)
+    # new_coords = MDS(n_components=1, dissimilarity='precomputed').fit_transform(distance_symmetrized)
+    return np.argsort(new_coords.flatten())
 
 
 def setup_plot():
