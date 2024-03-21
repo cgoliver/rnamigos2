@@ -1,137 +1,21 @@
 """
 Plot relationship between dissimilarity from train set and performance
 """
-import os.path
-import pickle
-import itertools
+import os
+import sys
+
 from collections import Counter
-
-import scipy.spatial.transform
-from joblib import Parallel, delayed
-
+import itertools
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import numpy as np
-from scipy.stats import spearmanr
-from scipy.spatial.distance import jaccard, squareform
-from sklearn.neighbors import KDTree
-from sklearn.manifold import TSNE
-from sklearn import preprocessing
-from sklearn.cluster import AgglomerativeClustering
 import pandas as pd
-from rdkit import Chem
-from rdkit import DataStructs
+import pickle
+from rdkit import Chem, DataStructs
 from rdkit.Chem import MACCSkeys
+from scipy.spatial.distance import squareform, cdist
 import seaborn as sns
-import scienceplots
-from sklearn.manifold import MDS
-
-# plt.style.use('nature')
 
 from fig_scripts.plot_utils import group_df, get_rmscores, get_smooth_order, rotate_2D_coords
-
-
-def compute_old():
-    def get_score(pocket_id, sm, df):
-        try:
-            return df.loc[(df['pocket_id'] == pocket_id) & (df['smiles'] == sm)]['mixed'].iloc[0]
-        except IndexError:
-            return np.nan
-
-    def one_corr(pocket_1, pocket_2, scores, ref_ligs, percentile=.05):
-        scores_1 = [get_score(pocket_1, sm, scores) for sm in ref_ligs]
-        scores_2 = [get_score(pocket_2, sm, scores) for sm in ref_ligs]
-
-        sm_sorted_1 = sorted(zip(scores_1, ref_ligs), key=lambda x: x[0], reverse=True)
-        sm_sorted_2 = sorted(zip(scores_2, ref_ligs), key=lambda x: x[0], reverse=True)
-
-        top_K = int(len(ref_ligs) * percentile)
-
-        sm_keep_1 = set([sm for _, sm in sm_sorted_1[:top_K]])
-        sm_keep_2 = set([sm for _, sm in sm_sorted_2[:top_K]])
-
-        overlap = len(sm_keep_1 & sm_keep_2) / len(sm_keep_1 | sm_keep_2)
-
-        return pocket_1, pocket_2, overlap
-
-    # names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", 'rb'))
-    # scores = pd.read_csv("outputs/mixed.csv")
-    # test_pockets = list(scores['pocket_id'])
-    # pocket_pairs = list(itertools.combinations(test_pockets, 2))
-    # # test_pockets = test_pockets[:5]
-    # # pocket_names = [f"{n.split('_')[0]}-{n.split('_')[2]}" for n in test_pockets]
-    #
-    # scores_raw = pd.read_csv("outputs/mixed_raw.csv")
-    # ref_ligs = list(set(scores_raw.loc[scores_raw['pocket_id'] == '1BYJ_A_GE3_30']['smiles']))
-    # rows = []
-    # for i, (p1, p2) in enumerate(pocket_pairs):
-    #     _,_, r = one_corr(p1, p2, scores, ref_ligs)
-    #     rows.append({'pocket_1': p1, 'pocket_2': p2, 'overlap': r})
-    #     print(i, p1, p2, r, len(pocket_pairs))
-    # pd.DataFrame(rows).to_csv("outputs/pred_mixed_overlap.csv")
-
-    # OLD ? TO GET NEGATIVES ?
-    # smiles_list = pd.read_csv("data/csvs/fp_data.csv")['LIGAND_SMILES']
-    # mols = [Chem.MolFromSmiles(s) for s in smiles_list]
-    # clean_mols = []
-    # clean_smiles = []
-    # for mol, sm in zip(mols, smiles_list):
-    #     if mol is None:
-    #         continue
-    #     clean_mols.append(mol)
-    #     clean_smiles.append(sm)
-    # smiles_to_ind = {sm: i for i, sm in enumerate(clean_smiles)}
-    # fps = [MACCSkeys.GenMACCSKeys(m) for m in clean_mols]
-    # fps = [np.array(fp.ToList()) for fp in fps]
-    # fps = np.vstack(fps)
-    # row_sums = fps.sum(axis=1, keepdims=True)
-    # fps = fps / row_sums
-    # print(fps.shape)
-
-    # OLD ? TO GET PERF VS I DON'T KNOW
-    # # fp novelty vs performance
-    # tree = KDTree(fps, leaf_size=2, metric='euclidean')
-    # colors = ['blue', 'red', 'green']
-    # epss = [0.1, 0.15, 0.2]
-    # for i, eps in enumerate(epss):
-    #     perfs = []
-    #     neis = []
-    #     for p in test_pockets:
-    #         native = scores_raw.loc[(scores_raw['pocket_id'] == p) & (scores_raw['is_active'] == 1)].iloc[0]['smiles']
-    #         native_fp = fps[smiles_to_ind[native]].reshape(-1, 1).T
-    #         num_nei = tree.query_radius(native_fp, eps, count_only=True)[0]
-    #         neis.append(num_nei - 1)
-    #         perfs.append(scores.loc[(scores['pocket_id'] == p) & (scores['decoys'] == 'chembl')].iloc[0]['score'])
-    #
-    #     perfs = np.array(perfs)
-    #     neis = np.array(neis)
-    #
-    #     bins = np.linspace(neis.min(), neis.max(), 10)  # 20 bins from min to max of x
-    #     bin_indices = np.digitize(neis, bins)  # Assign each x to a bin
-    #
-    #     # Calculate mean and standard deviation for y-values in each bin
-    #     bin_means = [perfs[bin_indices == i].mean() for i in range(1, len(bins))]
-    #     bin_stds = [perfs[bin_indices == i].std() for i in range(1, len(bins))]
-    #
-    #     # Use the mid-point of each bin for plotting
-    #     bin_centers = 0.5 * (bins[:-1] + bins[1:])
-    #
-    #     y_jitter_strength = 0.02  # Adjust this value to increase/decrease jitter
-    #     x_jitter_strength = 0.03  # Adjust this value to increase/decrease jitter
-    #
-    #     # Adding random jitter to x and y
-    #     neis = neis + np.random.normal(0, x_jitter_strength, neis.shape)
-    #     perfs = perfs + np.random.normal(0, y_jitter_strength, perfs.shape)
-    #
-    #     # plt.errorbar(bin_centers, bin_means, yerr=bin_stds, fmt='o', ecolor=colors[i], elinewidth=3, capsize=0, label=eps)
-    #     plt.scatter(neis, perfs, c=colors[i], alpha=0.5, label=f"{eps}", s=20)
-    #
-    # plt.gca().set_xlim(plt.gca().get_xlim()[::-1])
-    # plt.xlabel("Number of neighbors")
-    # plt.ylabel("Performance")
-    # plt.legend()
-    # plt.show()
-    pass
 
 
 def train_sim_perf_plot(grouped=True):
@@ -294,7 +178,7 @@ def sims(grouped=True):
     # plt.show()
 
     ax = double_heatmap(corr1=square_corrs, corr2=square_rms, kwargs2={'vmax': 0.7, 'vmin': 0.2})
-    plt.savefig("figs/rmscores_preds", format="pdf")
+    plt.savefig("figs/rmscores_preds.pdf")
     plt.show()
 
     # COMPARE: jaccard vs fp sim of natives
@@ -307,14 +191,14 @@ def sims(grouped=True):
     square_tani = square_tani[order][:, order]
     palette_lig = sns.light_palette('navy', as_cmap=True)
     ax = double_heatmap(corr1=square_corrs, corr2=square_tani, kwargs2={'cmap': palette_lig})
-    plt.savefig("figs/tanimotos_preds", format="pdf")
+    plt.savefig("figs/tanimotos_preds.pdf")
     plt.show()
 
     ax = double_heatmap(corr1=square_tani,
                         corr2=square_rms,
                         kwargs1={'cmap': palette_lig},
                         kwargs2={'cmap': sns.light_palette('forestgreen'), 'vmax': 0.7, 'vmin': 0.2}, )
-    plt.savefig("figs/rmscores_ligands", format="pdf")
+    plt.savefig("figs/rmscores_ligands.pdf")
     plt.show()
 
     # plt.scatter(rms, corrs, alpha=0.7)
@@ -430,14 +314,14 @@ def tsne(grouped=True):
             rotated_X_pocket = rotate_2D_coords(fixed_x_embs, angle=angle)
             pocket_coords = rotated_X_pocket[links[:, 0]]
             ligand_coords = X_ligand[links[:, 1]]
-            dists = scipy.spatial.distance.cdist(pocket_coords, ligand_coords)
+            dists = cdist(pocket_coords, ligand_coords)
             all_angles.append(angle)
             all_dists.append(np.mean(dists))
         plt.plot(all_angles, all_dists)
         plt.show()
         return all_angles[np.argmin(all_dists)]
 
-    all_links = np.concatenate((pred_links, found_gt_links, missed_gt_links))
+    # all_links = np.concatenate((pred_links, found_gt_links, missed_gt_links))
     # best_angle = find_best_angle(X_embedded_pocket, X_embedded_lig, all_links)
     # print(best_angle)
     best_angle = 300
@@ -477,67 +361,6 @@ def tsne(grouped=True):
     ax.elev = 67
     plt.savefig("figs/tsne_mappings.pdf", format="pdf", bbox_inches='tight')
     plt.show()
-
-    # OLD TSNE
-    # ligand computations
-    # natives = set(list(df.loc[(df['is_active'] == 1) & (df['decoys'] == 'chembl')]['smiles'])) # TO FIX for several actives
-    # mols = [Chem.MolFromSmiles(s) for s in smiles_list]
-    # clean_mols = []
-    # clean_smiles = []
-    # for mol, sm in zip(mols, smiles_list):
-    #     if mol is None:
-    #         continue
-    #     clean_mols.append(mol)
-    #     clean_smiles.append(sm)
-    # smiles_to_ind = {sm: i for i, sm in enumerate(clean_smiles)}
-    # fps = np.array([MACCSkeys.GenMACCSKeys(m) for m in clean_mols])
-    # X_embedded_lig = TSNE(n_components=2, learning_rate='auto', init='pca').fit_transform(fps)
-
-    # Create a 3D plot
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # ax2 = fig.add_subplot(122)
-
-    # Plot the solid plane
-    # ax1.plot_surface(x_plane, y_plane, z_plane, alpha=0.2, color='grey')
-    # ax1.plot_surface(x_plane, y_plane, z_plane_lig, alpha=0.2, color='grey')
-
-    # ax2.plot_surface(x_plane, y_plane, z_plane, alpha=0.2, color='grey')
-    # ax2.plot_surface(x_plane, y_plane, z_plane_lig, alpha=0.2, color='grey')
-
-    # clustering_ligs = AgglomerativeClustering(distance_threshold=0.35, metric='cosine', linkage='average',
-    #                                           n_clusters=None).fit(fps)
-    # clustering_pockets = AgglomerativeClustering(metric='precomputed', linkage='single', n_clusters=None,
-    #                                              distance_threshold=0.4).fit(symmetrized_dists)
-    #
-    # offset = -10
-
-    # ax.scatter(X_embedded_pocket[:, 0], X_embedded_pocket[:, 1], marker='^', alpha=1, c='black', s=25)
-    # ax2.scatter(X_embedded_pocket[:,0], X_embedded_pocket[:,1],  alpha=.8, c='red', s=10)
-    # ax.scatter(X_embedded_pocket[:,0], X_embedded_pocket[:,1], [0] * X_embedded_pocket.shape[0], alpha=.8, c=clustering_pockets.labels_, cmap='Set2', s=5)
-    # ax1.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1], [-2] * X_embedded_lig.shape[0], c=clustering_ligs.labels_, alpha=.7, s=1, cmap='Set2')
-    # ax.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1] + offset, c=clustering_ligs.labels_, alpha=.7, s=3, cmap='Set2')
-    # ax.scatter(X_embedded_lig[:, 0], X_embedded_lig[:, 1] + offset,
-    #            c=['blue' if sm in active_smiles else 'grey' for sm in clean_smiles],
-    #            alpha=.7, s=[20 if sm in active_smiles else 0.5 for sm in clean_smiles])
-    # ax2.scatter(X_embedded_lig[:,0], X_embedded_lig[:,1], [-2] * X_embedded_lig.shape[0], c=clustering_ligs.labels_, alpha=.7, s=1, cmap='Set2')
-
-    # # missing natives links
-    # print(corrects, len(pocket_list))
-    # for i, pocket in enumerate(pocket_list):
-    #     if i in corrects:
-    #         continue
-    #
-    #     try:
-    #         print("YO")
-    #         # lig_ind = smiles_to_ind[df.loc[df['PDB_ID_POCKET'] == pocket]['LIGAND_SMILES'].iloc[0]]
-    #         lig_ind = smiles_to_ind[df.loc[(df['pocket_id'] == pocket) & (df['is_active'] == 1)]['smiles'].iloc[0]]
-    #         ax.plot([X_embedded_pocket[i][0], X_embedded_lig[lig_ind][0]],
-    #                 [X_embedded_pocket[i][1], X_embedded_lig[lig_ind][1] + offset],
-    #                 linestyle='-', color='red', lw=1, alpha=.7)
-    #     except KeyError:
-    #         print(i)
-    #         continue
 
 
 if __name__ == "__main__":
