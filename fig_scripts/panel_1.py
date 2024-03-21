@@ -4,7 +4,7 @@ import pandas as pd
 import seaborn as sns
 from seaborn.palettes import dark_palette, light_palette, blend_palette
 
-from fig_scripts.plot_utils import group_df
+from fig_scripts.plot_utils import group_df, get_smooth_order
 
 
 def custom_diverging_palette(h_neg, h_pos, s_neg=75, s_pos=75, l_neg=50, l_pos=50, sep=1, n=6,  # noqa
@@ -32,18 +32,26 @@ def barcodes(grouped=True):
         r"\texttt{mixed}": "mixed.csv",
     }
     rows = []
-    prev_row = None
+    prev_pockets = None
     for csv_name in name_runs.values():
         # print(m)
         df = pd.read_csv(f"outputs/{csv_name}")
         if grouped:
             df = group_df(df)
         row = df[df['decoys'] == 'chembl'].sort_values(by='pocket_id')
-        if prev_row is None:
-            prev_row = row['pocket_id'].values
+        all_pockets= row['pocket_id'].values
+        if prev_pockets is None:
+            prev_pockets = all_pockets
         else:
-            assert (prev_row == row['pocket_id'].values).all(), print(prev_row, row['pocket_id'].values)
+            assert (prev_pockets == all_pockets).all(), print(prev_pockets, all_pockets)
         rows.append(row['score'])
+
+    # FIND SMOOTHER PERMUTED VERSION
+    order = get_smooth_order(prev_pockets)
+    for i in range(len(rows)):
+        new_row = rows[i].values[order]
+        rows[i] = new_row
+
     # sns.heatmap(rows, cmap='binary_r')
     # cmap = sns.color_palette("vlag_r", as_cmap=True)
     # cmap = sns.diverging_palette(0, 245, s=100, l=50, as_cmap=True)
@@ -74,7 +82,11 @@ def barcodes(grouped=True):
     plt.yticks(np.arange(len(name_runs)) + 0.5, [name for name in name_runs.keys()], rotation=0, va="center")
     plt.tick_params(axis='y', left=False, right=False, labelleft=True)
 
-    # plot
+    # plotis is probably useless
+    # selected_pockets = set(pockets)
+    # test_index = np.array([name in selected_pockets for name in rmscores_labels])
+    # test_rmscores_labels = rmscores_labels[test_index]
+    # test_rmscores_values = rmscores_valu
     plt.xlabel(r"Pocket")
     plt.ylabel(r"Method")
     plt.savefig("figs/barcode.pdf", bbox_inches='tight')
@@ -141,5 +153,5 @@ def violins():
 if __name__ == "__main__":
     grouped = True
     barcodes(grouped=grouped)
-    barcodes_transposed(grouped=grouped)
+    # barcodes_transposed(grouped=grouped)
     pass

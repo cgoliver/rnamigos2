@@ -26,7 +26,7 @@ import seaborn as sns
 import scienceplots
 from sklearn.manifold import MDS
 
-plt.style.use('nature')
+# plt.style.use('nature')
 
 from fig_scripts.plot_utils import group_df, get_rmscores, get_smooth_order, rotate_2D_coords
 
@@ -145,10 +145,12 @@ def train_sim_perf_plot(grouped=True):
         mixed_res = group_df(mixed_res)
     mixed_res['train_sim_max'] = mixed_res['pocket_id'].apply(
         lambda x: rmscores.loc[x, rmscores.index.isin(names_train)].max())
+
     sns.scatterplot(data=mixed_res, x='train_sim_max', y='score', alpha=0.7)
     sns.despine()
-    plt.tight_layout()
-    plt.savefig("figs/2b.pdf", format="pdf")
+    plt.xlabel("Max RMscore to train set")
+    plt.ylabel("AuROC")
+    plt.savefig("figs/train_max_perf.pdf", format="pdf", bbox_inches='tight')
     plt.show()
 
 
@@ -202,11 +204,11 @@ def compute_pred_distances(big_df_raw,
 def double_heatmap(corr1, corr2=None,
                    kwargs1={},
                    kwargs2={}):
-    default_kwargs_1 = {'cmap': sns.light_palette('blue', as_cmap=True),
+    default_kwargs_1 = {'cmap': sns.light_palette('royalblue', as_cmap=True),
                         'linewidths': 2,
                         'square': True,
                         'cbar_kws': {"shrink": .95}}
-    default_kwargs_2 = {'cmap': sns.light_palette('green', as_cmap=True),
+    default_kwargs_2 = {'cmap': sns.light_palette('forestgreen', as_cmap=True),
                         'linewidths': 2,
                         'square': True,
                         'cbar_kws': {"shrink": .95}}
@@ -226,9 +228,9 @@ def double_heatmap(corr1, corr2=None,
 
 
 def sims(grouped=True):
-    plt.rcParams['figure.figsize'] = (10, 5)
     # PLOT 1
     # train_sim_perf_plot(grouped=grouped)
+    # plt.rcParams['figure.figsize'] = (10, 5)
 
     # Get raw values
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_raw.csv')
@@ -242,20 +244,7 @@ def sims(grouped=True):
     smooth = True
     rmscores = get_rmscores()
     if smooth:
-        rmscores_values = rmscores.values
-        rmscores_labels = rmscores.columns
-
-        # Select testset
-        test_set = set(test_pockets)
-        test_index = np.array([name in test_set for name in rmscores_labels])
-        test_rmscores_labels = rmscores_labels[test_index]
-        test_rmscores_values = rmscores_values[test_index][:, test_index]
-
-        # Order following test_pocket sort
-        sorter = np.argsort(test_rmscores_labels)
-        test_rmscores_labels = test_rmscores_labels[sorter]
-        test_rmscores_values = test_rmscores_values[sorter][:, sorter]
-        order = get_smooth_order(rmscores=test_rmscores_values)
+        order = get_smooth_order(pockets=test_pockets, rmscores=rmscores)
     else:
         order = np.arange(len(test_pockets))
 
@@ -305,6 +294,7 @@ def sims(grouped=True):
     # plt.show()
 
     ax = double_heatmap(corr1=square_corrs, corr2=square_rms, kwargs2={'vmax': 0.7, 'vmin': 0.2})
+    plt.savefig("figs/rmscores_preds", format="pdf")
     plt.show()
 
     # COMPARE: jaccard vs fp sim of natives
@@ -315,14 +305,16 @@ def sims(grouped=True):
     tani = [DataStructs.TanimotoSimilarity(fp_1, fp_2) for fp_1, fp_2 in itertools.combinations(fps, 2)]
     square_tani = squareform(tani)
     square_tani = square_tani[order][:, order]
-    palette_lig = sns.light_palette('orange', as_cmap=True)
+    palette_lig = sns.light_palette('navy', as_cmap=True)
     ax = double_heatmap(corr1=square_corrs, corr2=square_tani, kwargs2={'cmap': palette_lig})
+    plt.savefig("figs/tanimotos_preds", format="pdf")
     plt.show()
 
-    ax = double_heatmap(corr1=square_rms,
-                        corr2=square_tani,
-                        kwargs1={'cmap': sns.light_palette('green'), 'vmax': 0.7, 'vmin': 0.2},
-                        kwargs2={'cmap': palette_lig})
+    ax = double_heatmap(corr1=square_tani,
+                        corr2=square_rms,
+                        kwargs1={'cmap': palette_lig},
+                        kwargs2={'cmap': sns.light_palette('forestgreen'), 'vmax': 0.7, 'vmin': 0.2}, )
+    plt.savefig("figs/rmscores_ligands", format="pdf")
     plt.show()
 
     # plt.scatter(rms, corrs, alpha=0.7)
@@ -336,10 +328,6 @@ def sims(grouped=True):
 
 
 def tsne(grouped=True):
-    plt.rcParams['figure.figsize'] = (10, 5)
-    decoys = 'chembl'
-    # decoys = 'pdb'
-
     # GET POCKET SPACE EMBEDDINGS
     # Get the test_pockets that were used
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_raw.csv')
@@ -458,11 +446,11 @@ def tsne(grouped=True):
     ax = plt.axes(projection='3d')
     X_embedded_pocket = rotate_2D_coords(X_embedded_pocket, angle=best_angle)
     ax.scatter(X_embedded_pocket[:, 0], X_embedded_pocket[:, 1], z_offset * np.ones(len(X_embedded_pocket)),
-               c=['green' if pocket in test_pockets else 'grey' for pocket in all_pockets],
+               c=['forestgreen' if pocket in test_pockets else 'grey' for pocket in all_pockets],
                s=[20 if pocket in test_pockets else 0.5 for pocket in all_pockets],
                alpha=.9)
     ax.scatter(X_embedded_lig[:, 0], X_embedded_lig[:, 1], np.zeros(len(X_embedded_lig)),
-               c=['blue' if sm in active_smiles else 'grey' for sm in smiles_list],
+               c=['navy' if sm in active_smiles else 'grey' for sm in smiles_list],
                s=[20 if sm in active_smiles else 0.5 for sm in smiles_list],
                alpha=.9)
 
@@ -487,8 +475,7 @@ def tsne(grouped=True):
     ax.set_axis_off()
     ax.azim = 41
     ax.elev = 67
-    # ax.dist = dist
-    plt.savefig("figs/fig_2a.pdf", format="pdf", bbox_inches='tight')
+    plt.savefig("figs/tsne_mappings.pdf", format="pdf", bbox_inches='tight')
     plt.show()
 
     # OLD TSNE
@@ -554,5 +541,5 @@ def tsne(grouped=True):
 
 
 if __name__ == "__main__":
-    # sims()
+    sims()
     tsne()
