@@ -6,6 +6,7 @@ import pickle
 import itertools
 from collections import Counter
 
+import scipy.spatial.transform
 from joblib import Parallel, delayed
 
 import matplotlib.pyplot as plt
@@ -27,7 +28,7 @@ from sklearn.manifold import MDS
 
 plt.style.use('nature')
 
-from fig_scripts.plot_utils import group_df, get_rmscores, get_smooth_order
+from fig_scripts.plot_utils import group_df, get_rmscores, get_smooth_order, rotate_2D_coords
 
 
 def compute_old():
@@ -392,19 +393,13 @@ def tsne(grouped=True):
     #             alpha=.7)
     # plt.show()
 
-    fig = plt.figure()
+    x_offset = -0.5
+    # x_offset = 0.
+    y_offset = -0.5
+    # y_offset = 0.
     z_offset = 2
-    ax = fig.add_subplot(projection='3d')
-
-    # plot spaces with an offset
-    ax.scatter(X_embedded_pocket[:, 0], X_embedded_pocket[:, 1], z_offset * np.ones(len(X_embedded_pocket)),
-               c=['green' if pocket in test_pockets else 'grey' for pocket in all_pockets],
-               s=[20 if pocket in test_pockets else 0.5 for pocket in all_pockets],
-               alpha=.7)
-    ax.scatter(X_embedded_lig[:, 0], X_embedded_lig[:, 1], np.zeros(len(X_embedded_lig)),
-               c=['blue' if sm in active_smiles else 'grey' for sm in smiles_list],
-               s=[20 if sm in active_smiles else 0.5 for sm in smiles_list],
-               alpha=.7)
+    X_embedded_pocket[:, 0] += x_offset
+    X_embedded_pocket[:, 1] += y_offset
 
     # GET LINKS
     smiles_to_ind = {smiles: i for i, smiles in enumerate(smiles_list)}
@@ -412,7 +407,8 @@ def tsne(grouped=True):
     pred_links = []
     found_gt_links = []
     missed_gt_links = []
-    for pocket in test_pockets:
+    for i, pocket in enumerate(test_pockets):
+        # if i > 3: break
         # pred links
         pocket_id = pocket_to_ind[pocket]
         pred_smiles = get_predictions_pocket(pocket,
@@ -435,29 +431,64 @@ def tsne(grouped=True):
     found_gt_links = np.asarray(found_gt_links)
     missed_gt_links = np.asarray(missed_gt_links)
 
+    def find_best_angle(X_pocket, X_ligand, links):
+        """
+        Rotate one of the spaces to minimize crossings.
+        """
+        fixed_x_embs = X_pocket.copy()
+        all_angles = list()
+        all_dists = list()
+        for angle in range(0, 360, 10):
+            rotated_X_pocket = rotate_2D_coords(fixed_x_embs, angle=angle)
+            pocket_coords = rotated_X_pocket[links[:, 0]]
+            ligand_coords = X_ligand[links[:, 1]]
+            dists = scipy.spatial.distance.cdist(pocket_coords, ligand_coords)
+            all_angles.append(angle)
+            all_dists.append(np.mean(dists))
+        plt.plot(all_angles, all_dists)
+        plt.show()
+        return all_angles[np.argmin(all_dists)]
+
+    all_links = np.concatenate((pred_links, found_gt_links, missed_gt_links))
+    # best_angle = find_best_angle(X_embedded_pocket, X_embedded_lig, all_links)
+    # print(best_angle)
+    best_angle = 300
+
+    # PLOT 3D
+    ax = plt.axes(projection='3d')
+    X_embedded_pocket = rotate_2D_coords(X_embedded_pocket, angle=best_angle)
+    ax.scatter(X_embedded_pocket[:, 0], X_embedded_pocket[:, 1], z_offset * np.ones(len(X_embedded_pocket)),
+               c=['green' if pocket in test_pockets else 'grey' for pocket in all_pockets],
+               s=[20 if pocket in test_pockets else 0.5 for pocket in all_pockets],
+               alpha=.9)
+    ax.scatter(X_embedded_lig[:, 0], X_embedded_lig[:, 1], np.zeros(len(X_embedded_lig)),
+               c=['blue' if sm in active_smiles else 'grey' for sm in smiles_list],
+               s=[20 if sm in active_smiles else 0.5 for sm in smiles_list],
+               alpha=.9)
+
+    # Get coords for each kind of link
     pred_links_pocket_coords = X_embedded_pocket[pred_links[:, 0]]
     pred_links_ligand_coords = X_embedded_lig[pred_links[:, 1]]
-
     found_gt_links_pocket_coords = X_embedded_pocket[found_gt_links[:, 0]]
     found_gt_links_ligand_coords = X_embedded_lig[found_gt_links[:, 1]]
-
     missed_gt_links_pocket_coords = X_embedded_pocket[missed_gt_links[:, 0]]
     missed_gt_links_ligand_coords = X_embedded_lig[missed_gt_links[:, 1]]
 
+    # Plot them with different colors
     for pocket_coord, ligand_coord in zip(pred_links_pocket_coords, pred_links_ligand_coords):
-        ax.plot([pocket_coord[0], ligand_coord[0]], [pocket_coord[1], ligand_coord[1]], zs=[z_offset, 0], color='gray', alpha=0.1)
-
+        ax.plot([pocket_coord[0], ligand_coord[0]], [pocket_coord[1], ligand_coord[1]], zs=[z_offset, 0],
+                color='gray', alpha=0.1)
     for pocket_coord, ligand_coord in zip(found_gt_links_pocket_coords, found_gt_links_ligand_coords):
-        ax.plot([pocket_coord[0], ligand_coord[0]], [pocket_coord[1], ligand_coord[1]], zs=[z_offset, 0], color='green',
-                alpha=0.5)
+        ax.plot([pocket_coord[0], ligand_coord[0]], [pocket_coord[1], ligand_coord[1]], zs=[z_offset, 0],
+                color='forestgreen', alpha=0.3)
     for pocket_coord, ligand_coord in zip(missed_gt_links_pocket_coords, missed_gt_links_ligand_coords):
-        ax.plot([pocket_coord[0], ligand_coord[0]], [pocket_coord[1], ligand_coord[1]], zs=[z_offset, 0], color='red',
-                alpha=0.5)
-    # ax1.set_title("Ground Truth")
-    # ax2.set_title("Prediction")
+        ax.plot([pocket_coord[0], ligand_coord[0]], [pocket_coord[1], ligand_coord[1]], zs=[z_offset, 0],
+                color='firebrick', alpha=0.3)
     ax.set_axis_off()
-    # ax2.set_axis_off()
-    plt.savefig("fig_2a.pdf", format="pdf")
+    ax.azim = 41
+    ax.elev = 67
+    # ax.dist = dist
+    plt.savefig("figs/fig_2a.pdf", format="pdf", bbox_inches='tight')
     plt.show()
 
     # OLD TSNE
@@ -520,6 +551,7 @@ def tsne(grouped=True):
     #     except KeyError:
     #         print(i)
     #         continue
+
 
 if __name__ == "__main__":
     # sims()

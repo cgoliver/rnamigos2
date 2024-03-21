@@ -47,6 +47,15 @@ def get_smooth_order(rmscores):
     # new_coords = MDS(n_components=1, dissimilarity='precomputed').fit_transform(distance_symmetrized)
     return np.argsort(new_coords.flatten())
 
+def rotate_2D_coords(coords, angle=0):
+    """
+    coords are expected to be (N,2)
+    """
+    theta = (angle / 180.) * np.pi
+    rot_matrix = np.array([[np.cos(theta), -np.sin(theta)],
+                           [np.sin(theta), np.cos(theta)]])
+    center = coords.mean(axis=0)
+    return (coords - center) @ rot_matrix + center
 
 def setup_plot():
     # SETUP PLOT
