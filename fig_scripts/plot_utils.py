@@ -65,7 +65,7 @@ def setup_plot():
     return palette
 
 
-PALETTE = setup_plot()
+#PALETTE = setup_plot()
 
 
 class CustomScale(mscale.ScaleBase):

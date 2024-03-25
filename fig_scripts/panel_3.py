@@ -45,9 +45,9 @@ if __name__ == "__main__":
                       init='pca').fit_transform(fps)
 
 
-    fig, axarr = plt.subplots(4, 1)
-    axs = axarr.flatten()
     
+    markers = ["^", "P", "D", "*"]
+    colors = ['green', 'blue', 'red', 'orange']
     for i, robin in enumerate(robins):
         actives = pd.read_csv(f"outputs/robin/{robin}_actives.txt", delimiter=' ')
         actives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
@@ -67,13 +67,14 @@ if __name__ == "__main__":
 
         N = len(scores_active) + len(scores_inactive)
 
-        colors_active = ['yellow' if ((r / N) > 0.9) else 'grey' for r in ranks_active] 
-        colors_inactive = ['yellow' if ((r / N) > 0.9) else 'grey' for r in ranks_inactive] 
+        colors_active = [colors[i] if ((r / N) > 0.9) else 'grey' for r in ranks_active] 
+        colors_inactive = [colors[i] if ((r / N) > 0.9) else 'grey' for r in ranks_inactive] 
 
-        axs[i].scatter(X_embedded[inds_inactive,0], X_embedded[inds_inactive,1], c=colors_inactive, marker='o', s=.5, alpha=.5)
-        axs[i].scatter(X_embedded[inds_active,0], X_embedded[inds_active,1], c=colors_active, linewidths=0.8, edgecolors='black', marker='^', s=50, alpha=1)
-        axs[i].set_title(robin)
-        axs[i].axis('off')
+        plt.scatter(X_embedded[inds_inactive,0], X_embedded[inds_inactive,1], c=colors_inactive, marker='o', s=.5, alpha=.5)
+        plt.scatter(X_embedded[inds_active,0], X_embedded[inds_active,1], c=colors_active, linewidths=0.8, edgecolors='black', marker=markers[i], s=50, alpha=1, label=robin)
+    
+    plt.legend()
+    plt.axis("off")
     plt.show()
 
     pass

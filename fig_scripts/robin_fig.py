@@ -1,4 +1,5 @@
 from collections import defaultdict
+import random
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -140,7 +141,7 @@ def get_dfs_docking(ligand_name):
     return merged
 
 
-def get_dfs_migos(pocket_name):
+def get_dfs_migos(pocket_name, swap=True, swap_on='merged'):
     names = ['smiles', 'dock', 'is_native', 'native_fp', 'merged']
     out_dir = 'outputs/robin'
     actives_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_actives.txt"), names=names, sep=' ')
@@ -152,6 +153,22 @@ def get_dfs_migos(pocket_name):
     # merged = pd.concat([actives_df, inactives_df, decoys_df])
     # merged = pd.concat([actives_df, decoys_df])
     merged = pd.concat([actives_df, inactives_df])
+    if swap:
+        other_pocket = random.choice(list(set(pocket_names) - set([pocket_name])))
+        other_actives = pd.read_csv(os.path.join(out_dir, f"{other_pocket}_actives.txt"), names=names, sep=' ')
+        other_actives['split'] = 'actives'
+        other_inactives = pd.read_csv(os.path.join(out_dir, f"{other_pocket}_inactives.txt"), names=names, sep=' ')
+        other_inactives['split'] = 'inactives'
+        merged_other = pd.concat([other_actives, other_inactives])
+        both =  merged.merge(merged_other, on='smiles', suffixes=('_orig', '_other'))
+        if swap_on == 'merged':
+            both['merged'] = both['merged_other']
+            both['split'] = both['split_orig']
+        if swap_on == 'split':
+            both['split'] = both['split_other']
+            both['merged'] = both['merged_orig']
+        return both 
+
     return merged
 
 

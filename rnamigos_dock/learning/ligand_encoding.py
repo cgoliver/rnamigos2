@@ -164,6 +164,7 @@ class MolGraphEncoder:
     def smiles_to_graph_one(self, smiles):
         if smiles in self.cashed_graphs:
             return self.cashed_graphs[smiles]
+        graph_nx = smiles_to_nx(smiles)
         return self.nx_mol_to_dgl(graph_nx)
         
     def smiles_to_graph_list(self, smiles_list):

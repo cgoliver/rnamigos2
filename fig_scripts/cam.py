@@ -8,6 +8,7 @@ import networkx as nx
 from yaml import safe_load
 from dgl.dataloading import GraphDataLoader
 from torchvision.models.feature_extraction import create_feature_extractor
+import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -101,7 +102,7 @@ def load_model(params, saved_model_dir):
     return model
 
 
-def grad_CAM(model, layer, pocket, lig, scaled=True, ligand_cam=True):
+def grad_CAM(model, layer, pocket, lig, scaled=True, ligand_cam=True, save_csv=None):
 
     inner_layer_output = {}
     def get_inner_layer_output(module, input, output):
@@ -126,6 +127,20 @@ def grad_CAM(model, layer, pocket, lig, scaled=True, ligand_cam=True):
     if scaled:
         cam = (cam - cam.min())/(cam.max() - cam.min())
 
+
+    if not save_csv is None:
+        if ligand_cam: 
+            graph = pocket_graph
+            suffix = "_ligand"
+        else:
+            graph = ligand_graph
+            suffix = "_pocket"
+
+        rows = []
+        for node, val in zip(sorted(graph.nodes()), cam):
+            rows.append({"id": node.item(), "cam": val.item()})
+
+        pd.DataFrame(rows).to_csv(save_csv)
     return cam
 
 def highlight_pdb_pocket(pocket_path, cam, outpath):
@@ -141,11 +156,13 @@ def highlight_pdb_pocket(pocket_path, cam, outpath):
             color = colors.to_hex(colormap(val.item()))
             pdbid, chain, pos = node.split(".")
             cmds.write(f"color /{chain}:{pos} {color}\n")
-            keep_ligs.append(f"/{chain}.{pos}")
+            keep_ligs.append(f"{chain}:{pos}")
         
-        cmds.write(f"delete ~{','.join(keep_ligs)},/{lig_chain}.{lig_pos}\n")
-        cmds.write("background solid white \n")
-        cmds.write("center")
+        cmds.write(f"delete ~/{','.join(keep_ligs)},{lig_chain}:{lig_pos}\n")
+        cmds.write("nucleotides tube/slab shape box \n")
+        cmds.write("show cartoons \n")
+        cmds.write("set bgColor white \n")
+        cmds.write("view")
 
 def highlight_pdb_ligand(lig_graph, cam, outpath):
     """ Generate chimera command file to place a colormapped surface mesh around
@@ -156,9 +173,9 @@ def highlight_pdb_ligand(lig_graph, cam, outpath):
     keep_ligs = []
     with open(outpath, "w") as cmds:
         for (node, data), val in zip(sorted(lig_graph.nodes(data=True)), cam):
-            print(node)
             color = colors.to_hex(colormap(val.item()))
             cmds.write(f"color /{lig_chain}:{lig_pos}@{data['atom_name']} {color}\n")
+        cmds.write("hb ligand restrict cross color yellow radius 0.2")
     
 if __name__ == "__main__":
     args = cline()
@@ -174,9 +191,8 @@ if __name__ == "__main__":
     else:
         ligand_graph, ligand_graph_nx = MolGraphEncoder().mol2_to_graph_one(args.mol2_path)
 
-    print(ligand_graph)
-    cam_pocket = grad_CAM(model, args.layer, pocket_graph, ligand_graph, ligand_cam=False, scaled=not args.raw_values)
-    cam_ligand = grad_CAM(model, args.layer, pocket_graph, ligand_graph, ligand_cam=True, scaled=not args.raw_values)
+    cam_pocket = grad_CAM(model, args.layer, pocket_graph, ligand_graph, ligand_cam=False, scaled=not args.raw_values, save_csv=f"outputs/CAM/{args.pocket_id}_pocket_cam.csv")
+    cam_ligand = grad_CAM(model, args.layer, pocket_graph, ligand_graph, ligand_cam=True, scaled=not args.raw_values, save_csv=f"outputs/CAM/{args.pocket_id}_ligand_cam.csv")
 
     highlight_pdb_pocket(pocket_path, cam_pocket, args.outpath_pocket)
     highlight_pdb_ligand(ligand_graph_nx, cam_ligand, args.outpath_lig)

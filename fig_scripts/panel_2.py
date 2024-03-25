@@ -23,7 +23,6 @@ from rdkit.Chem import MACCSkeys
 import seaborn as sns
 import scienceplots
 
-plt.style.use('nature')
 
 from fig_scripts.plot_utils import group_df, get_rmscores, get_smooth_order
 
@@ -158,6 +157,13 @@ def compute_pred_distances(big_df_raw, out_name="outputs/pred_mixed_overlap_vinc
     pocket_pairs = list(itertools.combinations(test_pockets, 2))
     ref_ligs = list(set(big_df_raw.loc[big_df_raw['pocket_id'] == '1BYJ_A_GE3_30']['smiles']))
 
+    # Factorize the 'Category' column
+    codes, uniques = pd.factorize(big_df_raw['smiles'])
+
+    # Update the 'Category' column with the encoded integers
+    big_df_raw['lig_id'] = codes
+
+
     def get_predictions_pocket(pocket, scores, ref_ligs, percentile=percentile):
         pocket_scores = scores.loc[scores['pocket_id'] == pocket]
         pocket_lig_scores = pocket_scores.loc[pocket_scores['smiles'].isin(ref_ligs)]
@@ -170,11 +176,34 @@ def compute_pred_distances(big_df_raw, out_name="outputs/pred_mixed_overlap_vinc
     pocket_preds = {}
     for pocket in test_pockets:
         pocket_preds[pocket] = get_predictions_pocket(pocket, ref_ligs=ref_ligs, scores=big_df_raw)
+        #print(pocket, pocket_preds[pocket])
 
-    from collections import Counter
     all_pred = Counter()
     for pred in pocket_preds.values():
         all_pred += Counter(pred)
+
+    orders = {sm:i for i, sm in enumerate(all_pred.keys())}
+    df_ridge = big_df_raw.loc[big_df_raw['smiles'].isin(all_pred)]
+    df_ridge['rank'] = df_ridge.groupby('pocket_id')['mixed'].rank(pct=True, ascending=True)
+    df_ridge['order'] = df_ridge['smiles'].apply(lambda x:orders[x])
+
+    df_ridge = df_ridge.sort_values(by='order')
+    print(df_ridge)
+
+    sns.set(font_scale = .5)
+
+    # Initialize the FacetGrid object
+    pal = sns.cubehelix_palette(10, rot=-.25, light=.7)
+    g = sns.FacetGrid(df_ridge, row="smiles", hue="smiles", aspect=15, height=.5, palette=pal)
+
+    # Draw the densities in a few steps
+    g.map(sns.kdeplot, "rank",
+          bw_adjust=.5, clip_on=False,
+          fill=True, alpha=1, linewidth=1.5)
+    g.map(sns.kdeplot, "rank", clip_on=False, color="w", lw=2, bw_adjust=.5)
+    g.despine(bottom=True, left=True)
+    plt.show()
+
 
     rows = []
     for p1, p2 in (pocket_pairs):
@@ -222,6 +251,8 @@ def sims(grouped=True):
     big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles', 'is_active'])
 
     test_pockets = sorted(big_df_raw['pocket_id'].unique())
+    for p in test_pockets:
+        print(p)
     pocket_pairs = list(itertools.combinations(test_pockets, 2))
 
     # Get smooth ordering
@@ -250,7 +281,7 @@ def sims(grouped=True):
 
     # COMPUTE PDIST based on overlap of predictions
     out_name = "outputs/pred_mixed_overlap_vincent.csv"
-    compute_pred_distances(big_df_raw=big_df_raw, out_name=out_name, percentile=0.1)
+    compute_pred_distances(big_df_raw=big_df_raw, out_name=out_name, percentile=0.01)
     results_df = pd.read_csv(out_name)
     corrs = list(results_df['overlap'])
     square_corrs = squareform(corrs)
