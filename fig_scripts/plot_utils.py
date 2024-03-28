@@ -39,13 +39,44 @@ def get_rmscores():
     return rm_scores
 
 
-def get_smooth_order(rmscores):
-    distance_symmetrized = (1 - rmscores + (1 - rmscores).T)/2
+def get_smooth_order(pockets, rmscores=None):
+    """
+    Given pockets in a certain order, return a permutation so that similar pockets are close in the permuted list
+    """
+    if rmscores is None:
+        rmscores = get_rmscores()
+    rmscores_values = rmscores.values
+    rmscores_labels = rmscores.columns
+
+    # Subset queried pockets, this is needed when we have only a few pockets (otherwise indices are over len(pockets))
+    selected_pockets = set(pockets)
+    test_index = np.array([name in selected_pockets for name in rmscores_labels])
+    test_rmscores_labels = rmscores_labels[test_index]
+    test_rmscores_values = rmscores_values[test_index][:, test_index]
+
+    # Order following query pockets order
+    pocket_to_id = {pocket: i for i, pocket in enumerate(test_rmscores_labels)}
+    sorter = [pocket_to_id[pocket] for pocket in pockets]
+    test_rmscores_values = test_rmscores_values[sorter][:, sorter]
+
+    # Use the values to re-order the pockets
+    distance_symmetrized = (1 - test_rmscores_values + (1 - test_rmscores_values).T) / 2
     # sim_error = distance_symmetrized - (distance_symmetrized).T
     new_coords = TSNE(n_components=1, learning_rate='auto', metric='precomputed', init='random').fit_transform(
         distance_symmetrized)
     # new_coords = MDS(n_components=1, dissimilarity='precomputed').fit_transform(distance_symmetrized)
     return np.argsort(new_coords.flatten())
+
+
+def rotate_2D_coords(coords, angle=0):
+    """
+    coords are expected to be (N,2)
+    """
+    theta = (angle / 180.) * np.pi
+    rot_matrix = np.array([[np.cos(theta), -np.sin(theta)],
+                           [np.sin(theta), np.cos(theta)]])
+    center = coords.mean(axis=0)
+    return (coords - center) @ rot_matrix + center
 
 
 def setup_plot():
@@ -65,7 +96,7 @@ def setup_plot():
     return palette
 
 
-#PALETTE = setup_plot()
+PALETTE = setup_plot()
 
 
 class CustomScale(mscale.ScaleBase):
