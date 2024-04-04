@@ -5,11 +5,15 @@ import time
 
 from loguru import logger
 import dgl
+from dgl.dataloading import GraphDataLoader
+
 import torch
 import torch.nn.functional as F
 
 from rnamigos_dock.learning.utils import dgl_to_nx
 from rnamigos_dock.learning.decoy_utils import *
+from rnamigos_dock.learning.loader import VirtualScreenDataset
+from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 
 
 def send_graph_to_device(g, device):
@@ -45,19 +49,19 @@ def print_gradients(model):
     pass
 
 
-def test(model, test_loader, criterion, device):
+def validate(model, val_loader, criterion, device):
     """
     Compute accuracy and loss of model over given dataset
     :param model:
-    :param test_loader:
-    :param test_loss_fn:
+    :param val_loader:
+    :param criterion:
     :param device:
     :return:
     """
     model.eval()
-    test_loss = 0
-    test_size = len(test_loader)
-    for batch_idx, (batch) in enumerate(test_loader):
+    val_loss = 0
+    val_size = len(val_loader)
+    for batch_idx, (batch) in enumerate(val_loader):
         graph, ligand_input, target, idx = batch['graph'], batch['ligand_input'], batch['target'], batch['idx']
 
         # Get data on the devices
@@ -72,9 +76,9 @@ def test(model, test_loader, criterion, device):
                 loss = criterion(pred.squeeze(), target.squeeze(dim=0).float())
             else:
                 loss = criterion(pred.squeeze(), target.float())
-        test_loss += loss.item()
+        val_loss += loss.item()
 
-    return test_loss / test_size
+    return val_loss / val_size
 
 
 def train_dock(model,
@@ -82,13 +86,15 @@ def train_dock(model,
                optimizer,
                train_loader,
                val_loader,
+               test_loader,
                save_path,
                writer=None,
                device='cpu',
                num_epochs=25,
                wall_time=None,
                early_stop_threshold=10,
-               pretrain_weight=0.1
+               pretrain_weight=0.1,
+               cfg=None
                ):
     """
     Performs the entire training routine.
@@ -173,14 +179,11 @@ def train_dock(model,
         train_loss = running_loss / num_batches
         writer.add_scalar("Training epoch loss", train_loss, epoch)
 
-        # train_accuracy = running_corrects / num_batches
-        # writer.log_scalar("Train accuracy during training", train_accuracy, epoch)
+        # Validation phase
+        val_loss = validate(model, val_loader, criterion, device)
+        print(">> val loss ", val_loss)
 
-        # Test phase
-        test_loss = test(model, val_loader, criterion, device)
-        print(">> test loss ", test_loss)
-
-        writer.add_scalar("Test loss during training", test_loss, epoch)
+        writer.add_scalar("Validation loss during training", val_loss, epoch)
 
         """
         learning_curve_val_df = learning_curve_val_df.append({'EPOCH': str(ne), 
@@ -188,12 +191,12 @@ def train_dock(model,
             'TYPE_LOSS':'TRAIN'}, ignore_index=True)
         
         learning_curve_val_df = learning_curve_val_df.append({'EPOCH': str(ne), 
-            'LOSS': str(test_loss), 
-            'TYPE_LOSS':'TEST'}, ignore_index=True)
+            'LOSS': str(val_loss), 
+            'TYPE_LOSS':'VAL'}, ignore_index=True)
         """
         # Checkpointing
-        if test_loss < best_loss:
-            best_loss = test_loss
+        if val_loss < best_loss:
+            best_loss = val_loss
             epochs_from_best = 0
             model.cpu()
             torch.save({
@@ -217,7 +220,16 @@ def train_dock(model,
             time_elapsed = time.time() - start_time
             if time_elapsed * (1 + 1 / (epoch + 1)) > .95 * wall_time * 3600:
                 break
-        del test_loss
+        del val_loss
+
+        if not epoch % 10:
+            lower_is_better = cfg.train.target in ['dock', 'native_fp']
+            efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
+                                                                               test_loader,
+                                                                               metric=mean_active_rank,
+                                                                               lower_is_better=lower_is_better)
+            writer.add_scalar("Test EF during training", np.mean(efs), epoch)
+
     best_state_dict = torch.load(save_path)['model_state_dict']
     model.load_state_dict(best_state_dict)
     model.eval()

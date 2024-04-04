@@ -11,7 +11,8 @@ Make sure to set the correct `train.loss` given the target you chose. Optioins:
 * `l2`: L1 loss
 * `bce`: Binary crossentropy
 """
-
+import os
+import sys
 from pathlib import Path
 
 import numpy.random
@@ -28,6 +29,9 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import pandas as pd
 
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from rnamigos_dock.learning.loader import (get_systems, DockingDataset, IsNativeSampler, NativeFPSampler,
                                            RingCollater, VirtualScreenDataset)
 from rnamigos_dock.learning import learn
@@ -35,6 +39,7 @@ from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEn
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 from rnamigos_dock.learning.utils import mkdirs
 
+# torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
 
 
@@ -53,7 +58,6 @@ def main(cfg: DictConfig):
     Hardware settings
     '''
 
-    # torch.multiprocessing.set_sharing_strategy('file_system')
     if torch.cuda.is_available():
         if cfg.device != 'cpu':
             try:
@@ -128,6 +132,19 @@ def main(cfg: DictConfig):
                                  collate_fn=val_collater.collate,
                                  **loader_args)
 
+    test_loader_args = {'shuffle': False,
+                        'batch_size': 1,
+                        'num_workers': 4,
+                        'collate_fn': lambda x: x[0]
+                        }
+
+    test_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
+                                        decoy_mode='chembl',
+                                        ligands_path=cfg.data.ligand_db,
+                                        systems=test_systems,
+                                        use_graphligs=cfg.model.use_graphligs,
+                                        group_ligands=True)
+    test_loader = GraphDataLoader(dataset=test_dataset, **test_loader_args)
     print('Created data loader')
 
     '''
@@ -220,11 +237,14 @@ def main(cfg: DictConfig):
                                      device=device,
                                      train_loader=train_loader,
                                      val_loader=val_loader,
+                                     test_loader=test_loader,
                                      save_path=save_path,
                                      writer=writer,
                                      num_epochs=num_epochs,
                                      early_stop_threshold=cfg.train.early_stop,
-                                     pretrain_weight=cfg.train.pretrain_weight)
+                                     pretrain_weight=cfg.train.pretrain_weight,
+                                     cfg=cfg,
+                                     )
 
     logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
     logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")
@@ -244,7 +264,7 @@ def main(cfg: DictConfig):
                                        use_graphligs=cfg.model.use_graphligs,
                                        rognan=False,
                                        group_ligands=True)
-        dataloader = GraphDataLoader(dataset=dataset, **loader_args)
+        dataloader = GraphDataLoader(dataset=dataset, **test_loader_args)
 
         print('Created data loader')
 

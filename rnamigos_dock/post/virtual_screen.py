@@ -81,6 +81,6 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
         pocket_names.append(pocket_name)
         all_smiles.append(smiles)
     logger.debug(f"VS failed on {failed_set}")
-    print(failed)
-    print(efs)
+    # print(failed)
+    # print(efs)
     return efs, all_scores, status, pocket_names, all_smiles

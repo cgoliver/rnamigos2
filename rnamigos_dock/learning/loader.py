@@ -425,7 +425,6 @@ class VirtualScreenDataset(DockingDataset):
         return list(open(smiles_path).readlines())
 
     def get_ligands(self, pocket_name):
-        print(self.decoy_mode)
         actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_name, self.decoy_mode, 'actives.txt'))
         decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_name, self.decoy_mode, 'decoys.txt'))
         # We need to return all actives and ensure they are not in the inactives of a pocket
