@@ -7,5 +7,5 @@ tensorboard
 hydra-core
 loguru
 rdkit
-rnaglib>=2.0.4
+rnaglib==2.0.4
 git+https://github.com/cgoliver/fr3d-python.git
