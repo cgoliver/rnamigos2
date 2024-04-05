@@ -115,6 +115,7 @@ def train_dock(model,
     start_time = time.time()
     best_loss = sys.maxsize
     batch_size = train_loader.batch_size
+    vs_every = cfg.train.vs_every if cfg is not None else 10
     # if we delay attributor, start with attributor OFF
     # if <= -1, both always ON.
 
@@ -222,7 +223,7 @@ def train_dock(model,
                 break
         del val_loss
 
-        if not epoch % 10:
+        if not epoch % vs_every:
             lower_is_better = cfg.train.target in ['dock', 'native_fp']
             efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
                                                                                test_loader,

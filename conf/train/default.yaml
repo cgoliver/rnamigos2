@@ -6,6 +6,7 @@ clf_lam: 1.0
 reconstruction_lam: 1.0
 kfold: 5
 num_epochs: 100
+vs_every: 20
 embed_only: false
 early_stop: 10
 use_nucs: true
