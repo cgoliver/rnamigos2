@@ -436,6 +436,9 @@ class VirtualScreenDataset(DockingDataset):
             group_actives = set(group_list)
             decoys_smiles = [smile for smile in decoys_smiles if smile not in group_actives]
             actives_smiles = list(group_actives)
+        # Filter None
+        actives_smiles = [x for x in actives_smiles if x is not None]
+        decoys_smiles = [x for x in decoys_smiles if x is not None]
         return actives_smiles, decoys_smiles
 
     def __getitem__(self, idx):
@@ -453,8 +456,12 @@ class VirtualScreenDataset(DockingDataset):
             # Now we don't Rognan anymore for ligands
             pocket_name = self.all_pockets_names[idx]
             actives_smiles, decoys_smiles = self.get_ligands(pocket_name)
-            all_smiles = actives_smiles + decoys_smiles
 
+            # Remove empty cases
+            if len(actives_smiles) == 0 or len(decoys_smiles) == 0:
+                return None, None, None, None, None
+
+            all_smiles = actives_smiles + decoys_smiles
             is_active = np.zeros(len(all_smiles))
             is_active[:len(actives_smiles)] = 1.
 
