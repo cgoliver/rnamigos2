@@ -86,7 +86,8 @@ def train_dock(model,
                optimizer,
                train_loader,
                val_loader,
-               test_loader,
+               val_vs_loader,
+               test_vs_loader,
                save_path,
                writer=None,
                device='cpu',
@@ -225,8 +226,15 @@ def train_dock(model,
 
         if not epoch % vs_every:
             lower_is_better = cfg.train.target in ['dock', 'native_fp']
+
             efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
-                                                                               test_loader,
+                                                                               val_vs_loader,
+                                                                               metric=mean_active_rank,
+                                                                               lower_is_better=lower_is_better)
+            writer.add_scalar("Val EF during training", np.mean(efs), epoch)
+
+            efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
+                                                                               test_vs_loader,
                                                                                metric=mean_active_rank,
                                                                                lower_is_better=lower_is_better)
             writer.add_scalar("Test EF during training", np.mean(efs), epoch)

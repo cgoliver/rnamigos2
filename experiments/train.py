@@ -132,19 +132,26 @@ def main(cfg: DictConfig):
                                  collate_fn=val_collater.collate,
                                  **loader_args)
 
-    test_loader_args = {'shuffle': False,
-                        'batch_size': 1,
-                        'num_workers': 4,
-                        'collate_fn': lambda x: x[0]
-                        }
+    vs_loader_args = {'shuffle': False,
+                      'batch_size': 1,
+                      'num_workers': 4,
+                      'collate_fn': lambda x: x[0]
+                      }
 
-    test_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
-                                        decoy_mode='chembl',
-                                        ligands_path=cfg.data.ligand_db,
-                                        systems=test_systems,
-                                        use_graphligs=cfg.model.use_graphligs,
-                                        group_ligands=True)
-    test_loader = GraphDataLoader(dataset=test_dataset, **test_loader_args)
+    val_vs_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
+                                          decoy_mode='chembl',
+                                          ligands_path=cfg.data.ligand_db,
+                                          systems=validation_systems,
+                                          use_graphligs=cfg.model.use_graphligs,
+                                          group_ligands=True)
+    val_vs_loader = GraphDataLoader(dataset=val_vs_dataset, **vs_loader_args)
+    test_vs_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
+                                           decoy_mode='chembl',
+                                           ligands_path=cfg.data.ligand_db,
+                                           systems=test_systems,
+                                           use_graphligs=cfg.model.use_graphligs,
+                                           group_ligands=True)
+    test_vs_loader = GraphDataLoader(dataset=test_vs_dataset, **vs_loader_args)
     print('Created data loader')
 
     '''
@@ -237,7 +244,8 @@ def main(cfg: DictConfig):
                                      device=device,
                                      train_loader=train_loader,
                                      val_loader=val_loader,
-                                     test_loader=test_loader,
+                                     val_vs_loader=val_vs_loader,
+                                     test_vs_loader=test_vs_loader,
                                      save_path=save_path,
                                      writer=writer,
                                      num_epochs=num_epochs,
@@ -264,7 +272,7 @@ def main(cfg: DictConfig):
                                        use_graphligs=cfg.model.use_graphligs,
                                        rognan=False,
                                        group_ligands=True)
-        dataloader = GraphDataLoader(dataset=dataset, **test_loader_args)
+        dataloader = GraphDataLoader(dataset=dataset, **vs_loader_args)
 
         print('Created data loader')
 
@@ -291,7 +299,7 @@ def main(cfg: DictConfig):
         print('Mean EF :', np.mean(efs))
 
     df = pd.DataFrame(rows)
-    d = Path(cfg.result_dir, parents=True, exist_ok=True)
+    d = Path("outputs/all", parents=True, exist_ok=True)
     df.to_csv(d / cfg.name)
     df_raw = pd.DataFrame(raw_rows)
     df_raw.to_csv(d / Path(cfg.name.split(".")[0] + "_raw.csv"))
