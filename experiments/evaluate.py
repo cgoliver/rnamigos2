@@ -12,10 +12,16 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
 
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
 from rnamigos_dock.learning.models import Embedder, LigandGraphEncoder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen
 
+
+torch.multiprocessing.set_sharing_strategy('file_system')
+torch.set_num_threads(1)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="evaluate")
 def main(cfg: DictConfig):

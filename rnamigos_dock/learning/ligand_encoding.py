@@ -71,9 +71,14 @@ def mol_to_nx(mol):
 
 
 def smiles_to_nx(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return mol_to_nx(mol)
-    
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        nx_graph = mol_to_nx(mol)
+        return nx_graph
+    except:
+        return None
+
+
 def oh_tensor(category, n):
     # One-hot float tensor construction
     t = torch.zeros(n, dtype=torch.float)
@@ -126,19 +131,19 @@ class MolGraphEncoder:
                     continue
                 elif row.startswith("@<TRIPOS>BOND"):
                     break
-                if in_section: 
+                if in_section:
                     atom_names.append(row.split()[1])
                 else:
                     continue
         graph_nx = mol_to_nx(mol)
-        for node,i  in enumerate(graph_nx.nodes()):
+        for node, i in enumerate(graph_nx.nodes()):
             graph_nx.nodes[node]['atom_name'] = atom_names[i]
         graph_dgl = self.nx_mol_to_dgl(graph_nx)
         return graph_dgl, graph_nx
 
-
     def nx_mol_to_dgl(self, graph_nx):
         try:
+            assert graph_nx is not None
             # Get edges as one hot
             edge_type = {edge: torch.tensor(self.edge_map[label]) for edge, label in
                          (nx.get_edge_attributes(graph_nx, 'bond_type')).items()}
@@ -166,7 +171,7 @@ class MolGraphEncoder:
             return self.cashed_graphs[smiles]
         graph_nx = smiles_to_nx(smiles)
         return self.nx_mol_to_dgl(graph_nx)
-        
+
     def smiles_to_graph_list(self, smiles_list):
         graphs = []
         for i, sm in enumerate(smiles_list):

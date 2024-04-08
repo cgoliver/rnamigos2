@@ -39,7 +39,7 @@ from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEn
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 from rnamigos_dock.learning.utils import mkdirs
 
-# torch.multiprocessing.set_sharing_strategy('file_system')
+torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
 
 
