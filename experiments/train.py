@@ -102,8 +102,18 @@ def main(cfg: DictConfig):
                     'stretch_scores': cfg.train.stretch_scores,
                     'undirected': cfg.data.undirected}
 
-    train_systems, validation_systems = np.split(train_systems.sample(frac=1, random_state=42),
-                                                 [int(.8 * len(train_systems))])
+    def split(train, frac=0.8, system_based=True):
+        if system_based:
+            train_names = train['PDB_ID_POCKET'].unique()
+            train_names = np.random.choice(train_names, size=int(frac * len(train_names)), replace=False)
+            train_systems = train[train['PDB_ID_POCKET'].isin(train_names)]
+            validation_systems = train[~train['PDB_ID_POCKET'].isin(train_names)]
+        else:
+            train_systems, validation_systems = np.split(train.sample(frac=1, random_state=42),
+                                                         [int(frac * len(train))])
+        return train_systems, validation_systems
+
+    train_systems, validation_systems = split(train_systems, frac=0.8, system_based=False)
     train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
     validation_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
     # These one cannot be a shared object
@@ -132,6 +142,8 @@ def main(cfg: DictConfig):
                                  collate_fn=val_collater.collate,
                                  **loader_args)
 
+    # This avoids having too many pockets in the VS validation
+    vs_validation_systems = split(train_systems, frac=0.8, system_based=True)
     vs_loader_args = {'shuffle': False,
                       'batch_size': 1,
                       'num_workers': 4,
@@ -141,7 +153,7 @@ def main(cfg: DictConfig):
     val_vs_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
                                           decoy_mode='chembl',
                                           ligands_path=cfg.data.ligand_db,
-                                          systems=validation_systems,
+                                          systems=vs_validation_systems,
                                           use_graphligs=cfg.model.use_graphligs,
                                           group_ligands=True)
     val_vs_loader = GraphDataLoader(dataset=val_vs_dataset, **vs_loader_args)
