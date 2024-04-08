@@ -75,12 +75,12 @@ def main(cfg: DictConfig):
     Dataloader creation
     '''
 
-    train_systems = get_systems(target=cfg.train.target,
-                                rnamigos1_split=cfg.train.rnamigos1_split,
-                                use_rnamigos1_train=cfg.train.use_rnamigos1_train,
-                                use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
-                                group_pockets=cfg.train.group_pockets,
-                                filter_robin=cfg.train.filter_robin)
+    train_val_systems = get_systems(target=cfg.train.target,
+                                    rnamigos1_split=cfg.train.rnamigos1_split,
+                                    use_rnamigos1_train=cfg.train.use_rnamigos1_train,
+                                    use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
+                                    group_pockets=cfg.train.group_pockets,
+                                    filter_robin=cfg.train.filter_robin)
     test_systems = get_systems(target=cfg.train.target,
                                rnamigos1_split=cfg.train.rnamigos1_split,
                                use_rnamigos1_train=cfg.train.use_rnamigos1_train,
@@ -113,7 +113,9 @@ def main(cfg: DictConfig):
                                                          [int(frac * len(train))])
         return train_systems, validation_systems
 
-    train_systems, validation_systems = split(train_systems, frac=0.8, system_based=False)
+    train_systems, validation_systems = split(train_val_systems.copy(), frac=0.8, system_based=False)
+    # This avoids having too many pockets in the VS validation
+    _, vs_validation_systems = split(train_val_systems.copy(), frac=0.8, system_based=True)
     train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
     validation_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
     # These one cannot be a shared object
@@ -142,8 +144,6 @@ def main(cfg: DictConfig):
                                  collate_fn=val_collater.collate,
                                  **loader_args)
 
-    # This avoids having too many pockets in the VS validation
-    vs_validation_systems = split(train_systems, frac=0.8, system_based=True)
     vs_loader_args = {'shuffle': False,
                       'batch_size': 1,
                       'num_workers': 4,
