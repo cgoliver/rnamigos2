@@ -410,11 +410,17 @@ class VirtualScreenDataset(DockingDataset):
         self.rognan = rognan
         self.group_ligands = group_ligands
         if self.group_ligands:
+            # This amounts to choosing only reps.
+            # Previously, the retained ones were the centroids.
             script_dir = os.path.dirname(__file__)
+            reps_file = os.path.join(script_dir, '../../data/group_reps_75.p')
+            train_group_reps, test_group_reps = pickle.load(open(reps_file, 'rb'))
+            reps = set(train_group_reps+test_group_reps)
+            self.all_pockets_names = [pocket for pocket in self.all_pockets_names if pocket in reps]
+
             splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
             _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
             self.groups = {**train_names_grouped, **test_names_grouped}
-            self.all_pockets_names = [pocket for pocket in self.all_pockets_names if pocket in self.groups]
             self.reverse_groups = {group_member: group_rep for group_rep, group_members in self.groups.items()
                                    for group_member in group_members}
         pass

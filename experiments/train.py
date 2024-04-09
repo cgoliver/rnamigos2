@@ -5,7 +5,7 @@ We have 3 options for training modes (`train.target`):
 * `is_native`: predict whether the given ligand is the native for the given pocket (binary classification)
 * `native_fp`: given only a pocket, predict the native ligand's fingerprint. This is the RNAmigos1.0 setting (multi-label classification)`
 
-Make sure to set the correct `train.loss` given the target you chose. Optioins:
+Make sure to set the correct `train.loss` given the target you chose. Options:
 
 * `l1`: L2 loss
 * `l2`: L1 loss
@@ -275,16 +275,15 @@ def main(cfg: DictConfig):
     decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder']
     for decoy_mode in decoys:
         pocket_path = cfg.data.pocket_graphs
-        dataset = VirtualScreenDataset(pocket_path,
-                                       cache_graphs=False,
-                                       ligands_path=cfg.data.ligand_db,
-                                       systems=test_systems,
-                                       decoy_mode=decoy_mode,
-                                       fp_type='MACCS',
-                                       use_graphligs=cfg.model.use_graphligs,
-                                       rognan=False,
-                                       group_ligands=True)
-        dataloader = GraphDataLoader(dataset=dataset, **vs_loader_args)
+        final_vs_dataset = VirtualScreenDataset(pocket_path,
+                                                cache_graphs=False,
+                                                ligands_path=cfg.data.ligand_db,
+                                                systems=test_systems,
+                                                decoy_mode=decoy_mode,
+                                                fp_type='MACCS',
+                                                use_graphligs=cfg.model.use_graphligs,
+                                                group_ligands=False)
+        dataloader = GraphDataLoader(dataset=final_vs_dataset, **vs_loader_args)
 
         print('Created data loader')
 

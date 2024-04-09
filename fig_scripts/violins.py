@@ -1,31 +1,62 @@
+import os
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from fig_scripts.plot_utils import PALETTE, group_df
-
-
 
 # TEST SET
 name_runs = {
     # r"\texttt{fp_old}": "paper_fp.csv",
     # r"\texttt{fp_0}": "fp_split_grouped0.csv",
-    r"\texttt{fp}": "fp_split_grouped1.csv",
+    # r"\texttt{fp_pre}": "fp_split_grouped1.csv",
+    # r"\texttt{fp}": "fp_0.csv",
+    # r"\texttt{fp}": "fp_1.csv",
+    # r"\texttt{fp}": "fp_42.csv",
     # r"\texttt{fp_2}": "fp_split_grouped2.csv",
     # r"\texttt{native_old}": "paper_native.csv",
     # r"\texttt{native0}": "native_split_grouped0.csv",
-    r"\texttt{native}": "native_split_grouped1.csv",
+    # r"\texttt{native_pre}": "native_split_grouped1.csv",
+    r"\texttt{native}": "native_0.csv",
+    # r"\texttt{toto}": "toto_0.csv",
+    # r"\texttt{native}": "native_1.csv",
+    # r"\texttt{native}": "native_42.csv",
     # r"\texttt{native2}": "native_split_grouped2.csv",
     # r"\texttt{dock_old}": "paper_dock.csv",
     # r"\texttt{dock0}": "dock_split_grouped0.csv",
-    r"\texttt{dock}": "dock_split_grouped1.csv",
+    # r"\texttt{dock_pre}": "dock_split_grouped1.csv",
+    # r"\texttt{dock}": "dock_0.csv",
+    # r"\texttt{dock}": "dock_1.csv",
+    # r"\texttt{dock}": "dock_42.csv",
     # r"\texttt{dock2}": "dock_split_grouped2.csv",
-    r"\texttt{rDock}": "rdock.csv",
+    # r"\texttt{rDock}": "rdock.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
-    r"\texttt{mixed}": "mixed.csv",
-    r"\texttt{mixed\newline+ rDock}": "mixed_rdock.csv",
+    # r"\texttt{mixed}": "mixed.csv",
+    # r"\texttt{mixed\newline+ rDock}": "mixed_rdock.csv",
 }
+
+# Difference Mean EF / print is because group_df() does not use group reps but subsamples.
+
+# 0
+#                   \textbackslash texttt\{fp\} & 0.874 \$\textbackslash pm\$ 0.220 \\ ~perf at logging epoch : 0.91
+#               \textbackslash texttt\{native\} & 0.912 \$\textbackslash pm\$ 0.241 \\ Mean EF : 0.90436 \\ ~perf at logging epoch : 0.96
+#                 \textbackslash texttt\{dock\} & 0.928 \$\textbackslash pm\$ 0.160 \\
+
+# 1
+#                   \textbackslash texttt\{fp\} & 0.868 \$\textbackslash pm\$ 0.211 \\ ~perf at logging epoch : 0.905
+#               \textbackslash texttt\{native\} & 0.960 \$\textbackslash pm\$ 0.138 \\ Mean EF : 0.95541
+#                 \textbackslash texttt\{dock\} & 0.945 \$\textbackslash pm\$ 0.141 \\
+
+# 42
+#                   \textbackslash texttt\{fp\} & 0.859 \$\textbackslash pm\$ 0.212 \\ ~perf at logging epoch : 0.92
+#               \textbackslash texttt\{native\} & 0.944 \$\textbackslash pm\$ 0.168 \\
+#                 \textbackslash texttt\{dock\} & 0.935 \$\textbackslash pm\$ 0.157 \\
 
 names = list(name_runs.keys())
 runs = list(name_runs.values())
@@ -37,14 +68,30 @@ decoy_mode = 'chembl'
 grouped = True
 
 # Parse ef data for the runs and gather them in a big database
-dfs = (pd.read_csv(f"outputs/{f}") for f in runs)
-dfs = (df.assign(name=names[i]) for i, df in enumerate(dfs))
+dfs = [pd.read_csv(f"outputs/{f}") for f in runs]
+dfs = [df.assign(name=names[i]) for i, df in enumerate(dfs)]
 big_df = pd.concat(dfs)
 big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
 
+means_0 = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+import pickle
+script_dir = os.path.dirname(__file__)
+splits_file = os.path.join(script_dir, '../data/train_test_75.p')
+_, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+groups = {**train_names_grouped, **test_names_grouped}
+big_df_2 = big_df[big_df['pocket_id'].isin(groups)]
+means_2 = big_df_2.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+# dfs = [df for df in dfs]
+# print(len(big_df['pocket_id'].unique()))
 if grouped:
     big_df = group_df(big_df)
+means_3 = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+# print(len(big_df['pocket_id'].unique()))
 
+print(means_0)
+print(means_2)
+print(means_3)
+luhfr
 # For a detailed score per pocket
 # table = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by=['pocket_id', 'name'])
 # print(table.to_latex(index=False, columns=['pocket_id', 'name', 'score']))
@@ -60,8 +107,9 @@ sorterIndex = dict(zip(names, range(len(names))))
 means['name_rank'] = means['name'].map(sorterIndex)
 means = means.sort_values(['name_rank'], ascending=[True])
 print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
+# sys.exit()
 
-main_palette = PALETTE + PALETTE # useful extra colors for debug plotting more items
+main_palette = PALETTE + PALETTE  # useful extra colors for debug plotting more items
 violin_palette = PALETTE + PALETTE
 
 plt.gca().set_yscale('custom')

@@ -17,10 +17,14 @@ np.random.seed(42)
 def get_groups():
     script_dir = os.path.dirname(__file__)
     splits_file = os.path.join(script_dir, '../data/train_test_75.p')
-    _, _, _, test_names_grouped = pickle.load(open(splits_file, 'rb'))
-    group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
+    _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+    train_group_reps = [random.choice(names) for key, names in train_names_grouped.items()]
+    test_group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
     group_reps_path = os.path.join(script_dir, '../data/group_reps_75.p')
-    pickle.dump(group_reps, open(group_reps_path, 'wb'))
+    pickle.dump((train_group_reps, test_group_reps), open(group_reps_path, 'wb'))
+
+
+# get_groups()
 
 
 def group_df(df):
@@ -29,8 +33,8 @@ def group_df(df):
     """
     script_dir = os.path.dirname(__file__)
     splits_file = os.path.join(script_dir, '../data/group_reps_75.p')
-    group_reps = pickle.load(open(splits_file, 'rb'))
-    df = df.loc[df['pocket_id'].isin(group_reps)]
+    train_group_reps, test_group_reps = pickle.load(open(splits_file, 'rb'))
+    df = df.loc[df['pocket_id'].isin(train_group_reps + test_group_reps)]
     return df
 
 

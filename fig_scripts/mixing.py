@@ -9,7 +9,10 @@ from scipy.signal import savgol_filter
 import seaborn as sns
 from sklearn import metrics
 
-from plot_utils import get_groups, group_df
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from fig_scripts.plot_utils import get_groups, group_df
 
 
 # Normalize
