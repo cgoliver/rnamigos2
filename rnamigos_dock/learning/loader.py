@@ -162,7 +162,7 @@ class DockingDataset(Dataset):
 
             Arguments:
                 pockets_path (str): path to annotated graphs (see `annotator.py`).
-                get_sim_mat (bool): whether to compute a node similarity matrix (deault=True).
+                get_sim_mat (bool): whether to compute a node similarity matrix (default=True).
                 nucs (bool): whether to include nucleotide ID in node (default=False).
         """
 
@@ -241,9 +241,6 @@ class DockingDataset(Dataset):
                 'rings': rings,
                 'idx': [idx]}
 
-
-# FOR NATIVE, KEEP AS POSITIVE ALL IN GROUP
-# TODO: FOR FP TOO, ONLY LOOP ON GROUP BUT ITER ON LIGANDS
 
 class IsNativeSampler(Sampler):
     def __init__(self, systems_dataframe, group_sampling=True):
@@ -430,6 +427,9 @@ class VirtualScreenDataset(DockingDataset):
 
     def parse_smiles(self, smiles_path):
         return list(open(smiles_path).readlines())
+        # sm_list = list(open(smiles_path).readlines())
+        # sm_list = [sm.strip() for sm in sm_list]
+        # return sm_list
 
     def get_ligands(self, pocket_name):
         actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_name, self.decoy_mode, 'actives.txt'))
