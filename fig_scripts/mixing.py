@@ -80,8 +80,8 @@ def mix_three(df, coeffs=(0.5, 0.5, 0), score1='dock', score2='fp', score3='nati
         normalized_native = normalize(native_scores)
 
         pocket_df['mixed'] = (x * normalized_docking
-                                 + y * normalized_fp
-                                 + z * normalized_native).values
+                              + y * normalized_fp
+                              + z * normalized_native).values
         # pocket_df['mixed'] = -(x * np.exp(- normalized_docking / 3) +
         #                           y * np.exp(-normalized_fp / 3) +
         #                           z * np.exp(-normalized_native / 3))
@@ -125,13 +125,15 @@ def mix_all(df):
         if min_dist < 0.001:
             to_remove.append(i)
     coeffs = np.delete(coeffs, to_remove, axis=0)
-    print(f"Filtered coeffs results in {len(coeffs)} grid points")
+    # print(f"Filtered coeffs results in {len(coeffs)} grid points")
 
     all_thresh_res = []
-    for x, y, z in coeffs:
+    for i, (x, y, z) in enumerate(coeffs):
+        if not i % 20:
+            print(f'Doing {i}/{len(coeffs)}')
         all_efs = mix_three(df=df, coeffs=(x, y, z), return_dfs=False)
         pocket_ef = np.mean(all_efs)
-        print(x, y, z, pocket_ef)
+        # print(x, y, z, pocket_ef)
         all_thresh_res.append(pocket_ef)
 
     # Print best result
@@ -162,10 +164,14 @@ def get_mix(df, coeffs, score1='dock', score2='fp', score3='native', outname_col
     mixed_df = pd.DataFrame({"pocket_id": [mixed[1] for mixed in mixed_df],
                              'decoys': ['chembl' for _ in mixed_df],
                              'score': [mixed[2] for mixed in mixed_df]})
-    mixed_df.to_csv(f"outputs/{outname}.csv")
+    mixed_df.to_csv(os.path.join("outputs", outname))
 
 
-def find_best_mix(runs, grouped=True, decoy='chembl'):
+def find_best_mix(runs, grouped=True, decoy='chembl', outname_csv=f'mixed'):
+    """
+    This will find the best coeff to merge dock, fp and native;
+    print the best coeff and save the resulting efs in a csv.
+    """
     raw_dfs = [pd.read_csv(f"outputs/{r}_raw.csv") for r in runs]
     raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
     raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
@@ -190,13 +196,13 @@ def find_best_mix(runs, grouped=True, decoy='chembl'):
 
     # Now dump this best mixed as a csv
     get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
-            outname_col='mixed', outname=f'mixed{"_grouped" if GROUPED else ""}')
+            outname_col='mixed', outname=outname_csv)
 
     # Get the best mixed and add it to the combined results df
     raw_df_combined = pd.read_csv(f'outputs/mixed{"_grouped" if GROUPED else ""}_raw.csv')
     raw_df_combined = raw_df_combined.sort_values(by=['pocket_id', 'smiles', 'is_active'])
     big_df_raw['mixed'] = raw_df_combined['mixed'].values
-    big_df_raw.to_csv(f'outputs/big_df{"_grouped" if GROUPED else ""}_raw.csv')
+    return big_df_raw
 
 
 def get_table_mixing(df):
@@ -260,22 +266,27 @@ if __name__ == "__main__":
     # get_groups()
 
     # FIRST LET'S PARSE INFERENCE CSVS AND MIX THEM
-    RUNS = ['rdock',
-            'dock_split_grouped1',
-            'fp_split_grouped1',
-            'native_split_grouped1',
-            ]
     DECOY = 'chembl'
     # DECOY = 'pdb'
     GROUPED = True
-    find_best_mix(runs=RUNS, grouped=GROUPED, decoy=DECOY)
+    # for seed in 42:
+    for seed in 0, 1, 42:
+        RUNS = ['rdock',
+                f'dock_{seed}',
+                f'fp_{seed}',
+                f'native_{seed}',
+                ]
+        out_name = f'mixed{"_grouped" if GROUPED else ""}_{seed}.csv'
+        out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
+        big_df_raw = find_best_mix(runs=RUNS, grouped=GROUPED, decoy=DECOY, outname_csv=out_name)
+        big_df_raw.to_csv(out_path_raw)
 
-    # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs and get the rdock+mixed
-    big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if GROUPED else ""}_raw.csv')
-    # plot_pairs(big_df_raw)
-    # get_table_mixing(big_df_raw)
+        # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs and get the rdock+mixed
+        # big_df_raw = pd.read_csv(out_path_raw)
+        # plot_pairs(big_df_raw)
+        # get_table_mixing(big_df_raw)
 
-    # To dump rdock_combined
-    coeffs = (0.7, 0.3, 0.)
-    get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
-            outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}')
+        # To dump rdock_combined
+        # coeffs = (0.7, 0.3, 0.)
+        # get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
+        #         outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}.csv')
