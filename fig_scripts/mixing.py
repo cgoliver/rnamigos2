@@ -293,15 +293,17 @@ if __name__ == "__main__":
         big_df_raw = pd.read_csv(out_path_raw)
         # all_thresh_res = plot_pairs(big_df_raw)  # 0: 0.13-0.27, 1: 0.13-0.24; 42: 0.27-0.4
         # all_all_thresh_res.append(all_thresh_res)
-        get_table_mixing(big_df_raw)
+        # get_table_mixing(big_df_raw)
     # all_all_thresh_res = np.mean(np.asarray(all_all_thresh_res), axis=0)
     # plt.plot(all_thresh, all_all_thresh_res, label='mean')
     # plt.legend()
     # plt.show()
 
+    # To dump rdock_combined
     for seed in 0, 1, 42:
-        # To dump rdock_combined
+        out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
+        big_df_raw = pd.read_csv(out_path_raw)
         coeffs = (0.75, 0.25, 0.)
         get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
-                outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}.csv')
+                outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}')
 

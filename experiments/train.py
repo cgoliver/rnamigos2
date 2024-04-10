@@ -308,13 +308,16 @@ def main(cfg: DictConfig):
                 'decoys': decoy_mode,
                 'pocket_id': pocket_id})
         print('Mean EF :', np.mean(efs))
+    logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
+
+    d = Path("outputs/all", parents=True, exist_ok=True)
+    base_name = Path(cfg.name).stem
 
     df = pd.DataFrame(rows)
-    d = Path("outputs/all", parents=True, exist_ok=True)
-    df.to_csv(d / cfg.name)
+    df.to_csv(d / (base_name + '.csv'))
+
     df_raw = pd.DataFrame(raw_rows)
-    df_raw.to_csv(d / Path(cfg.name.split(".")[0] + "_raw.csv"))
-    logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
+    df_raw.to_csv(d / (base_name + "_raw.csv"))
 
 
 if __name__ == "__main__":

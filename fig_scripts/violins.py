@@ -19,6 +19,7 @@ name_runs = {
     # r"\texttt{fp}": "fp_0.csv",
     # r"\texttt{fp}": "fp_1.csv",
     r"\texttt{fp}": "fp_42.csv",
+    # r"\texttt{fp}": "fp_1_1_2.csv",
     # r"\texttt{fp_2}": "fp_split_grouped2.csv",
     # r"\texttt{native_old}": "paper_native.csv",
     # r"\texttt{native0}": "native_split_grouped0.csv",
@@ -37,7 +38,7 @@ name_runs = {
     r"\texttt{rDock}": "rdock.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
     r"\texttt{mixed}": "mixed_grouped_42.csv",
-    r"\texttt{mixed\newline+ rDock}": "mixed_rdock_grouped_42.csv.csv",
+    r"\texttt{mixed\newline+ rDock}": "mixed_rdock_grouped_42.csv",
 }
 
 # Difference Mean EF / print is because group_df() does not use group reps but subsamples.

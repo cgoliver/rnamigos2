@@ -19,9 +19,9 @@ from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
 from rnamigos_dock.learning.models import Embedder, LigandGraphEncoder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen
 
-
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
+
 
 @hydra.main(version_base=None, config_path="../conf", config_name="evaluate")
 def main(cfg: DictConfig):
@@ -148,10 +148,11 @@ def main(cfg: DictConfig):
 
     df = pd.DataFrame(rows)
     d = Path(cfg.result_dir, parents=True, exist_ok=True)
-    df.to_csv(d / cfg.csv_name)
+    base_name = Path(cfg.csv_name).stem
+    df.to_csv(d / (base_name + '.csv'))
 
     df_raw = pd.DataFrame(raw_rows)
-    df_raw.to_csv(d / Path(cfg.csv_name.split(".")[0] + "_raw.csv"))
+    df_raw.to_csv(d / (base_name + "_raw.csv"))
 
 
 if __name__ == "__main__":
