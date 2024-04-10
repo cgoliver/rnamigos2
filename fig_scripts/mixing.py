@@ -268,6 +268,19 @@ def plot_pairs(df):
     return all_thresh_res
 
 
+def get_self_mix(df_1, df_2, score, all_thresh):
+    df_1 = df_1[['pocket_id', 'smiles', 'is_active', score]]
+    renamed_score = score + '_copy_2'
+    df_2[renamed_score] = df_2[score]
+    df_2 = df_2[['pocket_id', 'smiles', 'is_active', renamed_score]]
+    df_to_use = df_1.merge(df_2, on=['pocket_id', 'smiles', 'is_active'], how='outer')
+    all_results = get_mix_pair(df_to_use, score1=score, score2=renamed_score, all_thresh=all_thresh, verbose=False)
+    best_idx = np.argmax(np.array(all_results))
+    best_perf = all_results[best_idx]
+    # print(pair, f"{best_idx}/{n_intervals}", best_perf)
+    print(score, best_perf)
+
+
 if __name__ == "__main__":
     # Fix groups
     # get_groups()
@@ -276,9 +289,11 @@ if __name__ == "__main__":
     DECOY = 'chembl'
     # DECOY = 'pdb'
     GROUPED = True
+    seeds = [0, 1, 42]
+
     all_thresh = np.linspace(0, 1, 30)
     all_all_thresh_res = []
-    for seed in 0, 1, 42:
+    for seed in seeds:
         RUNS = ['rdock',
                 f'dock_{seed}',
                 f'fp_{seed}',
@@ -290,7 +305,7 @@ if __name__ == "__main__":
         # big_df_raw.to_csv(out_path_raw)
 
         # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs and get the rdock+mixed
-        big_df_raw = pd.read_csv(out_path_raw)
+        # big_df_raw = pd.read_csv(out_path_raw)
         # all_thresh_res = plot_pairs(big_df_raw)  # 0: 0.13-0.27, 1: 0.13-0.24; 42: 0.27-0.4
         # all_all_thresh_res.append(all_thresh_res)
         # get_table_mixing(big_df_raw)
@@ -299,11 +314,21 @@ if __name__ == "__main__":
     # plt.legend()
     # plt.show()
 
-    # To dump rdock_combined
-    for seed in 0, 1, 42:
-        out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
-        big_df_raw = pd.read_csv(out_path_raw)
-        coeffs = (0.75, 0.25, 0.)
-        get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
-                outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}')
+    for i in range(len(seeds)):
+        to_compare = i, (i + 1) % len(seeds)
+        out_path_raw_1 = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seeds[to_compare[0]]}_raw.csv'
+        big_df_raw_1 = pd.read_csv(out_path_raw_1)
+        out_path_raw_2 = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seeds[to_compare[1]]}_raw.csv'
+        big_df_raw_2 = pd.read_csv(out_path_raw_2)
+        for score in ['fp', 'native', 'dock']:
+            get_self_mix(big_df_raw_1, big_df_raw_2, score, [0.5])
+            # get_self_mix(big_df_raw_1, big_df_raw_2, score, all_thresh)
 
+
+    # To dump rdock_combined
+    # for seed in seeds:
+    #     out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
+    #     big_df_raw = pd.read_csv(out_path_raw)
+    #     coeffs = (0.75, 0.25, 0.)
+    #     get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
+    #             outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}')
