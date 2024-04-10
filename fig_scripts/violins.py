@@ -16,7 +16,7 @@ name_runs = {
     # r"\texttt{fp_old}": "paper_fp.csv",
     # r"\texttt{fp_0}": "fp_split_grouped0.csv",
     # r"\texttt{fp_pre}": "fp_split_grouped1.csv",
-    # r"\texttt{fp}": "fp_0.csv",
+    r"\texttt{fp}": "fp_0.csv",
     # r"\texttt{fp}": "fp_1.csv",
     # r"\texttt{fp}": "fp_42.csv",
     # r"\texttt{fp_2}": "fp_split_grouped2.csv",
@@ -31,11 +31,11 @@ name_runs = {
     # r"\texttt{dock_old}": "paper_dock.csv",
     # r"\texttt{dock0}": "dock_split_grouped0.csv",
     # r"\texttt{dock_pre}": "dock_split_grouped1.csv",
-    # r"\texttt{dock}": "dock_0.csv",
+    r"\texttt{dock}": "dock_0.csv",
     # r"\texttt{dock}": "dock_1.csv",
     # r"\texttt{dock}": "dock_42.csv",
     # r"\texttt{dock2}": "dock_split_grouped2.csv",
-    # r"\texttt{rDock}": "rdock.csv",
+    r"\texttt{rDock}": "rdock.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
     # r"\texttt{mixed}": "mixed.csv",
     # r"\texttt{mixed\newline+ rDock}": "mixed_rdock.csv",
@@ -73,25 +73,33 @@ dfs = [df.assign(name=names[i]) for i, df in enumerate(dfs)]
 big_df = pd.concat(dfs)
 big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
 
-means_0 = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
-import pickle
-script_dir = os.path.dirname(__file__)
-splits_file = os.path.join(script_dir, '../data/train_test_75.p')
-_, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
-groups = {**train_names_grouped, **test_names_grouped}
-big_df_2 = big_df[big_df['pocket_id'].isin(groups)]
-means_2 = big_df_2.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
-# dfs = [df for df in dfs]
-# print(len(big_df['pocket_id'].unique()))
+# means_ungrouped = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+# import pickle
+# script_dir = os.path.dirname(__file__)
+# splits_file = os.path.join(script_dir, '../data/train_test_75.p')
+# _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+# groups = {**train_names_grouped, **test_names_grouped}
+# centroids = big_df[big_df['pocket_id'].isin(groups)]
+# means_centroids = centroids.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+
 if grouped:
     big_df = group_df(big_df)
-means_3 = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
-# print(len(big_df['pocket_id'].unique()))
+means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 
-print(means_0)
-print(means_2)
-print(means_3)
-luhfr
+# print('Ungrouped')
+# print(means_ungrouped)
+# print('Group reps')
+# print(means_centroids)
+# print('Grouped')
+# print(means)
+
+# dock    920  925
+# fp      856  856
+# native  938  955
+# rDock   955  959
+# mixedb       0.9805
+# mixedbest    0.9840
+
 # For a detailed score per pocket
 # table = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by=['pocket_id', 'name'])
 # print(table.to_latex(index=False, columns=['pocket_id', 'name', 'score']))

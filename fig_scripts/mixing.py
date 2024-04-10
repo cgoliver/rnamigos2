@@ -89,10 +89,6 @@ def mix_three(df, coeffs=(0.5, 0.5, 0), score1='dock', score2='fp', score3='nati
         fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df['mixed'], drop_intermediate=True)
         enrich = metrics.auc(fpr, tpr)
 
-        # sorted_df = pocket_df.sort_values(by='mixed')
-        # sorted_df = sorted_df.reset_index(drop=True)
-        # native_ind = sorted_df.loc[sorted_df['is_active'] == 1].index[0]
-        # enrich = native_ind / (len(sorted_df) - 1)
         if return_dfs:
             all_efs.append((pocket_df[['pocket_id', 'smiles', 'is_active', 'mixed']], p, enrich))
         else:
@@ -158,13 +154,14 @@ def get_mix(df, coeffs, score1='dock', score2='fp', score3='native', outname_col
     # Merge df and add decoys value
     mixed_df_raw = pd.concat([mixed[0] for mixed in mixed_df])
     mixed_df_raw = mixed_df_raw.rename(columns={'mixed': outname_col})
-    mixed_df_raw.to_csv(f"outputs/{outname}_raw.csv")
     dumb_decoy = [DECOY for _ in range(len(mixed_df_raw))]
     mixed_df_raw.insert(len(mixed_df_raw.columns), "decoys", dumb_decoy)
+    mixed_df_raw.to_csv(f"outputs/{outname}_raw.csv")
+
     mixed_df = pd.DataFrame({"pocket_id": [mixed[1] for mixed in mixed_df],
                              'decoys': ['chembl' for _ in mixed_df],
                              'score': [mixed[2] for mixed in mixed_df]})
-    mixed_df.to_csv(os.path.join("outputs", outname))
+    mixed_df.to_csv(f"outputs/{outname}.csv")
 
 
 def find_best_mix(runs, grouped=True, decoy='chembl', outname_csv=f'mixed'):
@@ -174,23 +171,33 @@ def find_best_mix(runs, grouped=True, decoy='chembl', outname_csv=f'mixed'):
     """
     raw_dfs = [pd.read_csv(f"outputs/{r}_raw.csv") for r in runs]
     raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
-    raw_dfs = [df.sort_values(by=['pocket_id', 'smiles', 'is_active']) for df in raw_dfs]
-    big_df_raw = raw_dfs[0][['pocket_id', 'smiles', 'is_active']]
-
-    # Now add score and flip docking scores, dock scores and distances for which low is better
-    big_df_raw['rdock'] = -raw_dfs[0]['raw_score'].values
-    big_df_raw['dock'] = -raw_dfs[1]['raw_score'].values
-    big_df_raw['fp'] = -raw_dfs[2]['raw_score'].values
-    big_df_raw['native'] = raw_dfs[3]['raw_score'].values
-
     if grouped:
-        big_df_raw = group_df(big_df_raw)
+        raw_dfs = [group_df(df) for df in raw_dfs]
+
+    for df in raw_dfs:
+        df['smiles'] = df['smiles'].str.strip()
+
+    raw_dfs[0]['rdock'] = -raw_dfs[0]['raw_score'].values
+    raw_dfs[1]['dock'] = -raw_dfs[1]['raw_score'].values
+    raw_dfs[2]['fp'] = -raw_dfs[2]['raw_score'].values
+    raw_dfs[3]['native'] = raw_dfs[3]['raw_score'].values
+
+    big_df_raw = raw_dfs[1]
+    big_df_raw = big_df_raw.merge(raw_dfs[2], on=['pocket_id', 'smiles', 'is_active'], how='outer')
+    big_df_raw = big_df_raw.merge(raw_dfs[3], on=['pocket_id', 'smiles', 'is_active'], how='outer')
+    big_df_raw = big_df_raw.merge(raw_dfs[0], on=['pocket_id', 'smiles', 'is_active'], how='inner')
+    big_df_raw = big_df_raw[['pocket_id', 'smiles', 'is_active', 'rdock', 'dock', 'fp', 'native']]
+    # rows_with_nan = big_df_raw[big_df_raw.isna().any(axis=1)]
 
     # Find the best mix, and then dump it
-    best_mix = mix_all(big_df_raw)
     # best_mix = [0.44, 0.39, 0.17]  # OLD
     # best_mix = [0.36841931, 0.26315665, 0.36841931]  # UNGROUPED
     # best_mix = [0.3529, 0.2353, 0.4118]  # UNGROUPED value of AuROC :  0.9827
+    best_mix = mix_all(big_df_raw)
+    # best_mix = [0.429, 0.190, 0.381]  # New models (seed 0) value 0.9878, balanced is 0.9878
+    # best_mix = [0.388, 0.167, 0.444]  # New models (seed 1) value 0.9935, balanced is 0.9900
+    # best_mix = [0.412, 0.118, 0.471]  # New models (seed 42) value 0.9840, balanced is 0.9805
+
     print("balanced perf", np.mean(mix_three(df=big_df_raw, coeffs=(0.3, 0.3, 0.3))))
     print("best perf", np.mean(mix_three(df=big_df_raw, coeffs=best_mix)))
 
@@ -199,9 +206,8 @@ def find_best_mix(runs, grouped=True, decoy='chembl', outname_csv=f'mixed'):
             outname_col='mixed', outname=outname_csv)
 
     # Get the best mixed and add it to the combined results df
-    raw_df_combined = pd.read_csv(f'outputs/mixed{"_grouped" if GROUPED else ""}_raw.csv')
-    raw_df_combined = raw_df_combined.sort_values(by=['pocket_id', 'smiles', 'is_active'])
-    big_df_raw['mixed'] = raw_df_combined['mixed'].values
+    raw_df_mixed = pd.read_csv(f'outputs/{outname_csv}_raw.csv')
+    big_df_raw = big_df_raw.merge(raw_df_mixed, on=['pocket_id', 'smiles', 'is_active'], how='inner')
     return big_df_raw
 
 
@@ -213,14 +219,14 @@ def get_table_mixing(df):
     # Do singletons
     for method in all_methods:
         result = get_ef_one(df, score=method)
-        print(method, result)
+        # print(method, result)
         all_res[method] = result
     # Do pairs
     for pair in itertools.combinations(all_methods, 2):
         all_results = get_mix_pair(df, score1=pair[0], score2=pair[1], all_thresh=all_thresh, verbose=False)
         best_idx = np.argmax(np.array(all_results))
         best_perf = all_results[best_idx]
-        print(pair, f"{best_idx}/{n_intervals}", best_perf)
+        # print(pair, f"{best_idx}/{n_intervals}", best_perf)
         all_res[pair] = best_perf
 
     # Add mixed results
@@ -231,11 +237,11 @@ def get_table_mixing(df):
     all_results = get_mix_pair(df, score1=pair[0], score2=pair[1], all_thresh=all_thresh, verbose=False)
     best_idx = np.argmax(np.array(all_results))
     best_perf = all_results[best_idx]
-    print(pair, f"{best_idx}/{n_intervals}", best_perf)
+    # print(pair, f"{best_idx}/{n_intervals}", best_perf)
     all_res[pair] = best_perf
 
     for k, v in all_res.items():
-        print(k, v)
+        print(f"{k}, result: {v:.4f}")
 
 
 def plot_pairs(df):
@@ -256,9 +262,10 @@ def plot_pairs(df):
         plt.plot(all_thresh, all_thresh_res, label=score2)
 
     # plt.ylim(0.98, 1)
-    plt.legend()
-    plt.show()
-    return df
+    # plt.xlabel('Fraction of score 1')
+    # plt.legend()
+    # plt.show()
+    return all_thresh_res
 
 
 if __name__ == "__main__":
@@ -269,24 +276,32 @@ if __name__ == "__main__":
     DECOY = 'chembl'
     # DECOY = 'pdb'
     GROUPED = True
-    # for seed in 42:
+    all_thresh = np.linspace(0, 1, 30)
+    all_all_thresh_res = []
     for seed in 0, 1, 42:
         RUNS = ['rdock',
                 f'dock_{seed}',
                 f'fp_{seed}',
                 f'native_{seed}',
                 ]
-        out_name = f'mixed{"_grouped" if GROUPED else ""}_{seed}.csv'
+        out_name = f'mixed{"_grouped" if GROUPED else ""}_{seed}'
         out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
-        big_df_raw = find_best_mix(runs=RUNS, grouped=GROUPED, decoy=DECOY, outname_csv=out_name)
-        big_df_raw.to_csv(out_path_raw)
+        # big_df_raw = find_best_mix(runs=RUNS, grouped=GROUPED, decoy=DECOY, outname_csv=out_name)
+        # big_df_raw.to_csv(out_path_raw)
 
         # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs and get the rdock+mixed
-        # big_df_raw = pd.read_csv(out_path_raw)
-        # plot_pairs(big_df_raw)
-        # get_table_mixing(big_df_raw)
+        big_df_raw = pd.read_csv(out_path_raw)
+        # all_thresh_res = plot_pairs(big_df_raw)  # 0: 0.13-0.27, 1: 0.13-0.24; 42: 0.27-0.4
+        # all_all_thresh_res.append(all_thresh_res)
+        get_table_mixing(big_df_raw)
+    # all_all_thresh_res = np.mean(np.asarray(all_all_thresh_res), axis=0)
+    # plt.plot(all_thresh, all_all_thresh_res, label='mean')
+    # plt.legend()
+    # plt.show()
 
+    for seed in 0, 1, 42:
         # To dump rdock_combined
-        # coeffs = (0.7, 0.3, 0.)
-        # get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
-        #         outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}.csv')
+        coeffs = (0.75, 0.25, 0.)
+        get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
+                outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}.csv')
+
