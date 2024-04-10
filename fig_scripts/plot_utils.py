@@ -24,7 +24,8 @@ def get_groups():
     pickle.dump((train_group_reps, test_group_reps), open(group_reps_path, 'wb'))
 
 
-# get_groups()
+if __name__ == '__main__':
+    get_groups()
 
 
 def group_df(df):
@@ -33,7 +34,10 @@ def group_df(df):
     """
     script_dir = os.path.dirname(__file__)
     splits_file = os.path.join(script_dir, '../data/group_reps_75.p')
-    train_group_reps, test_group_reps = pickle.load(open(splits_file, 'rb'))
+    try:
+        train_group_reps, test_group_reps = pickle.load(open(splits_file, 'rb'))
+    except FileNotFoundError as e:
+        raise Exception("To produce this missing file run python fig_scripts/plot_utils.py") from e
     df = df.loc[df['pocket_id'].isin(train_group_reps + test_group_reps)]
     return df
 
