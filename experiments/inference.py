@@ -89,7 +89,9 @@ def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False)
     """
     # Get dgl graph with node expansion BFS
     dgl_graph = get_dgl_graph(cif_path, residue_list)
+    print("Successfully built the graph")
     smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
+    print("Successfully parsed ligands, ready for inference")
     inference(dgl_graph=dgl_graph, smiles_list=smiles_list, out_path=out_path, dump_all=dump_all)
 
 
