@@ -412,7 +412,7 @@ class VirtualScreenDataset(DockingDataset):
             script_dir = os.path.dirname(__file__)
             reps_file = os.path.join(script_dir, '../../data/group_reps_75.p')
             train_group_reps, test_group_reps = pickle.load(open(reps_file, 'rb'))
-            reps = set(train_group_reps+test_group_reps)
+            reps = set(train_group_reps + test_group_reps)
             self.all_pockets_names = [pocket for pocket in self.all_pockets_names if pocket in reps]
 
             splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
@@ -453,12 +453,13 @@ class VirtualScreenDataset(DockingDataset):
                 pocket_name = self.all_pockets_names[np.random.randint(0, len(self.all_pockets_names))]
             else:
                 pocket_name = self.all_pockets_names[idx]
+
             if self.cache_graphs:
                 pocket_graph, _ = self.all_pockets[pocket_name]
             else:
                 pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_name}.json"),
+                                                 undirected=self.undirected,
                                                  use_rings=False)
-
             # Now we don't Rognan anymore for ligands
             pocket_name = self.all_pockets_names[idx]
             actives_smiles, decoys_smiles = self.get_ligands(pocket_name)
@@ -477,7 +478,8 @@ class VirtualScreenDataset(DockingDataset):
                 all_inputs = self.ligand_encoder.smiles_to_fp_list(all_smiles)
                 all_inputs = torch.tensor(all_inputs)
             return pocket_name, pocket_graph, all_inputs, torch.tensor(is_active), all_smiles
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+            print(e)
             return None, None, None, None, None
 
 

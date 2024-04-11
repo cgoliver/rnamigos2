@@ -25,8 +25,8 @@ torch.set_num_threads(1)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="evaluate")
 def main(cfg: DictConfig):
-    print(OmegaConf.to_yaml(cfg))
-    print('Done importing')
+    # print(OmegaConf.to_yaml(cfg))
+    # print('Done importing')
     '''
     Hardware settings
     '''
@@ -116,7 +116,6 @@ def main(cfg: DictConfig):
                                        ligands_path=params['data']['ligand_db'],
                                        systems=test_systems,
                                        decoy_mode=decoy_mode,
-                                       fp_type='MACCS',
                                        use_graphligs=params['model']['use_graphligs'],
                                        group_ligands=False)
 

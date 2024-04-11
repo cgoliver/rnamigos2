@@ -66,7 +66,7 @@ def to_undirected(edge_map):
     return undirected_edge_map
 
 
-def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings=False):
+def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=False, use_rings=False):
     """
     NetworkX Graph or path to a json => DGL graph
     """
@@ -107,7 +107,7 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=True, use_rings
         return pocket_graph_dgl, rings
 
 
-def get_dgl_graph(cif_path, residue_list):
+def get_dgl_graph(cif_path, residue_list, undirected=False):
     """
     :param cif_path: toto/tata/1cqr.cif
     :param residue_list: list of strings "A.2","A.3",... ,"A.85" (missing pdb, useful for inference)
@@ -129,7 +129,7 @@ def get_dgl_graph(cif_path, residue_list):
         expanded_graph = nx_graph
         in_pocket = {node: True for node in nx_graph.nodes}
         nx.set_node_attributes(expanded_graph, name='in_pocket', values=in_pocket)
-    dgl_graph, _ = load_rna_graph(expanded_graph)
+    dgl_graph, _ = load_rna_graph(expanded_graph, undirected=undirected)
     return dgl_graph
 
 

@@ -83,7 +83,7 @@ if __name__ == "__main__":
         # Get dgl pocket
         pocket_path = os.path.join(expanded_path, pocket)
         pocket_graph = graph_io.load_json(pocket_path)
-        dgl_pocket_graph, _ = load_rna_graph(pocket_graph)
+        dgl_pocket_graph, _ = load_rna_graph(pocket_graph, undirected=False)
 
         # Get smiles list for decoys
         # decoys_ligands_path = os.path.join(decoys_ligands_dir, f"{ligand_name}_decoys.txt")
