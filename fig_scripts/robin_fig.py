@@ -13,6 +13,7 @@ import scienceplots
 
 plt.style.use('nature')
 
+
 def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_actives = np.sum(is_active)
     n_screened = int(frac * len(scores))
@@ -160,14 +161,14 @@ def get_dfs_migos(pocket_name, swap=True, swap_on='merged'):
         other_inactives = pd.read_csv(os.path.join(out_dir, f"{other_pocket}_inactives.txt"), names=names, sep=' ')
         other_inactives['split'] = 'inactives'
         merged_other = pd.concat([other_actives, other_inactives])
-        both =  merged.merge(merged_other, on='smiles', suffixes=('_orig', '_other'))
+        both = merged.merge(merged_other, on='smiles', suffixes=('_orig', '_other'))
         if swap_on == 'merged':
             both['merged'] = both['merged_other']
             both['split'] = both['split_orig']
         if swap_on == 'split':
             both['split'] = both['split_other']
             both['merged'] = both['merged_orig']
-        return both 
+        return both
 
     return merged
 
@@ -184,7 +185,8 @@ if __name__ == '__main__':
         # break
 
         # FOR MIGOS
-        merged = get_dfs_migos(pocket_name=pocket_name)
+        swap = False
+        merged = get_dfs_migos(pocket_name=pocket_name, swap=swap)
         score_to_use = 'merged'
         # score_to_use = 'dock'
         # score_to_use = 'is_native'
