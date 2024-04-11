@@ -135,7 +135,7 @@ def mix_all(df):
     # Print best result
     zs = np.array(all_thresh_res)
     best_i = np.argmax(zs)
-    print('Best results for ', coeffs[best_i], ' value of MAR : ', zs[best_i])
+    print('Best results for ', [f"{coeff:.3f}" for coeff in coeffs[best_i]], ' value of AuROC : ', zs[best_i])
 
     # 3D scatter plot the results
     fig = plt.figure()
@@ -190,16 +190,14 @@ def find_best_mix(runs, grouped=True, decoy='chembl', outname_csv=f'mixed'):
     # rows_with_nan = big_df_raw[big_df_raw.isna().any(axis=1)]
 
     # Find the best mix, and then dump it
-    # best_mix = [0.44, 0.39, 0.17]  # OLD
-    # best_mix = [0.36841931, 0.26315665, 0.36841931]  # UNGROUPED
-    # best_mix = [0.3529, 0.2353, 0.4118]  # UNGROUPED value of AuROC :  0.9827
-    best_mix = mix_all(big_df_raw)
-    # best_mix = [0.429, 0.190, 0.381]  # New models (seed 0) value 0.9878, balanced is 0.9878
-    # best_mix = [0.388, 0.167, 0.444]  # New models (seed 1) value 0.9935, balanced is 0.9900
-    # best_mix = [0.412, 0.118, 0.471]  # New models (seed 42) value 0.9840, balanced is 0.9805
+    best_mix = (0.3, 0.3, 0.3)
+    # best_mix = mix_all(big_df_raw)
+    # best_mix = [0.391 0.304 0.304]  # New models (seed 0) value 0.9959, balanced is 0.9952
+    # best_mix = [0.388, 0.222, 0.388]  # New models (seed 1) value 0.9931, balanced is 0.9904
+    # best_mix = [0.375, 0.292, 0.333]  # New models (seed 42) value 0.9904, balanced is 0.9898
 
-    print("balanced perf", np.mean(mix_three(df=big_df_raw, coeffs=(0.3, 0.3, 0.3))))
-    print("best perf", np.mean(mix_three(df=big_df_raw, coeffs=best_mix)))
+    # print("balanced perf", np.mean(mix_three(df=big_df_raw, coeffs=(0.3, 0.3, 0.3))))
+    # print("best perf", np.mean(mix_three(df=big_df_raw, coeffs=best_mix)))
 
     # Now dump this best mixed as a csv
     get_mix(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix,
@@ -301,18 +299,18 @@ if __name__ == "__main__":
                 ]
         out_name = f'mixed{"_grouped" if GROUPED else ""}_{seed}'
         out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
-        # big_df_raw = find_best_mix(runs=RUNS, grouped=GROUPED, decoy=DECOY, outname_csv=out_name)
-        # big_df_raw.to_csv(out_path_raw)
+        big_df_raw = find_best_mix(runs=RUNS, grouped=GROUPED, decoy=DECOY, outname_csv=out_name)
+        big_df_raw.to_csv(out_path_raw)
 
         # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs and get the rdock+mixed
-        # big_df_raw = pd.read_csv(out_path_raw)
-        # all_thresh_res = plot_pairs(big_df_raw)  # 0: 0.13-0.27, 1: 0.13-0.24; 42: 0.27-0.4
-        # all_all_thresh_res.append(all_thresh_res)
-        # get_table_mixing(big_df_raw)
-    # all_all_thresh_res = np.mean(np.asarray(all_all_thresh_res), axis=0)
-    # plt.plot(all_thresh, all_all_thresh_res, label='mean')
-    # plt.legend()
-    # plt.show()
+        big_df_raw = pd.read_csv(out_path_raw)
+        all_thresh_res = plot_pairs(big_df_raw)
+        all_all_thresh_res.append(all_thresh_res)
+        get_table_mixing(big_df_raw)
+    all_all_thresh_res = np.mean(np.asarray(all_all_thresh_res), axis=0)
+    plt.plot(all_thresh, all_all_thresh_res, label='mean')
+    plt.legend()
+    plt.show()
 
     for i in range(len(seeds)):
         to_compare = i, (i + 1) % len(seeds)
@@ -321,14 +319,13 @@ if __name__ == "__main__":
         out_path_raw_2 = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seeds[to_compare[1]]}_raw.csv'
         big_df_raw_2 = pd.read_csv(out_path_raw_2)
         for score in ['fp', 'native', 'dock']:
-            get_self_mix(big_df_raw_1, big_df_raw_2, score, [0.5])
-            # get_self_mix(big_df_raw_1, big_df_raw_2, score, all_thresh)
-
+            # get_self_mix(big_df_raw_1, big_df_raw_2, score, [0.5])
+            get_self_mix(big_df_raw_1, big_df_raw_2, score, all_thresh)
 
     # To dump rdock_combined
-    # for seed in seeds:
-    #     out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
-    #     big_df_raw = pd.read_csv(out_path_raw)
-    #     coeffs = (0.75, 0.25, 0.)
-    #     get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
-    #             outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}')
+    for seed in seeds:
+        out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
+        big_df_raw = pd.read_csv(out_path_raw)
+        coeffs = (0.75, 0.25, 0.)
+        get_mix(big_df_raw, score1='mixed', score2='rdock', coeffs=coeffs,
+                outname_col='combined', outname=f'mixed_rdock{"_grouped" if GROUPED else ""}_{seed}')
