@@ -18,7 +18,7 @@ name_runs = {
     # r"\texttt{fp_pre}": "fp_split_grouped1.csv",
     # r"\texttt{fp}": "fp_0.csv",
     # r"\texttt{fp}": "fp_1.csv",
-    r"\texttt{fp}": "fp_42.csv",
+    r"\texttt{recons}": "fp_42.csv",
     # r"\texttt{fp}": "fp_1_1_2.csv",
     # r"\texttt{fp_2}": "fp_split_grouped2.csv",
     # r"\texttt{native_old}": "paper_native.csv",
@@ -26,14 +26,14 @@ name_runs = {
     # r"\texttt{native_pre}": "native_split_grouped1.csv",
     # r"\texttt{native}": "native_0.csv",
     # r"\texttt{native}": "native_1.csv",
-    r"\texttt{native}": "native_42.csv",
+    r"\texttt{compat}": "native_42.csv",
     # r"\texttt{native2}": "native_split_grouped2.csv",
     # r"\texttt{dock_old}": "paper_dock.csv",
     # r"\texttt{dock0}": "dock_split_grouped0.csv",
     # r"\texttt{dock_pre}": "dock_split_grouped1.csv",
     # r"\texttt{dock}": "dock_0.csv",
     # r"\texttt{dock}": "dock_1.csv",
-    r"\texttt{dock}": "dock_42.csv",
+    r"\texttt{aff}": "dock_42.csv",
     # r"\texttt{dock2}": "dock_split_grouped2.csv",
     r"\texttt{rDock}": "rdock.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
@@ -192,5 +192,5 @@ plt.ylabel("AuROC")
 plt.grid(True, which='both', axis='y')
 plt.vlines(3.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
 # plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
-plt.savefig("fig_scripts/violins_mixed.pdf", bbox_inches='tight')
+plt.savefig("figs/violins_mixed.pdf", bbox_inches='tight')
 plt.show()

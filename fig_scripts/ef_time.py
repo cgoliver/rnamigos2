@@ -22,10 +22,10 @@ def virtual_screen(df, sort_up_to=0, score_column='rdock'):
 
 def build_ef_df(out_csv='fig_script/time_ef.csv', grouped=True):
     decoy = 'chembl'
-    big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_raw.csv')
+    big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_42_raw.csv')
     big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles', 'is_active'])
     # Combined is not present in big_df_raw
-    combined = pd.read_csv(f'outputs/mixed_rdock{"_grouped" if grouped else ""}_raw.csv')
+    combined = pd.read_csv(f'outputs/mixed_rdock{"_grouped" if grouped else ""}_42_raw.csv')
     combined = combined.sort_values(by=['pocket_id', 'smiles', 'is_active'])
     big_df_raw['combined'] = combined['combined'].values
     pockets = big_df_raw['pocket_id'].unique()
@@ -109,7 +109,7 @@ def line_plot(df):
 
     times = np.linspace(0, 8.3, 20)
     # Add sole mixed performance
-    mixed_means = [0.983] * 20
+    mixed_means = [0.9898] * 20
     ax.plot(times, mixed_means, label=r'\texttt{mixed}', linewidth=2, color=PALETTE[-2], linestyle='--')
 
     for (means, stds), name, color in zip(model_res, names, palette):
@@ -208,5 +208,5 @@ if __name__ == "__main__":
 
     df = pd.read_csv(out_csv)
     line_plot(df)
-    # vax_plot(df)
+    vax_plot(df)
     pass

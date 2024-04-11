@@ -1,5 +1,5 @@
 debug: false
-name: final_chembl_native_graphligs_dim64_optimol1
+name: native_4
 device: cpu
 verbose: false
 tokens:
@@ -38,25 +38,32 @@ train:
   reconstruction_lam: 1.0
   kfold: 5
   num_epochs: 1000
+  vs_every: 20
   embed_only: false
   early_stop: 100
   use_nucs: true
   target: is_native
+  use_normalized_score: false
+  stretch_scores: false
   shuffle: true
   loss: bce
   use_rnamigos1_train: false
   use_rnamigos1_ligands: false
-  rnamigos1_split: -1
-  learning_rate: 0.001
-  pretrain_weight: 0
+  filter_robin: false
+  rnamigos1_split: -2
+  group_pockets: 1
+  group_sample: false
+  learning_rate: 0.0001
+  pretrain_weight: 0.0
   simfunc: None
   simfunc_depth: 2
   max_kernel: 20
+  result_dir: outputs/
 paths:
   model_path: models/
   pretrain_save: pretrained/
 data:
-  pocket_graphs: data/json_pockets_annotated
+  pocket_graphs: data/json_pockets_expanded
   pretrain_graphs: data/pretrain_data/data/annotated/NR_chops_annot
   ligand_db: data/ligand_db
   rnamigos1_test: false
@@ -74,7 +81,7 @@ model:
     hidden_dim: 32
     num_layers: 3
   graphlig_encoder:
-    use_pretrained: 1
+    use_pretrained: true
     features_dim: 22
     gcn_hdim: 32
     gcn_layers: 3
@@ -88,6 +95,6 @@ model:
   pool: att
   dropout: 0.2
   batch_norm: true
-  use_pretrained: false
-  pretrained_path: pretrained/R_1_16/model.pth
+  use_pretrained: true
+  pretrained_path: pretrained/pretrain_hungarian_64/model.pth
   use_graphligs: true
