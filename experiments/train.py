@@ -156,14 +156,16 @@ def main(cfg: DictConfig):
                                           ligands_path=cfg.data.ligand_db,
                                           systems=vs_validation_systems,
                                           use_graphligs=cfg.model.use_graphligs,
-                                          group_ligands=True)
+                                          group_ligands=True,
+                                          reps_only=True)
     val_vs_loader = GraphDataLoader(dataset=val_vs_dataset, **vs_loader_args)
     test_vs_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
                                            decoy_mode='chembl',
                                            ligands_path=cfg.data.ligand_db,
                                            systems=test_systems,
                                            use_graphligs=cfg.model.use_graphligs,
-                                           group_ligands=True)
+                                           group_ligands=True,
+                                           reps_only=True)
     test_vs_loader = GraphDataLoader(dataset=test_vs_dataset, **vs_loader_args)
     print('Created data loader')
 
@@ -283,7 +285,8 @@ def main(cfg: DictConfig):
                                                 decoy_mode=decoy_mode,
                                                 fp_type='MACCS',
                                                 use_graphligs=cfg.model.use_graphligs,
-                                                group_ligands=False)
+                                                group_ligands=True,
+                                                reps_only=False)
         dataloader = GraphDataLoader(dataset=final_vs_dataset, **vs_loader_args)
 
         print('Created data loader')

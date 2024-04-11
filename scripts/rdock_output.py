@@ -1,11 +1,16 @@
 """ Convert consolidated csv with RDOCK to output/ format """
-from dgl.dataloading import GraphDataLoader
 import os
+import sys
+
+from dgl.dataloading import GraphDataLoader
 import numpy as np
-from pathlib import Path
-import pandas as pd
 import pickle
+import pandas as pd
+from pathlib import Path
 import torch
+
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from rnamigos_dock.post.virtual_screen import mean_active_rank
 from rnamigos_dock.learning.loader import get_systems
@@ -18,21 +23,31 @@ class VirtualScreenDatasetDocking:
                  systems,
                  ligands_path,
                  decoy_mode='pdb',
-                 group_ligands=False,
+                 group_ligands=True,
+                 reps_only=False
                  ):
         self.ligands_path = ligands_path
         self.systems = systems
         self.decoy_mode = decoy_mode
         self.all_pockets_names = list(self.systems['PDB_ID_POCKET'].unique())
+
         self.group_ligands = group_ligands
+        self.reps_only = reps_only
+        script_dir = os.path.dirname(__file__)
+        if self.reps_only:
+            # This amounts to choosing only reps.
+            # Previously, the retained ones were the centroids.
+            reps_file = os.path.join(script_dir, '../data/group_reps_75.p')
+            train_group_reps, test_group_reps = pickle.load(open(reps_file, 'rb'))
+            reps = set(train_group_reps + test_group_reps)
+            self.all_pockets_names = [pocket for pocket in self.all_pockets_names if pocket in reps]
+
         if self.group_ligands:
-            script_dir = os.path.dirname(__file__)
             splits_file = os.path.join(script_dir, '../data/train_test_75.p')
             _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
             self.groups = {**train_names_grouped, **test_names_grouped}
             self.reverse_groups = {group_member: group_rep for group_rep, group_members in self.groups.items()
                                    for group_member in group_members}
-        pass
 
     def __len__(self):
         return len(self.all_pockets_names)
@@ -48,11 +63,19 @@ class VirtualScreenDatasetDocking:
         # We need to return all actives and ensure they are not in the inactives of a pocket
         if self.group_ligands:
             group_pockets = self.groups[self.reverse_groups[pocket_name]]
-            group_list = [self.parse_smiles(Path(self.ligands_path, pocket, self.decoy_mode, 'actives.txt'))[0]
-                          for pocket in group_pockets]
+            group_list = []
+            for pocket in group_pockets:
+                try:
+                    active = self.parse_smiles(Path(self.ligands_path, pocket, self.decoy_mode, 'actives.txt'))[0]
+                    group_list.append(active)
+                except Exception as e:
+                    pass
+                    # print(e)
             group_actives = set(group_list)
             decoys_smiles = [smile for smile in decoys_smiles if smile not in group_actives]
             actives_smiles = list(group_actives)
+        actives_smiles = [x for x in actives_smiles if x is not None]
+        decoys_smiles = [x for x in decoys_smiles if x is not None]
         return actives_smiles, decoys_smiles
 
     def __getitem__(self, idx):
@@ -63,7 +86,8 @@ class VirtualScreenDatasetDocking:
             is_active = np.zeros(len(all_smiles))
             is_active[:len(actives_smiles)] = 1.
             return pocket_name, all_smiles, torch.tensor(is_active)
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+            # print(e)
             return None, None, None
 
 
@@ -123,7 +147,7 @@ test_systems = get_systems(target="native_fp",
                            use_rnamigos1_ligands=False,
                            return_test=True)
 
-df = pd.read_csv("../data/rnamigos2_dataset_consolidated.csv")
+df = pd.read_csv("data/rnamigos2_dataset_consolidated.csv")
 df = df[['PDB_ID_POCKET', 'LIGAND_SMILES', 'LIGAND_SOURCE', 'TOTAL', 'INTER']]
 df = df[df['PDB_ID_POCKET'].isin(test_systems['PDB_ID_POCKET'].unique())]
 script_dir = os.path.dirname(__file__)
@@ -133,7 +157,8 @@ for decoy_mode in decoys:
     dataset = VirtualScreenDatasetDocking(ligands_path=os.path.join(script_dir, '../data/ligand_db'),
                                           systems=test_systems,
                                           decoy_mode=decoy_mode,
-                                          group_ligands=True)
+                                          group_ligands=True,
+                                          reps_only=False)
 
     loader_args = {'shuffle': False,
                    'batch_size': 1,
@@ -161,10 +186,10 @@ for decoy_mode in decoys:
 
 df = pd.DataFrame(rows)
 df_raw = pd.DataFrame(raw_rows)
-df.to_csv("../outputs/rdock.csv")
-df_raw.to_csv("../outputs/rdock_raw.csv")
-# df.to_csv("../outputs/rdock_total.csv")
-# df_raw.to_csv("../outputs/rdock_raw_total.csv")
+df.to_csv("outputs/rdock.csv")
+df_raw.to_csv("outputs/rdock_raw.csv")
+# df.to_csv("outputs/rdock_total.csv")
+# df_raw.to_csv("outputs/rdock_raw_total.csv")
 
 # def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
 #     """ Compute the average rank of actives in the scored ligand set
@@ -189,9 +214,9 @@ df_raw.to_csv("../outputs/rdock_raw.csv")
 #     return (np.mean([rank for rank, (score, is_active) in enumerate(is_active_sorted) if is_active]) + 1) / len(scores)
 #
 #
-# df = pd.read_csv("../data/rnamigos2_dataset_consolidated.csv")
+# df = pd.read_csv("data/rnamigos2_dataset_consolidated.csv")
 # df = df.loc[df['TYPE'] == 'TEST']
-# decoy_db = Path("../data/ligand_db")
+# decoy_db = Path("data/ligand_db")
 #
 # # ,score,metric,data_idx,decoys,pocket_id
 # # ,raw_score,is_active,pocket_id
@@ -245,7 +270,7 @@ df_raw.to_csv("../outputs/rdock_raw.csv")
 #                             }
 #                            )
 #
-# pd.DataFrame(ef_rows).to_csv("../outputs/rdock.csv")
-# pd.DataFrame(raw_rows).to_csv("../outputs/rdock_raw.csv")
-# # pd.DataFrame(ef_rows).to_csv("../outputs/rdock_total.csv")
-# # pd.DataFrame(raw_rows).to_csv("../outputs/rdock_total_raw.csv")
+# pd.DataFrame(ef_rows).to_csv("outputs/rdock.csv")
+# pd.DataFrame(raw_rows).to_csv("outputs/rdock_raw.csv")
+# # pd.DataFrame(ef_rows).to_csv("outputs/rdock_total.csv")
+# # pd.DataFrame(raw_rows).to_csv("outputs/rdock_total_raw.csv")

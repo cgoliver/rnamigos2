@@ -117,8 +117,8 @@ def main(cfg: DictConfig):
                                        systems=test_systems,
                                        decoy_mode=decoy_mode,
                                        use_graphligs=params['model']['use_graphligs'],
-                                       group_ligands=False)
-
+                                       group_ligands=True,
+                                       reps_only=False)
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
         print('Created data loader')
