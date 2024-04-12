@@ -98,13 +98,19 @@ def setup_plot():
     plt.rc('grid', color='grey', alpha=0.2)
 
     # raw_hex = ["#61C6E7", "#4F7BF0", "#6183E7", "#FA4828"]
-    raw_hex = ["#3180e0", "#2ba9ff", "#2957d8", "#FA4828", "#0a14db", "#803b96"]
-    hex_plt = [f"{raw}" for raw in raw_hex]
-    palette = sns.color_palette(hex_plt)
-    return palette
+    palette_dict = {'fp': "#3180e0",
+                    'native': "#2ba9ff",
+                    'dock': "#2957d8",
+                    'rdock': "#FA4828",
+                    'mixed': "#0a14db",
+                    'mixed+rdock': "#803b96"}
+    # palette = ["#2ba9ff", "#2957d8", "#FA4828", "#0a14db", "#803b96"]
+    # palette = [f"{raw}" for raw in raw_hex]
+    # palette = sns.color_palette(palette)
+    return palette_dict
 
 
-PALETTE = setup_plot()
+PALETTE_DICT = setup_plot()
 
 
 class CustomScale(mscale.ScaleBase):

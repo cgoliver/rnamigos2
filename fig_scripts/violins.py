@@ -9,7 +9,7 @@ import seaborn as sns
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from fig_scripts.plot_utils import PALETTE, group_df
+from fig_scripts.plot_utils import PALETTE_DICT, group_df
 
 # TEST SET
 name_runs = {
@@ -57,6 +57,14 @@ name_runs = {
 #               \textbackslash texttt\{native\} & 0.944 \$\textbackslash pm\$ 0.168 \\
 #                 \textbackslash texttt\{dock\} & 0.935 \$\textbackslash pm\$ 0.157 \\
 
+main_palette = [
+    # PALETTE_DICT['fp'],
+    PALETTE_DICT['native'],
+    PALETTE_DICT['dock'],
+    PALETTE_DICT['rdock'],
+    PALETTE_DICT['mixed'],
+    PALETTE_DICT['mixed+rdock']]
+# violin_palette = PALETTE + PALETTE
 names = list(name_runs.keys())
 runs = list(name_runs.values())
 
@@ -94,8 +102,6 @@ if grouped:
     big_df = group_df(big_df)
 means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 
-
-
 # For a detailed score per pocket
 # table = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by=['pocket_id', 'name'])
 # print(table.to_latex(index=False, columns=['pocket_id', 'name', 'score']))
@@ -113,8 +119,6 @@ means = means.sort_values(['name_rank'], ascending=[True])
 print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
 # sys.exit()
 
-main_palette = PALETTE + PALETTE  # useful extra colors for debug plotting more items
-violin_palette = PALETTE + PALETTE
 
 plt.gca().set_yscale('custom')
 yticks = np.arange(0.6, 1)
@@ -192,7 +196,8 @@ plt.ylim(lower - 0.02, 1.001)
 plt.xlabel("")
 plt.ylabel("AuROC")
 plt.grid(True, which='both', axis='y')
-plt.vlines(3.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
+# Add vline to separate mixed from docking.
+plt.vlines(len(runs) - 2.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
 # plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
 plt.savefig("figs/violins_mixed.pdf", bbox_inches='tight')
 plt.show()

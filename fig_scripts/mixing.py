@@ -187,6 +187,7 @@ def compute_mix_csvs(balanced=True):
         """
         raw_dfs = [pd.read_csv(f"outputs/{r}_raw.csv") for r in runs]
         raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
+        raw_dfs = [df[['pocket_id', 'smiles', 'is_active', 'raw_score']] for df in raw_dfs]
         if grouped:
             raw_dfs = [group_df(df) for df in raw_dfs]
 
@@ -197,6 +198,8 @@ def compute_mix_csvs(balanced=True):
         raw_dfs[1]['dock'] = -raw_dfs[1]['raw_score'].values
         raw_dfs[2]['fp'] = -raw_dfs[2]['raw_score'].values
         raw_dfs[3]['native'] = raw_dfs[3]['raw_score'].values
+        raw_dfs = [df.drop('raw_score', axis=1) for df in raw_dfs]
+
 
         big_df_raw = raw_dfs[1]
         big_df_raw = big_df_raw.merge(raw_dfs[2], on=['pocket_id', 'smiles', 'is_active'], how='outer')
@@ -222,8 +225,8 @@ def compute_mix_csvs(balanced=True):
                          outname_col='mixed', outname=outname_csv)
 
         # Get the best mixed and add it to the combined results df
-        raw_df_mixed = pd.read_csv(f'outputs/{outname_csv}_raw.csv')
-        big_df_raw = big_df_raw.merge(raw_df_mixed, on=['pocket_id', 'smiles', 'is_active'], how='inner')
+        raw_df_mixed = pd.read_csv(f'outputs/{outname_csv}_raw.csv')[['pocket_id', 'smiles', 'is_active', 'mixed']]
+        big_df_raw = big_df_raw.merge(raw_df_mixed, on=['pocket_id', 'smiles', 'is_active'], how='outer')
 
         # Add docknat
         if balanced:
@@ -237,8 +240,8 @@ def compute_mix_csvs(balanced=True):
         outname_csv = outname_csv.replace('mixed', 'docknat')
         mix_three_scores(big_df_raw, score1='dock', score2='fp', score3='native', coeffs=best_mix_docknat,
                          outname_col='docknat', outname=outname_csv)
-        raw_df_mixed = pd.read_csv(f'outputs/{outname_csv}_raw.csv')
-        big_df_raw = big_df_raw.merge(raw_df_mixed, on=['pocket_id', 'smiles', 'is_active'], how='inner')
+        raw_df_mixed = pd.read_csv(f'outputs/{outname_csv}_raw.csv')[['pocket_id', 'smiles', 'is_active', 'docknat']]
+        big_df_raw = big_df_raw.merge(raw_df_mixed, on=['pocket_id', 'smiles', 'is_active'], how='outer')
         return big_df_raw
 
     for seed in SEEDS:
@@ -382,13 +385,13 @@ if __name__ == "__main__":
     compute_mix_csvs()
 
     # To compare to ensembling the same method with different seeds
-    compute_all_self_mix()
+    # compute_all_self_mix()
 
     # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs
-    plot_pairs(score1='rdock', score2='docknat')
+    # plot_pairs(score1='rdock', score2='docknat')
 
     # Get table with all mixing
-    get_table_mixing()
+    # get_table_mixing()
 
     # Dump rdock_combined with mixed and docknat
     combine_rdock()
