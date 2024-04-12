@@ -22,6 +22,7 @@ def virtual_screen(df, sort_up_to=0, score_column='rdock'):
 
 def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_42_raw.csv')
+    big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
 
     # Combined and combined_docknat are not present in big_df_raw
     combined_mixed = pd.read_csv(f'outputs/mixed_rdock{"_grouped" if grouped else ""}_42_raw.csv')
@@ -36,15 +37,18 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
     pockets = big_df_raw['pocket_id'].unique()
     ef_df_rows = []
     nsteps = 20
+    nshuffles = 10
     for pi, pocket in enumerate(pockets):
+        # if not pocket in ['6QIS_H_J48_101', '6XRQ_A_V8A_103']:
+        #     continue
         if not pi % 20:
             print(f"Doing pocket {pi}/{len(pockets)}")
+
         # RDOCK alone
         pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
-        for n in range(10):
+        for n in range(nshuffles):
             # Shuffle
-            np.random.seed(n)
-            pocket_df = pocket_df.sample(frac=1)
+            pocket_df = pocket_df.sample(frac=1, random_state=n)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
                 ef = virtual_screen(pocket_df, sort_up_to, score_column='rdock')
                 res = {'sort_up_to': i,
@@ -175,7 +179,7 @@ def line_plot(df, use_docknat=True):
     pass
 
 
-def vax_plot(df):
+def vax_plot(df, use_docknat=True):
     ref = df.loc[df['model'] == 'rdock'].groupby(['pocket', 'seed']).apply(lambda group: np.trapz(group['ef']))
     ref_mean = ref.groupby('pocket').mean().reset_index()
     ref_std = ref.groupby('pocket').std().reset_index()
@@ -196,10 +200,10 @@ def vax_plot(df):
     plt.rc('grid', color='grey', alpha=0.2)
 
     # strategy = 'RNAmigos2.0'
-    strategy = 'mixed'
-    # strategy = 'fp'
-    # strategy = 'Combined Score'
-    # strategy = 'Combined Score'
+    if use_docknat:
+        strategy = 'combined_docknat'
+    else:
+        strategy = 'combined'
     plot_df = efficiency_df.loc[efficiency_df['model'] == strategy]
     plot_df = plot_df.sort_values(by='efficiency', ascending=False).reset_index()
 
@@ -245,6 +249,7 @@ if __name__ == "__main__":
     # build_ef_df(out_csv=out_csv)
 
     df = pd.read_csv(out_csv, index_col=0)
-    line_plot(df, use_docknat=True)
-    vax_plot(df)
+    use_docknat = True
+    line_plot(df, use_docknat=use_docknat)
+    vax_plot(df, use_docknat=use_docknat)
     pass
