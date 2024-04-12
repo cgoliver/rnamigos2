@@ -70,10 +70,10 @@ if __name__ == "__main__":
         'is_native': 'saved_models/native',
         'native_fp': 'saved_models/fp'
     }
-    out_dir = 'outputs/robin'
+    out_dir = 'outputs/robin_docknative'
     os.makedirs(out_dir, exist_ok=True)
     decoys_ligands_dir = "data/robin_decoys_decoyfinder"
-    new_mixing_coeffs = [0.3, 0.3, 0.3]
+    new_mixing_coeffs = [0.3, 0., 0.3]
     # new_mixing_coeffs = [0.36841931, 0.26315665, 0.36841931]
     for pocket, ligand_name in ligand_names.items():
         pocket_name = pocket.strip('.json')

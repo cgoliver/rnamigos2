@@ -1,8 +1,10 @@
+import os
+
 from collections import defaultdict
-import random
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import random
 import seaborn as sns
 from sklearn import metrics
 
@@ -19,7 +21,8 @@ def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_screened = int(frac * len(scores))
     is_active_sorted = [a for _, a in sorted(zip(scores, is_active), reverse=not lower_is_better)]
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
-    return (n_actives_screened / n_screened) / (n_actives / len(scores))
+    ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
+    return ef
 
 
 def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
@@ -44,31 +47,6 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
     is_active_sorted = sorted(zip(scores, is_active), reverse=lower_is_better)
     return (np.mean([rank for rank, (score, is_active) in enumerate(is_active_sorted) if is_active]) + 1) / len(scores)
 
-
-# raw_df = pd.read_csv('outputs/definitive_chembl_fp_dim64_simhungarian_prew0_robinx3dna_raw.csv')
-# ef_df = pd.read_csv('outputs/definitive_chembl_fp_dim64_simhungarian_prew0_robinx3dna.csv')
-#
-# raw_df = pd.read_csv('outputs/definitive_chembl_fp_dim64_simhungarian_prew0_robin_raw.csv')
-# ef_df = pd.read_csv('outputs/definitive_chembl_fp_dim64_simhungarian_prew0_robin.csv')
-#
-# raw_df = pd.read_csv('outputs/definitive_chembl_fp_dim64_simhungarian_prew0_robinprebuilt_raw.csv')
-# ef_df = pd.read_csv('outputs/definitive_chembl_fp_dim64_simhungarian_prew0_robinprebuilt.csv')
-#
-# raw_df = pd.read_csv('outputs/final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0_robin_x3dna_raw.csv')
-# ef_df = pd.read_csv('outputs/final_chembl_dock_graphligs_dim64_simhungarian_prew0_optimol1_quant_stretch0_robin_x3dna.csv')
-#
-# raw_df_2 = pd.read_csv('outputs/final_chembl_native_graphligs_dim64_optimol1_robinprebuilt_raw.csv')
-# ef_df_2 = pd.read_csv('outputs/final_chembl_native_graphligs_dim64_optimol1_robinprebuilt.csv')
-
-# raw_df = pd.read_csv('outputs/definitive_chembl_fp_dim64_simhungarian_prew0_raw.csv')
-# ef_df = pd.read_csv('outputs/definitive_chembl_fp_dim64_simhungarian_prew0.csv')
-
-
-# nt_key = 'nt_code'
-# colors = {'C': 'red', 'G': 'yellow', 'A': 'blue', 'U': 'green'}
-#
-
-import os
 
 pocket_names = [
     "2GDI_Y_TPP_100",
@@ -178,33 +156,38 @@ if __name__ == '__main__':
     all_efs = list()
     all_aurocs = list()
     fig, axs = plt.subplots(4)
+    # score_to_use = 'dock_nat'
+    score_to_use = 'merged'
+    # score_to_use = 'dock'
+    # score_to_use = 'is_native'
+    # score_to_use = 'native_fp'
+    print(score_to_use)
+
     for i, (pocket_name, ligand_name) in enumerate(zip(pocket_names, ligand_names)):
         # FOR DOCKING
         # merged = get_dfs_docking(ligand_name=ligand_name)
         # score_to_use = 'docking_score'
-        # break
 
         # FOR MIGOS
         swap = False
         merged = get_dfs_migos(pocket_name=pocket_name, swap=swap)
-        score_to_use = 'merged'
-        # score_to_use = 'dock'
-        # score_to_use = 'is_native'
-        # score_to_use = 'native_fp'
+        merged['dock_nat'] = (merged['is_native'] + merged['dock'])/2
         ax = axs[i]
         sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', common_norm=False, clip=(0, 1), ax=ax)
         ax.set_title(pocket_name)
-        #     g = load_json(f"data/robin_graphs_x3dna/{name}.json")
-        #     g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
-        #     print(g.nodes(data=True))
-        #     rna_draw(g,
-        #              node_colors=[colors[d[nt_key]] for n,d in g.nodes(data=True)],
-        #              ax=axs[i][1])
+        # g = load_json(f"data/robin_graphs_x3dna/{name}.json")
+        # g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
+        # print(g.nodes(data=True))
+        # nt_key = 'nt_code'
+        # colors = {'C': 'red', 'G': 'yellow', 'A': 'blue', 'U': 'green'}
+        # rna_draw(g,
+        #          node_colors=[colors[d[nt_key]] for n,d in g.nodes(data=True)],
+        #          ax=axs[i][1])
         scores = merged[score_to_use]
         actives = merged['split'].isin(['actives'])
 
         # GET EFS
-        frac = 0.01
+        frac = 0.02
         ef = enrichment_factor(scores=scores, is_active=actives,
                                lower_is_better=False, frac=frac)
         all_efs.append(ef)
@@ -227,6 +210,8 @@ if __name__ == '__main__':
     #
     print(np.mean(all_efs))
     print(np.mean(all_aurocs))
-    plt.tight_layout()
-    plt.savefig("figs/fig_3a.pdf", format="pdf")
-    plt.show()
+    # plt.tight_layout()
+    # plt.savefig("figs/fig_3a.pdf", format="pdf")
+    # plt.show()
+
+#

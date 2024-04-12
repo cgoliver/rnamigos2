@@ -379,17 +379,16 @@ if __name__ == "__main__":
     SEEDS = [0, 1, 42]
 
     # FIRST LET'S PARSE INFERENCE CSVS AND MIX THEM
-    # compute_mix_csvs()
+    compute_mix_csvs()
 
     # To compare to ensembling the same method with different seeds
-    # compute_all_self_mix()
+    compute_all_self_mix()
 
     # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs
-    # plot_pairs(score1='rdock', score2='docknat')
+    plot_pairs(score1='rdock', score2='docknat')
 
     # Get table with all mixing
-    # get_table_mixing()
+    get_table_mixing()
 
     # Dump rdock_combined with mixed and docknat
     combine_rdock()
-

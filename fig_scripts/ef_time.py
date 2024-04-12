@@ -204,7 +204,7 @@ def vax_plot(df):
 if __name__ == "__main__":
     # Build the time df for making the figures, this can be commented then
     out_csv = 'fig_scripts/time_ef.csv'
-    # build_ef_df(out_csv=out_csv)
+    build_ef_df(out_csv=out_csv)
 
     df = pd.read_csv(out_csv)
     line_plot(df)
