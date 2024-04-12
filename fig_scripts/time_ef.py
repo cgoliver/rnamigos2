@@ -127,9 +127,9 @@ def line_plot(df, use_docknat=True):
     palette = [PALETTE_DICT['rdock'], PALETTE_DICT['mixed+rdock']]
     model_res = []
     if use_docknat:
-        all_models = ['rdock', 'combined']
-    else:
         all_models = ['rdock', 'combined_docknat']
+    else:
+        all_models = ['rdock', 'combined']
     for model in all_models:
         means, stds = get_means_stds(df, model)
         model_res.append((means, stds))
@@ -145,7 +145,7 @@ def line_plot(df, use_docknat=True):
     times = np.linspace(0, 8.3, 20)
     # Add sole mixed performance
     if use_docknat:
-        mixed_means = [0.9898] * 20
+        mixed_means = [0.9848] * 20
     else:
         mixed_means = [0.9898] * 20
     ax.plot(times, mixed_means, label=r'\texttt{mixed}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
@@ -245,6 +245,6 @@ if __name__ == "__main__":
     # build_ef_df(out_csv=out_csv)
 
     df = pd.read_csv(out_csv, index_col=0)
-    # line_plot(df)
+    line_plot(df, use_docknat=True)
     vax_plot(df)
     pass
