@@ -33,6 +33,10 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
     combined_docknat = combined_docknat[['pocket_id', 'smiles', 'is_active', 'combined_docknat']]
     big_df_raw = big_df_raw.merge(combined_docknat, on=['pocket_id', 'smiles', 'is_active'], how='outer')
 
+    combined_nat = pd.read_csv(f'outputs/nat_rdock{"_grouped" if grouped else ""}_42_raw.csv')
+    combined_nat = combined_nat[['pocket_id', 'smiles', 'is_active', 'combined_nat']]
+    big_df_raw = big_df_raw.merge(combined_nat, on=['pocket_id', 'smiles', 'is_active'], how='outer')
+
     # Now iterate
     pockets = big_df_raw['pocket_id'].unique()
     ef_df_rows = []
@@ -81,7 +85,7 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
                    'seed': 0}
             ef_df_rows.append(res)
 
-        # mixed+combined
+        # docknat+combined_docknat
         pocket_df = pocket_df.sort_values(by='docknat', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
             s = virtual_screen(pocket_df, sort_up_to, score_column='combined_docknat')
@@ -89,6 +93,17 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
                    'pocket': pocket,
                    'ef': s,
                    'model': "combined_docknat",
+                   'seed': 0}
+            ef_df_rows.append(res)
+
+        # docknat+combined_nat
+        pocket_df = pocket_df.sort_values(by='docknat', ascending=False)
+        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+            s = virtual_screen(pocket_df, sort_up_to, score_column='combined_nat')
+            res = {'sort_up_to': i,
+                   'pocket': pocket,
+                   'ef': s,
+                   'model': "combined_nat",
                    'seed': 0}
             ef_df_rows.append(res)
     df = pd.DataFrame(ef_df_rows)
@@ -125,15 +140,14 @@ def plot_mean_std(ax, times, means, stds, label, color):
     ax.fill_between(times, means_low, means_high, alpha=0.2, color=color)
 
 
-def line_plot(df, use_docknat=True):
+def line_plot(df, mixed_model='combined'):
     # Get results
     names = [r'\texttt{rDock}', r'\texttt{mixed+rDock}']
     palette = [PALETTE_DICT['rdock'], PALETTE_DICT['mixed+rdock']]
     model_res = []
-    if use_docknat:
-        all_models = ['rdock', 'combined_docknat']
-    else:
-        all_models = ['rdock', 'combined']
+    assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
+    all_models = ['rdock', mixed_model]
+
     for model in all_models:
         means, stds = get_means_stds(df, model)
         model_res.append((means, stds))
@@ -148,10 +162,14 @@ def line_plot(df, use_docknat=True):
 
     times = np.linspace(0, 8.3, 20)
     # Add sole mixed performance
-    if use_docknat:
+    if mixed_model == 'combined':
+        mixed_means = [0.9898] * 20
+    elif mixed_model == 'combined_docknat':
+        mixed_means = [0.9848] * 20
+    elif mixed_model == 'combined_nat':
         mixed_means = [0.9848] * 20
     else:
-        mixed_means = [0.9898] * 20
+        raise ValueError
     ax.plot(times, mixed_means, label=r'\texttt{mixed}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
 
     for (means, stds), name, color in zip(model_res, names, palette):
@@ -179,7 +197,7 @@ def line_plot(df, use_docknat=True):
     pass
 
 
-def vax_plot(df, use_docknat=True):
+def vax_plot(df, mixed_model='combined'):
     ref = df.loc[df['model'] == 'rdock'].groupby(['pocket', 'seed']).apply(lambda group: np.trapz(group['ef']))
     ref_mean = ref.groupby('pocket').mean().reset_index()
     ref_std = ref.groupby('pocket').std().reset_index()
@@ -200,11 +218,7 @@ def vax_plot(df, use_docknat=True):
     plt.rc('grid', color='grey', alpha=0.2)
 
     # strategy = 'RNAmigos2.0'
-    if use_docknat:
-        strategy = 'combined_docknat'
-    else:
-        strategy = 'combined'
-    plot_df = efficiency_df.loc[efficiency_df['model'] == strategy]
+    plot_df = efficiency_df.loc[efficiency_df['model'] == mixed_model]
     plot_df = plot_df.sort_values(by='efficiency', ascending=False).reset_index()
 
     # sns.set(style="whitegrid")  # Optional: Set the style of the plot
@@ -249,7 +263,9 @@ if __name__ == "__main__":
     # build_ef_df(out_csv=out_csv)
 
     df = pd.read_csv(out_csv, index_col=0)
-    use_docknat = True
-    line_plot(df, use_docknat=use_docknat)
-    vax_plot(df, use_docknat=use_docknat)
+    # mixed_model = 'combined'
+    # mixed_model = 'combined_docknat'
+    mixed_model = 'combined_nat'
+    line_plot(df, mixed_model=mixed_model)
+    vax_plot(df, mixed_model=mixed_model)
     pass

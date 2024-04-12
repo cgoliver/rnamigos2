@@ -292,8 +292,8 @@ def plot_pairs(score1='rdock', score2='docknat'):
         big_df_raw = pd.read_csv(out_path_raw)
         all_thresh_res = mix_two_scores(big_df_raw, score1, score2, all_thresh=all_thresh)
         all_all_thresh_res.append(all_thresh_res)
-        plt.plot(all_thresh, all_all_thresh_res, label=f'mixed seed {seed}')
-    all_all_thresh_res = np.mean(np.asarray(all_all_thresh_res), axis=0)
+        plt.plot(all_thresh, all_thresh_res, label=f'mixed seed {seed}')
+    all_all_thresh_res = np.mean(np.asarray(all_all_thresh_res), axis=0).flatten()
     plt.plot(all_thresh, all_all_thresh_res, label='mean')
     plt.legend()
     plt.show()
@@ -369,6 +369,15 @@ def combine_rdock():
         docknat_df = pd.read_csv(f"outputs/{outname_docknat_combined}_raw.csv")
         print('docknat', get_ef_one(big_df_raw, score='docknat'))
         print('docknat+rdock', get_ef_one(docknat_df, score='combined_docknat'))
+
+        # Dump nat+rdock
+        coeffs = (0.5, 0.5, 0.)
+        outname_docknat_combined = f'nat_rdock{"_grouped" if GROUPED else ""}_{seed}'
+        mix_three_scores(big_df_raw, score1='native', score2='rdock', coeffs=coeffs,
+                         outname_col='combined_nat', outname=outname_docknat_combined)
+        nat_df = pd.read_csv(f"outputs/{outname_docknat_combined}_raw.csv")
+        print('nat', get_ef_one(big_df_raw, score='native'))
+        print('nat+rdock', get_ef_one(nat_df, score='combined_nat'))
         print()
 
 
@@ -382,13 +391,13 @@ if __name__ == "__main__":
     SEEDS = [0, 1, 42]
 
     # FIRST LET'S PARSE INFERENCE CSVS AND MIX THEM
-    compute_mix_csvs()
+    # compute_mix_csvs()
 
     # To compare to ensembling the same method with different seeds
     # compute_all_self_mix()
 
     # NOW WE HAVE THE BEST ENSEMBLE MODEL AS DATA, we can plot pairs
-    # plot_pairs(score1='rdock', score2='docknat')
+    # plot_pairs(score1='rdock', score2='native')
 
     # Get table with all mixing
     # get_table_mixing()
