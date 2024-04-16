@@ -19,14 +19,14 @@ from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
 from rnamigos_dock.learning.models import Embedder, LigandGraphEncoder, LigandEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen
 
-
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
 
+
 @hydra.main(version_base=None, config_path="../conf", config_name="evaluate")
 def main(cfg: DictConfig):
-    print(OmegaConf.to_yaml(cfg))
-    print('Done importing')
+    # print(OmegaConf.to_yaml(cfg))
+    # print('Done importing')
     '''
     Hardware settings
     '''
@@ -116,10 +116,9 @@ def main(cfg: DictConfig):
                                        ligands_path=params['data']['ligand_db'],
                                        systems=test_systems,
                                        decoy_mode=decoy_mode,
-                                       fp_type='MACCS',
                                        use_graphligs=params['model']['use_graphligs'],
-                                       group_ligands=False)
-
+                                       group_ligands=True,
+                                       reps_only=False)
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
         print('Created data loader')
@@ -148,10 +147,11 @@ def main(cfg: DictConfig):
 
     df = pd.DataFrame(rows)
     d = Path(cfg.result_dir, parents=True, exist_ok=True)
-    df.to_csv(d / cfg.csv_name)
+    base_name = Path(cfg.csv_name).stem
+    df.to_csv(d / (base_name + '.csv'))
 
     df_raw = pd.DataFrame(raw_rows)
-    df_raw.to_csv(d / Path(cfg.csv_name.split(".")[0] + "_raw.csv"))
+    df_raw.to_csv(d / (base_name + "_raw.csv"))
 
 
 if __name__ == "__main__":

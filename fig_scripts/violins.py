@@ -9,7 +9,7 @@ import seaborn as sns
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from fig_scripts.plot_utils import PALETTE, group_df
+from fig_scripts.plot_utils import PALETTE_DICT, group_df
 
 # TEST SET
 name_runs = {
@@ -19,6 +19,8 @@ name_runs = {
     # r"\texttt{fp}": "fp_0.csv",
     # r"\texttt{fp}": "fp_1.csv",
     # r"RECO": "fp_42.csv",
+    # r"\texttt{recons}": "fp_42.csv",
+    # r"\texttt{fp}": "fp_1_1_2.csv",
     # r"\texttt{fp_2}": "fp_split_grouped2.csv",
     # r"\texttt{native_old}": "paper_native.csv",
     # r"\texttt{native0}": "native_split_grouped0.csv",
@@ -26,7 +28,8 @@ name_runs = {
     # r"\texttt{native}": "native_0.csv",
     # r"\texttt{toto}": "toto_0.csv",
     # r"\texttt{native}": "native_1.csv",
-     r"COMP": "native_42.csv",
+     r"COMPAT": "native_42.csv",
+    # r"\texttt{native}": "native_1.csv",
     # r"\texttt{native2}": "native_split_grouped2.csv",
     # r"\texttt{dock_old}": "paper_dock.csv",
     # r"\texttt{dock0}": "dock_split_grouped0.csv",
@@ -39,25 +42,33 @@ name_runs = {
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
      r"MIXED": "docknat_grouped_42.csv",
      r"MIXED+rDock": "docknat_rdock_grouped_42.csv",
+    # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
+    # r"\texttt{mixed}": "mixed_grouped_42.csv",
+    # r"\texttt{mixed\newline+ rDock}": "mixed_rdock_grouped_42.csv",
 }
 
 # Difference Mean EF / print is because group_df() does not use group reps but subsamples.
-
 # 0
 #                   \textbackslash texttt\{fp\} & 0.874 \$\textbackslash pm\$ 0.220 \\ ~perf at logging epoch : 0.91
 #               \textbackslash texttt\{native\} & 0.912 \$\textbackslash pm\$ 0.241 \\ Mean EF : 0.90436 \\ ~perf at logging epoch : 0.96
 #                 \textbackslash texttt\{dock\} & 0.928 \$\textbackslash pm\$ 0.160 \\
-
 # 1
 #                   \textbackslash texttt\{fp\} & 0.868 \$\textbackslash pm\$ 0.211 \\ ~perf at logging epoch : 0.905
 #               \textbackslash texttt\{native\} & 0.960 \$\textbackslash pm\$ 0.138 \\ Mean EF : 0.95541
 #                 \textbackslash texttt\{dock\} & 0.945 \$\textbackslash pm\$ 0.141 \\
-
 # 42
 #                   \textbackslash texttt\{fp\} & 0.859 \$\textbackslash pm\$ 0.212 \\ ~perf at logging epoch : 0.92
 #               \textbackslash texttt\{native\} & 0.944 \$\textbackslash pm\$ 0.168 \\
 #                 \textbackslash texttt\{dock\} & 0.935 \$\textbackslash pm\$ 0.157 \\
 
+main_palette = [
+    # PALETTE_DICT['fp'],
+    PALETTE_DICT['native'],
+    PALETTE_DICT['dock'],
+    PALETTE_DICT['rdock'],
+    PALETTE_DICT['mixed'],
+    PALETTE_DICT['mixed+rdock']]
+# violin_palette = PALETTE + PALETTE
 names = list(name_runs.keys())
 runs = list(name_runs.values())
 
@@ -73,20 +84,27 @@ dfs = [df.assign(name=names[i]) for i, df in enumerate(dfs)]
 big_df = pd.concat(dfs)
 big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
 
-means_0 = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
-import pickle
-script_dir = os.path.dirname(__file__)
-splits_file = os.path.join(script_dir, '../data/train_test_75.p')
-_, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
-groups = {**train_names_grouped, **test_names_grouped}
-big_df_2 = big_df[big_df['pocket_id'].isin(groups)]
-means_2 = big_df_2.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
-# dfs = [df for df in dfs]
-# print(len(big_df['pocket_id'].unique()))
+# This is to assess mean difference incurred by different groupings
+# means_ungrouped = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+# import pickle
+# script_dir = os.path.dirname(__file__)
+# splits_file = os.path.join(script_dir, '../data/train_test_75.p')
+# _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
+# groups = {**train_names_grouped, **test_names_grouped}
+# centroids = big_df[big_df['pocket_id'].isin(groups)]
+# means_centroids = centroids.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+# big_df_grouped = group_df(big_df)
+# means_grouped = big_df_grouped.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+# print('Ungrouped')
+# print(means_ungrouped)
+# print('Group reps')
+# print(means_centroids)
+# print('Grouped')
+# print(means_grouped)
+
 if grouped:
     big_df = group_df(big_df)
-means_3 = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
-# print(len(big_df['pocket_id'].unique()))
+means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 
 print(means_0)
 print(means_2)
@@ -108,8 +126,6 @@ means = means.sort_values(['name_rank'], ascending=[True])
 print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
 # sys.exit()
 
-main_palette = PALETTE + PALETTE  # useful extra colors for debug plotting more items
-violin_palette = PALETTE + PALETTE
 
 plt.gca().set_yscale('custom')
 yticks = np.arange(0.6, 1)
@@ -187,7 +203,8 @@ plt.ylim(lower - 0.02, 1.001)
 plt.xlabel("")
 plt.ylabel("AuROC")
 plt.grid(True, which='both', axis='y')
-plt.vlines(3.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
+# Add vline to separate mixed from docking.
+plt.vlines(len(runs) - 2.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
 # plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
 plt.savefig("figs/violins_mixed.pdf", bbox_inches='tight')
 plt.show()

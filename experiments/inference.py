@@ -15,8 +15,7 @@ from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 
 
-def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.44, 0.39, 0.17), models_path=None, dump_all=False):
-    # TODO update coeff but don't break colab
+def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.3, 0.3, 0.3), models_path=None, dump_all=False):
     """
     Run inference from python objects
     """
@@ -24,9 +23,9 @@ def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.44, 0.39, 0.17)
     script_dir = os.path.dirname(__file__)
     if models_path is None:
         models_path = {
-            'dock': os.path.join(script_dir, '../saved_models/paper_dock'),
-            'is_native': os.path.join(script_dir, '../saved_models/paper_native'),
-            'native_fp': os.path.join(script_dir, '../saved_models/paper_fp')
+            'dock': os.path.join(script_dir, '../saved_models/dock'),
+            'is_native': os.path.join(script_dir, '../saved_models/native'),
+            'native_fp': os.path.join(script_dir, '../saved_models/fp')
         }
     models = {model_name: get_model_from_dirpath(model_path) for model_name, model_path in models_path.items()}
 
@@ -90,7 +89,9 @@ def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False)
     """
     # Get dgl graph with node expansion BFS
     dgl_graph = get_dgl_graph(cif_path, residue_list)
+    print("Successfully built the graph")
     smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
+    print("Successfully parsed ligands, ready for inference")
     inference(dgl_graph=dgl_graph, smiles_list=smiles_list, out_path=out_path, dump_all=dump_all)
 
 

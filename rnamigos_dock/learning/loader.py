@@ -397,7 +397,8 @@ class VirtualScreenDataset(DockingDataset):
                  systems,
                  decoy_mode='pdb',
                  rognan=False,
-                 group_ligands=False,
+                 reps_only=False,
+                 group_ligands=True,
                  **kwargs
                  ):
         super().__init__(pockets_path, systems=systems, shuffle=False, **kwargs)
@@ -406,15 +407,17 @@ class VirtualScreenDataset(DockingDataset):
         self.all_pockets_names = list(self.systems['PDB_ID_POCKET'].unique())
         self.rognan = rognan
         self.group_ligands = group_ligands
-        if self.group_ligands:
+        self.reps_only = reps_only
+        script_dir = os.path.dirname(__file__)
+        if self.reps_only:
             # This amounts to choosing only reps.
             # Previously, the retained ones were the centroids.
-            script_dir = os.path.dirname(__file__)
             reps_file = os.path.join(script_dir, '../../data/group_reps_75.p')
             train_group_reps, test_group_reps = pickle.load(open(reps_file, 'rb'))
-            reps = set(train_group_reps+test_group_reps)
+            reps = set(train_group_reps + test_group_reps)
             self.all_pockets_names = [pocket for pocket in self.all_pockets_names if pocket in reps]
 
+        if self.group_ligands:
             splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
             _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, 'rb'))
             self.groups = {**train_names_grouped, **test_names_grouped}
@@ -426,10 +429,9 @@ class VirtualScreenDataset(DockingDataset):
         return len(self.all_pockets_names)
 
     def parse_smiles(self, smiles_path):
-        return list(open(smiles_path).readlines())
-        # sm_list = list(open(smiles_path).readlines())
-        # sm_list = [sm.strip() for sm in sm_list]
-        # return sm_list
+        sm_list = list(open(smiles_path).readlines())
+        sm_list = [sm.strip() for sm in sm_list]
+        return sm_list
 
     def get_ligands(self, pocket_name):
         actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_name, self.decoy_mode, 'actives.txt'))
@@ -437,8 +439,14 @@ class VirtualScreenDataset(DockingDataset):
         # We need to return all actives and ensure they are not in the inactives of a pocket
         if self.group_ligands:
             group_pockets = self.groups[self.reverse_groups[pocket_name]]
-            group_list = [self.parse_smiles(Path(self.ligands_path, pocket, self.decoy_mode, 'actives.txt'))[0]
-                          for pocket in group_pockets]
+            group_list = []
+            for pocket in group_pockets:
+                try:
+                    active = self.parse_smiles(Path(self.ligands_path, pocket, self.decoy_mode, 'actives.txt'))[0]
+                    group_list.append(active)
+                except Exception as e:
+                    pass
+                    # print(e)
             group_actives = set(group_list)
             decoys_smiles = [smile for smile in decoys_smiles if smile not in group_actives]
             actives_smiles = list(group_actives)
@@ -453,12 +461,13 @@ class VirtualScreenDataset(DockingDataset):
                 pocket_name = self.all_pockets_names[np.random.randint(0, len(self.all_pockets_names))]
             else:
                 pocket_name = self.all_pockets_names[idx]
+
             if self.cache_graphs:
                 pocket_graph, _ = self.all_pockets[pocket_name]
             else:
                 pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_name}.json"),
+                                                 undirected=self.undirected,
                                                  use_rings=False)
-
             # Now we don't Rognan anymore for ligands
             pocket_name = self.all_pockets_names[idx]
             actives_smiles, decoys_smiles = self.get_ligands(pocket_name)
@@ -477,7 +486,8 @@ class VirtualScreenDataset(DockingDataset):
                 all_inputs = self.ligand_encoder.smiles_to_fp_list(all_smiles)
                 all_inputs = torch.tensor(all_inputs)
             return pocket_name, pocket_graph, all_inputs, torch.tensor(is_active), all_smiles
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+            print(e)
             return None, None, None, None, None
 
 

@@ -24,7 +24,8 @@ def get_groups():
     pickle.dump((train_group_reps, test_group_reps), open(group_reps_path, 'wb'))
 
 
-# get_groups()
+if __name__ == '__main__':
+    get_groups()
 
 
 def group_df(df):
@@ -33,7 +34,10 @@ def group_df(df):
     """
     script_dir = os.path.dirname(__file__)
     splits_file = os.path.join(script_dir, '../data/group_reps_75.p')
-    train_group_reps, test_group_reps = pickle.load(open(splits_file, 'rb'))
+    try:
+        train_group_reps, test_group_reps = pickle.load(open(splits_file, 'rb'))
+    except FileNotFoundError as e:
+        raise Exception("To produce this missing file run python fig_scripts/plot_utils.py") from e
     df = df.loc[df['pocket_id'].isin(train_group_reps + test_group_reps)]
     return df
 
@@ -94,19 +98,25 @@ def setup_plot():
     plt.rc('grid', color='grey', alpha=0.2)
 
     # raw_hex = ["#61C6E7", "#4F7BF0", "#6183E7", "#FA4828"]
-    raw_hex = ["#3180e0", "#2ba9ff", "#2957d8", "#FA4828", "#0a14db", "#803b96"]
-    hex_plt = [f"{raw}" for raw in raw_hex]
-    palette = sns.color_palette(hex_plt)
-    return palette
+    palette_dict = {'fp': "#3180e0",
+                    'native': "#2ba9ff",
+                    'dock': "#2957d8",
+                    'rdock': "#FA4828",
+                    'mixed': "#0a14db",
+                    'mixed+rdock': "#803b96"}
+    # palette = ["#2ba9ff", "#2957d8", "#FA4828", "#0a14db", "#803b96"]
+    # palette = [f"{raw}" for raw in raw_hex]
+    # palette = sns.color_palette(palette)
+    return palette_dict
 
 
-PALETTE = setup_plot()
+PALETTE_DICT = setup_plot()
 
 
 class CustomScale(mscale.ScaleBase):
     name = 'custom'
 
-    def __init__(self, axis, offset=0.03, sup_lim=1):
+    def __init__(self, axis, offset=0.01, sup_lim=1):
         mscale.ScaleBase.__init__(self, axis=axis)
         self.offset = offset
         self.sup_lim = sup_lim

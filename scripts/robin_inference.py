@@ -1,6 +1,11 @@
 import os
+import sys
+
 from rnaglib.utils import graph_io
 from collections import defaultdict
+
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from experiments.inference import inference
 from rnaglib.drawing import rna_draw
@@ -15,8 +20,6 @@ def group_reference_pockets(pockets_path='data/json_pockets_expanded'):
     for pocket in all_pockets:
         pdb_id = pocket.split('_')[0]
         grouped_pockets[pdb_id].append(pocket)
-    # print(len(all_pockets))
-    # print(len(grouped_pockets))
     return grouped_pockets
 
 
@@ -66,20 +69,16 @@ if __name__ == "__main__":
     expanded_path = 'data/json_pockets_expanded'
     nodelists, ligand_names = get_nodelists_and_ligands()
 
-    # models_path = {
-    #     'dock': 'saved_models/robin_dock',
-    #     'is_native': 'saved_models/robin_native',
-    #     'native_fp': 'saved_models/robin_fp'
-    # }
     models_path = {
-        'dock': 'saved_models/split_grouped1_dock',
-        'is_native': 'saved_models/split_grouped1_native',
-        'native_fp': 'saved_models/split_grouped1_fp'
+        'dock': 'saved_models/dock',
+        'is_native': 'saved_models/native',
+        'native_fp': 'saved_models/fp'
     }
-    out_dir = 'outputs/robin'
+    out_dir = 'outputs/robin_docknative'
     os.makedirs(out_dir, exist_ok=True)
     decoys_ligands_dir = "data/robin_decoys_decoyfinder"
-    new_mixing_coeffs = [0.36841931, 0.26315665, 0.36841931]
+    new_mixing_coeffs = [0.3, 0., 0.3]
+    # new_mixing_coeffs = [0.36841931, 0.26315665, 0.36841931]
     for pocket, ligand_name in ligand_names.items():
         pocket_name = pocket.strip('.json')
         print('Doing pocket : ', pocket_name)
@@ -87,8 +86,12 @@ if __name__ == "__main__":
         # Get dgl pocket
         pocket_path = os.path.join(expanded_path, pocket)
         pocket_graph = graph_io.load_json(pocket_path)
+<<<<<<< HEAD
         dgl_pocket_graph, _ = load_rna_graph(pocket_graph)
         continue
+=======
+        dgl_pocket_graph, _ = load_rna_graph(pocket_graph, undirected=False)
+>>>>>>> 9b2ee8c77a494e6369c2466032eb2b46d4981434
 
         # Get smiles list for decoys
         # decoys_ligands_path = os.path.join(decoys_ligands_dir, f"{ligand_name}_decoys.txt")
@@ -108,8 +111,3 @@ if __name__ == "__main__":
         smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
         inference(dgl_graph=dgl_pocket_graph, smiles_list=smiles_list, out_path=out_path,
                   dump_all=True, models_path=models_path, mixing_coeffs=new_mixing_coeffs)
-
-
-
-
-

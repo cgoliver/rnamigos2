@@ -38,6 +38,7 @@ from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEncoder, Decoder, RNAmigosModel
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 from rnamigos_dock.learning.utils import mkdirs
+from fig_scripts.plot_utils import group_df
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
@@ -155,14 +156,16 @@ def main(cfg: DictConfig):
                                           ligands_path=cfg.data.ligand_db,
                                           systems=vs_validation_systems,
                                           use_graphligs=cfg.model.use_graphligs,
-                                          group_ligands=True)
+                                          group_ligands=True,
+                                          reps_only=True)
     val_vs_loader = GraphDataLoader(dataset=val_vs_dataset, **vs_loader_args)
     test_vs_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
                                            decoy_mode='chembl',
                                            ligands_path=cfg.data.ligand_db,
                                            systems=test_systems,
                                            use_graphligs=cfg.model.use_graphligs,
-                                           group_ligands=True)
+                                           group_ligands=True,
+                                           reps_only=True)
     test_vs_loader = GraphDataLoader(dataset=test_vs_dataset, **vs_loader_args)
     print('Created data loader')
 
@@ -270,7 +273,7 @@ def main(cfg: DictConfig):
     logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")
 
     # %%%%%%%%%%%%%%%%%%%%%%%
-    model = model.to('cpu')
+    best_model = best_model.to('cpu')
     rows, raw_rows = [], []
     decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder']
     for decoy_mode in decoys:
@@ -282,7 +285,8 @@ def main(cfg: DictConfig):
                                                 decoy_mode=decoy_mode,
                                                 fp_type='MACCS',
                                                 use_graphligs=cfg.model.use_graphligs,
-                                                group_ligands=False)
+                                                group_ligands=True,
+                                                reps_only=False)
         dataloader = GraphDataLoader(dataset=final_vs_dataset, **vs_loader_args)
 
         print('Created data loader')
@@ -291,7 +295,7 @@ def main(cfg: DictConfig):
         Experiment Setup
         '''
         lower_is_better = cfg.train.target in ['dock', 'native_fp']
-        efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
+        efs, scores, status, pocket_names, all_smiles = run_virtual_screen(best_model,
                                                                            dataloader,
                                                                            metric=mean_active_rank,
                                                                            lower_is_better=lower_is_better,
@@ -307,14 +311,23 @@ def main(cfg: DictConfig):
                 'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
                 'decoys': decoy_mode,
                 'pocket_id': pocket_id})
-        print('Mean EF :', np.mean(efs))
+        print(f'Mean EF for {decoy_mode}:', np.mean(efs))
+
+    logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
+
+    d = Path("outputs/all", parents=True, exist_ok=True)
+    base_name = Path(cfg.name).stem
 
     df = pd.DataFrame(rows)
-    d = Path("outputs/all", parents=True, exist_ok=True)
-    df.to_csv(d / cfg.name)
+    df.to_csv(d / (base_name + '.csv'))
+
     df_raw = pd.DataFrame(raw_rows)
-    df_raw.to_csv(d / Path(cfg.name.split(".")[0] + "_raw.csv"))
-    logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
+    df_raw.to_csv(d / (base_name + "_raw.csv"))
+
+    df = df.loc[df['decoys'] == 'chembl']
+    df = group_df(df)
+    mean = np.mean(df['score'].values)
+    print(f'Mean EF', mean)
 
 
 if __name__ == "__main__":

@@ -1,18 +1,12 @@
 """ Trainer """
 
 import sys
-import time
 
-from loguru import logger
 import dgl
-from dgl.dataloading import GraphDataLoader
-
+import time
 import torch
-import torch.nn.functional as F
 
-from rnamigos_dock.learning.utils import dgl_to_nx
 from rnamigos_dock.learning.decoy_utils import *
-from rnamigos_dock.learning.loader import VirtualScreenDataset
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 
 
