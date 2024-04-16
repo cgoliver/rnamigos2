@@ -141,7 +141,7 @@ def get_dfs_docking(ligand_name):
     return merged
 
 
-def get_dfs_migos(pocket_name, swap=True, swap_on='merged'):
+def get_dfs_migos(pocket_name, swap=False, swap_on='merged'):
     names = ['smiles', 'dock', 'is_native', 'native_fp', 'merged']
     out_dir = 'outputs/robin'
     actives_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_actives.txt"), names=names, sep=' ')

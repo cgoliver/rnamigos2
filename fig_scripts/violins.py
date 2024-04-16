@@ -18,27 +18,27 @@ name_runs = {
     # r"\texttt{fp_pre}": "fp_split_grouped1.csv",
     # r"\texttt{fp}": "fp_0.csv",
     # r"\texttt{fp}": "fp_1.csv",
-    # r"\texttt{fp}": "fp_42.csv",
+    # r"RECO": "fp_42.csv",
     # r"\texttt{fp_2}": "fp_split_grouped2.csv",
     # r"\texttt{native_old}": "paper_native.csv",
     # r"\texttt{native0}": "native_split_grouped0.csv",
     # r"\texttt{native_pre}": "native_split_grouped1.csv",
-    r"\texttt{native}": "native_0.csv",
+    # r"\texttt{native}": "native_0.csv",
     # r"\texttt{toto}": "toto_0.csv",
     # r"\texttt{native}": "native_1.csv",
-    # r"\texttt{native}": "native_42.csv",
+     r"COMP": "native_42.csv",
     # r"\texttt{native2}": "native_split_grouped2.csv",
     # r"\texttt{dock_old}": "paper_dock.csv",
     # r"\texttt{dock0}": "dock_split_grouped0.csv",
     # r"\texttt{dock_pre}": "dock_split_grouped1.csv",
     # r"\texttt{dock}": "dock_0.csv",
     # r"\texttt{dock}": "dock_1.csv",
-    # r"\texttt{dock}": "dock_42.csv",
+     r"AFF": "dock_42.csv",
     # r"\texttt{dock2}": "dock_split_grouped2.csv",
-    # r"\texttt{rDock}": "rdock.csv",
+     r"rDock": "rdock.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
-    # r"\texttt{mixed}": "mixed.csv",
-    # r"\texttt{mixed\newline+ rDock}": "mixed_rdock.csv",
+     r"MIXED": "docknat_grouped_42.csv",
+     r"MIXED+rDock": "docknat_rdock_grouped_42.csv",
 }
 
 # Difference Mean EF / print is because group_df() does not use group reps but subsamples.
@@ -91,7 +91,6 @@ means_3 = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 print(means_0)
 print(means_2)
 print(means_3)
-luhfr
 # For a detailed score per pocket
 # table = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by=['pocket_id', 'name'])
 # print(table.to_latex(index=False, columns=['pocket_id', 'name', 'score']))
@@ -190,5 +189,5 @@ plt.ylabel("AuROC")
 plt.grid(True, which='both', axis='y')
 plt.vlines(3.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
 # plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
-plt.savefig("fig_scripts/violins_mixed.pdf", bbox_inches='tight')
+plt.savefig("figs/violins_mixed.pdf", bbox_inches='tight')
 plt.show()

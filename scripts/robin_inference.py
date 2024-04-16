@@ -3,6 +3,7 @@ from rnaglib.utils import graph_io
 from collections import defaultdict
 
 from experiments.inference import inference
+from rnaglib.drawing import rna_draw
 from rnamigos_dock.tools.graph_utils import load_rna_graph
 
 
@@ -51,6 +52,9 @@ def get_nodelists_and_ligands(robin_systems=ROBIN_SYSTEMS, pockets_path='data/js
             representative_pocket = copies[0]
             pocket_path = os.path.join(pockets_path, representative_pocket)
             pocket_graph = graph_io.load_json(pocket_path)
+            colors = ['blue' if in_pocket else 'white' for n, in_pocket in pocket_graph.nodes(data='in_pocket')]
+            rna_draw(pocket_graph, node_colors=colors, layout='spring', show=True)
+
             node_list = [node[5:] for node, in_pocket in pocket_graph.nodes(data='in_pocket') if in_pocket]
             nodelists[representative_pocket] = node_list
             ligand_names[representative_pocket] = ligand_name
@@ -84,6 +88,7 @@ if __name__ == "__main__":
         pocket_path = os.path.join(expanded_path, pocket)
         pocket_graph = graph_io.load_json(pocket_path)
         dgl_pocket_graph, _ = load_rna_graph(pocket_graph)
+        continue
 
         # Get smiles list for decoys
         # decoys_ligands_path = os.path.join(decoys_ligands_dir, f"{ligand_name}_decoys.txt")

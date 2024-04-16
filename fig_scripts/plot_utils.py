@@ -85,9 +85,9 @@ def rotate_2D_coords(coords, angle=0):
 
 def setup_plot():
     # SETUP PLOT
-    plt.rcParams['text.usetex'] = True
+    plt.rcParams['text.usetex'] = False
     matplotlib.rcParams['mathtext.fontset'] = 'stix'
-    matplotlib.rcParams['font.family'] = 'STIXGeneral'
+    matplotlib.rcParams['font.family'] = 'Helvetica'
     plt.rc('font', size=16)  # fontsize of the tick labels
     plt.rc('ytick', labelsize=13)  # fontsize of the tick labels
     plt.rc('xtick', labelsize=13)  # fontsize of the tick labels

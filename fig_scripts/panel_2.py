@@ -7,6 +7,7 @@ import sys
 from collections import Counter
 import itertools
 import matplotlib.pyplot as plt
+import matplotlib 
 import numpy as np
 import pandas as pd
 import pickle
@@ -16,6 +17,8 @@ from scipy.spatial.distance import squareform, cdist
 from scipy.stats import spearmanr
 import seaborn as sns
 
+from seaborn.palettes import dark_palette, light_palette, blend_palette
+
 from fig_scripts.plot_utils import group_df, get_rmscores, get_smooth_order, rotate_2D_coords, get_groups
 
 def dock_correlation():
@@ -23,25 +26,114 @@ def dock_correlation():
     Docking vs rnamigos score correlation
     """
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", 'rb'))
-    dock = pd.read_csv("outputs/dock_split_grouped1_raw.csv")
-    dock = pd.read_csv("outputs/mixed_raw.csv")
+    dock = pd.read_csv("outputs/docknat_grouped_42_raw.csv")
     dock_pred = pd.read_csv("outputs/rdock_raw.csv")
     result = dock.merge(dock_pred, on=['pocket_id', 'decoys', 'smiles'])
     result = result.loc[(result['decoys'] == 'chembl') & (result['pocket_id'].isin(grouped_test.keys()))]
-    sns.regplot(data=result, x='raw_score', y='combined', color=".3", ci=99, scatter_kws={"alpha": 0.3, "s": 10}, line_kws={"color": "red"})
+    actives = result.loc[result['is_active_x'] == 1.0]
+    decoys = result.loc[result['is_active_x'] == 0.0]
+    g = sns.regplot(data=result, x='raw_score', y='docknat', color=".3", ci=99, scatter_kws={"alpha": 0.3, "s": 10}, line_kws={"color": "red"})
+    sns.scatterplot(data=actives, x='raw_score', y='docknat', color="blue", ax=g)
 
-    r, p = spearmanr(result['raw_score'], result['combined'])
 
-    plt.text(x=np.min(result['raw_score']), y=np.max(result['combined']),
+    r, p = spearmanr(result['raw_score'], result['docknat'])
+
+    plt.text(x=np.min(result['raw_score']), y=np.max(result['docknat']) - 0.5,
          s=f"$\\rho$ = {r:.2f}",
          color='red', fontweight='bold')
 
+    handles = [
+                matplotlib.lines.Line2D([], [], marker='o', color='blue', linestyle='none', markersize=10, label='Native'),
+                matplotlib.lines.Line2D([], [], marker='o', color='grey', linestyle='none', markersize=10, label='Decoy'),
+                ]
 
-    plt.savefig("figs/dock_corr.pdf", format="pdf")
+
+    plt.axvline(x=decoys['raw_score'].mean(), color='grey', linestyle='--')
+    plt.axvline(x=actives['raw_score'].mean(), color='blue', linestyle='--')
+
+    #plt.axhline(y=decoys['mixed'].mean(), color='grey', linestyle='--')
+    #plt.axhline(y=actives['mixed'].mean(), color='blue', linestyle='--')
+
+    plt.legend(handles=handles, loc='lower left')
+
     plt.xlabel("rDock Intermolecular Term (kcal/mol)")
-    plt.ylabel("RNAmigos2 Score")
+    plt.ylabel("score")
+    plt.savefig("figs/dock_corr.pdf", format="pdf")
+    plt.savefig("figs/dock_corr.png", format="png")
     plt.show()
     pass
+
+
+def barcodes(grouped=True):
+    # TEST SET
+    name_runs = {
+        r"COMP": "native_42.csv",
+        r"AFF": "dock_42.csv",
+        r"rDock": "rdock.csv",
+        r"MIXED": "mixed_grouped_42.csv",
+    }
+    rows = []
+    prev_pockets = None
+    for csv_name in name_runs.values():
+        # print(m)
+        df = pd.read_csv(f"outputs/{csv_name}")
+        if grouped:
+            df = group_df(df)
+        row = df[df['decoys'] == 'chembl'].sort_values(by='pocket_id')
+        all_pockets= row['pocket_id'].values
+        if prev_pockets is None:
+            prev_pockets = all_pockets
+        else:
+            assert (prev_pockets == all_pockets).all(), print(prev_pockets, all_pockets)
+        rows.append(row['score'])
+
+    # FIND SMOOTHER PERMUTED VERSION
+    order = get_smooth_order(prev_pockets)
+    for i in range(len(rows)):
+        new_row = rows[i].values[order]
+        rows[i] = new_row
+
+    # sns.heatmap(rows, cmap='binary_r')
+    # cmap = sns.color_palette("vlag_r", as_cmap=True)
+    # cmap = sns.diverging_palette(0, 245, s=100, l=50, as_cmap=True)
+    # cmap = custom_diverging_palette(0, 245, s_neg=100, l_neg=50, s_pos=90, l_pos=80, as_cmap=True)
+    red_pal = sns.light_palette('#CF403E', reverse=True, n_colors=128 - 10)
+    # blue_pal = sns.light_palette('#5c67ff', n_colors=30)[:10] # too grey/violet
+    # blue_pal = sns.light_palette('#9dabe1', n_colors=10) # a bit violet and also lot of color
+    # blue_pal = sns.light_palette('#a5b0d9', n_colors=10) # close
+    # blue_pal = sns.light_palette('#7689d5', n_colors=10) # nice blue but a bit dense
+    # blue_pal = sns.light_palette('#ccd6ff', n_colors=10) # brighter less blue
+    # blue_pal = sns.light_palette('#d6ecff', n_colors=10) # almost white
+    # blue_pal = sns.light_palette('#ebf5ff', n_colors=10) # whiter
+    blue_pal = sns.light_palette('#fff', n_colors=10)  # white
+    # blue_pal = sns.color_palette("light:b", n_colors=10) # hardcode blue
+    cmap = blend_palette(np.concatenate([red_pal, blue_pal]), 1, as_cmap=True)
+
+    # Handle spine
+    ax = sns.heatmap(rows, cmap=cmap)
+    for _, spine in ax.spines.items():
+        spine.set_visible(True)
+        spine.set_color('grey')
+
+    # Handle ticks
+    xticks = np.arange(0, len(rows[0]), 10)
+    xticks_labels = xticks + 1
+    plt.xticks(xticks, xticks_labels, va="center")
+    plt.tick_params(axis='x', bottom=False, labelbottom=True)
+    plt.yticks(np.arange(len(name_runs)) + 0.5, [name for name in name_runs.keys()], rotation=0, va="center")
+    plt.tick_params(axis='y', left=False, right=False, labelleft=True)
+
+    # plotis is probably useless
+    # selected_pockets = set(pockets)
+    # test_index = np.array([name in selected_pockets for name in rmscores_labels])
+    # test_rmscores_labels = rmscores_labels[test_index]
+    # test_rmscores_values = rmscores_valu
+    plt.xlabel(r"Pocket")
+    plt.ylabel(r"Method")
+    plt.savefig("figs/barcode.pdf", bbox_inches='tight')
+    plt.show()
+    pass
+
 
 def train_sim_perf_plot(grouped=True):
     """
@@ -50,7 +142,7 @@ def train_sim_perf_plot(grouped=True):
     get_groups()
     rmscores = get_rmscores()
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", 'rb'))
-    mixed_res = pd.read_csv(f'outputs/mixed.csv')
+    mixed_res = pd.read_csv(f'outputs/docknat_grouped_42.csv')
 
     fig, ax1 = plt.subplots()
 
@@ -61,6 +153,7 @@ def train_sim_perf_plot(grouped=True):
     native_smiles['lig_ids'] = native_smiles['PDB_ID_POCKET'].apply(lambda x: x.split("_")[2])
     lig_counts = Counter(list(native_smiles['lig_ids']))
     mixed_res['native_count'] = mixed_res['pocket_id'].apply(lambda x:lig_counts[x.split("_")[2]])
+    mixed_res['prevalence'] = mixed_res['native_count'] / (sum(lig_counts.values()))
     mixed_res['score'] = mixed_res['score'] + np.random.normal(0, 0.003, size=len(mixed_res))
 
 
@@ -72,14 +165,24 @@ def train_sim_perf_plot(grouped=True):
     print(mixed_res)
     plt.axhline(y=mixed_res['score'].mean(),color='black', linestyle='-', linewidth=2)
     plt.axhline(y=mixed_res['score'].median(),color='black', linestyle='--', linewidth=2)
-    sns.scatterplot(data=mixed_res, y='score', x='train_sim_max', alpha=0.5, ax=ax2, color='green', label='pockets', s=70)
-    sns.scatterplot(data=mixed_res, y='score', x='native_count', alpha=0.5, ax=ax1, color='blue', label='native ligands', s=70)
-    ax1.set_xscale('log')
+    sns.scatterplot(data=mixed_res, y='score', x='train_sim_max', alpha=0.5, ax=ax2, color='green',  s=70)
+    sns.scatterplot(data=mixed_res, y='score', x='prevalence', marker='^', alpha=0.5, ax=ax1, color='blue',  s=70)
     ax1.legend()
     ax2.legend()
+    ax1.tick_params(axis='x', colors='blue')
+    ax2.tick_params(axis='x', colors='green')
+
     #plt.legend()
     #sns.despine()
 
+    handles = [
+                matplotlib.lines.Line2D([], [], marker='^', color='blue', linestyle='none', markersize=10, label='Ligands'),
+                matplotlib.lines.Line2D([], [], marker='o', color='green', linestyle='none', markersize=10, label='Pockets'),
+                matplotlib.lines.Line2D([], [], color='black', linestyle='--', markersize=10, label='Median'),
+                matplotlib.lines.Line2D([], [], color='black', linestyle='-', markersize=10, label='Mean'),
+                ]
+
+    plt.legend(handles=handles, loc='lower center')
 
     plt.xlabel("Max RMscore to train set")
     #plt.ylabel("AuROC")
@@ -204,8 +307,8 @@ def sims(grouped=True):
     # plt.rcParams['figure.figsize'] = (10, 5)
 
     # Get raw values
-    big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_raw.csv')
-    big_df_raw = big_df_raw[['pocket_id', 'smiles', 'is_active', 'mixed']]
+    big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_42_raw.csv')
+    big_df_raw = big_df_raw[['pocket_id', 'smiles', 'is_active', 'score']]
     big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles', 'is_active'])
 
     test_pockets = sorted(big_df_raw['pocket_id'].unique())
@@ -304,7 +407,7 @@ def tsne(grouped=True):
     # GET POCKET SPACE EMBEDDINGS
     # Get the test_pockets that were used
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_raw.csv')
-    big_df_raw = big_df_raw[['pocket_id', 'smiles', 'is_active', 'mixed']]
+    big_df_raw = big_df_raw[['pocket_id', 'smiles', 'is_active', 'score']]
     big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles', 'is_active'])
     test_pockets = set(big_df_raw['pocket_id'].unique())
 
@@ -454,5 +557,6 @@ def tsne(grouped=True):
 
 if __name__ == "__main__":
     dock_correlation()
-    sims()
+    #sims()
+    barcodes()
     #tsne()
