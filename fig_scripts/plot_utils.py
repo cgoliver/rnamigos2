@@ -116,14 +116,18 @@ PALETTE_DICT = setup_plot()
 class CustomScale(mscale.ScaleBase):
     name = 'custom'
 
-    def __init__(self, axis, offset=0.01, sup_lim=1):
+    def __init__(self, axis, offset=0.01, sup_lim=1, divider=1):
         mscale.ScaleBase.__init__(self, axis=axis)
         self.offset = offset
+        self.divider = divider
         self.sup_lim = sup_lim
         self.thresh = None
 
     def get_transform(self):
-        return self.CustomTransform(thresh=self.thresh, offset=self.offset, sup_lim=self.sup_lim)
+        return self.CustomTransform(thresh=self.thresh,
+                                    offset=self.offset,
+                                    sup_lim=self.sup_lim,
+                                    divider=self.divider)
 
     def set_default_locators_and_formatters(self, axis):
         pass
@@ -133,34 +137,42 @@ class CustomScale(mscale.ScaleBase):
         output_dims = 1
         is_separable = True
 
-        def __init__(self, offset, thresh, sup_lim):
+        def __init__(self, offset, thresh, sup_lim, divider):
             mtransforms.Transform.__init__(self)
             self.thresh = thresh
             self.offset = offset
             self.sup_lim = sup_lim
+            self.divider = divider
 
         def transform_non_affine(self, a):
-            return - np.log(self.sup_lim + self.offset - a)
+            return - np.log((self.sup_lim + self.offset - a) / self.divider)
 
         def inverted(self):
-            return CustomScale.InvertedCustomTransform(thresh=self.thresh, offset=self.offset, sup_lim=self.sup_lim)
+            return CustomScale.InvertedCustomTransform(thresh=self.thresh,
+                                                       offset=self.offset,
+                                                       sup_lim=self.sup_lim,
+                                                       divider=self.divider)
 
     class InvertedCustomTransform(mtransforms.Transform):
         input_dims = 1
         output_dims = 1
         is_separable = True
 
-        def __init__(self, offset, thresh, sup_lim):
+        def __init__(self, offset, thresh, sup_lim, divider):
             mtransforms.Transform.__init__(self)
             self.offset = offset
             self.thresh = thresh
             self.sup_lim = sup_lim
+            self.divider = divider
 
         def transform_non_affine(self, a):
-            return self.sup_lim - np.exp(-a) + self.offset
+            return self.sup_lim - np.exp(-a * self.divider) + self.offset
 
         def inverted(self):
-            return CustomScale.CustomTransform(offset=self.offset, thresh=self.thresh, sup_lim=self.sup_lim)
+            return CustomScale.CustomTransform(offset=self.offset,
+                                               thresh=self.thresh,
+                                               sup_lim=self.sup_lim,
+                                               divider=self.divider)
 
 
 # X = type('CustomScale', (object,), dict(offset=0.01, name = 'custom'))
