@@ -11,10 +11,7 @@ from sklearn import metrics
 from rnaglib.drawing import rna_draw
 from rnaglib.utils import load_json
 
-import scienceplots
-
-plt.style.use('nature')
-
+from fig_scripts.plot_utils import PALETTE_DICT, group_df
 
 def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_actives = np.sum(is_active)
@@ -155,25 +152,33 @@ if __name__ == '__main__':
 
     all_efs = list()
     all_aurocs = list()
+
     fig, axs = plt.subplots(4)
-    # score_to_use = 'dock_nat'
-    score_to_use = 'merged'
+
+    score_to_use = 'dock_nat'
+    # score_to_use = 'merged'
     # score_to_use = 'dock'
     # score_to_use = 'is_native'
     # score_to_use = 'native_fp'
     print(score_to_use)
 
+    #plt.gca().set_yscale('custom')
     for i, (pocket_name, ligand_name) in enumerate(zip(pocket_names, ligand_names)):
         # FOR DOCKING
         # merged = get_dfs_docking(ligand_name=ligand_name)
         # score_to_use = 'docking_score'
 
         # FOR MIGOS
+
         swap = False
         merged = get_dfs_migos(pocket_name=pocket_name, swap=swap)
         merged['dock_nat'] = (merged['is_native'] + merged['dock'])/2
         ax = axs[i]
-        sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', common_norm=False, clip=(0, 1), ax=ax)
+
+        ax.set_xscale('custom')
+
+
+        sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', common_norm=False, ax=ax, log_scale=False)
         ax.set_title(pocket_name)
         # g = load_json(f"data/robin_graphs_x3dna/{name}.json")
         # g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
@@ -211,7 +216,7 @@ if __name__ == '__main__':
     print(np.mean(all_efs))
     print(np.mean(all_aurocs))
     # plt.tight_layout()
-    # plt.savefig("figs/fig_3a.pdf", format="pdf")
-    # plt.show()
+    plt.savefig("figs/fig_3a.pdf", format="pdf")
+    plt.show()
 
 #

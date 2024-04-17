@@ -23,7 +23,9 @@ if __name__ == "__main__":
     actives = pd.read_csv("outputs/robin/2GDI_Y_TPP_100_actives.txt", delimiter=' ')
     actives.columns = ['smiles', 'dock', 'native', 'fp', 'mixed']
     inactives = pd.read_csv("outputs/robin/2GDI_Y_TPP_100_inactives.txt", delimiter=' ')
-    inactives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
+
+    #{smiles} {dock_score} {native_score} {fp_score} {mixed_score}
+    inactives.columns = ['smiles', 'dock', 'nat', 'fp', 'mixed']
 
     smiles_list = sorted(list(set(actives['smiles']))) + sorted(list(set(inactives['smiles'])))
 
@@ -50,16 +52,18 @@ if __name__ == "__main__":
     colors = ['green', 'blue', 'red', 'orange']
     for i, robin in enumerate(robins):
         actives = pd.read_csv(f"outputs/robin/{robin}_actives.txt", delimiter=' ')
-        actives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
+        actives.columns = ['smiles', 'dock', 'native', 'fp', 'mixed']
+        actives['docknat'] = actives['dock'] + actives['native']
         inactives = pd.read_csv(f"outputs/robin/{robin}_inactives.txt", delimiter=' ')
-        inactives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
+        inactives.columns = ['smiles', 'dock', 'native', 'fp', 'mixed']
+        inactives['docknat'] = inactives['dock'] + inactives['native']
 
 
         inds_active = [smiles_to_ind[s] for s in actives['smiles'] if s in smiles_to_ind]
-        scores_active = [score for sm,score in zip(actives['smiles'], actives['score_4']) if sm in smiles_to_ind]
+        scores_active = [score for sm,score in zip(actives['smiles'], actives['docknat']) if sm in smiles_to_ind]
 
         inds_inactive = [smiles_to_ind[s] for s in inactives['smiles'] if s in smiles_to_ind]
-        scores_inactive = [score for sm,score in zip(inactives['smiles'], inactives['score_4']) if sm in smiles_to_ind]
+        scores_inactive = [score for sm,score in zip(inactives['smiles'], inactives['docknat']) if sm in smiles_to_ind]
 
         ranks = ss.rankdata(scores_active + scores_inactive)
         ranks_active = ranks[:len(scores_active)]
@@ -71,7 +75,7 @@ if __name__ == "__main__":
         colors_inactive = [colors[i] if ((r / N) > 0.9) else 'grey' for r in ranks_inactive] 
 
         plt.scatter(X_embedded[inds_inactive,0], X_embedded[inds_inactive,1], c=colors_inactive, marker='o', s=.5, alpha=.5)
-        plt.scatter(X_embedded[inds_active,0], X_embedded[inds_active,1], c=colors_active, linewidths=0.8, edgecolors='black', marker=markers[i], s=50, alpha=1, label=robin)
+        plt.scatter(X_embedded[inds_active,0], X_embedded[inds_active,1], c=colors_active, linewidths=0.8, edgecolors='black', marker='o', s=50, alpha=1, label=robin)
     
     plt.legend()
     plt.axis("off")
