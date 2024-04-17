@@ -186,8 +186,8 @@ if __name__ == "__main__":
             dead_color = 'whitesmoke'
             inactive_color = 'lightgrey'
 
-            colors_active = [colors[i] if ((r / N) > 0.9) else dead_color  for r in ranks_active] 
-            colors_inactive = [colors[i] if ((r / N) > 0.9) else inactive_color for r in ranks_inactive] 
+            colors_active = [colors[i] if ((r / N) > 0.6) else dead_color  for r in ranks_active] 
+            colors_inactive = [colors[i] if ((r / N) > 0.6) else inactive_color for r in ranks_inactive] 
 
             corrects = sum([c != dead_color for c in colors_active])
 

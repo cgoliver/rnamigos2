@@ -17,9 +17,10 @@ def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_actives = np.sum(is_active)
     n_screened = int(frac * len(scores))
     is_active_sorted = [a for _, a in sorted(zip(scores, is_active), reverse=not lower_is_better)]
+    scores_sorted = [s for s,_ in sorted(zip(scores, is_active), reverse=not lower_is_better)]
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
     ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
-    return ef
+    return ef, scores_sorted[n_screened]
 
 
 def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
@@ -153,8 +154,6 @@ if __name__ == '__main__':
     all_efs = list()
     all_aurocs = list()
 
-    fig, axs = plt.subplots(4)
-
     score_to_use = 'dock_nat'
     # score_to_use = 'merged'
     # score_to_use = 'dock'
@@ -175,14 +174,11 @@ if __name__ == '__main__':
         merged['dock_nat'] = (merged['is_native'] + merged['dock'])/2
         merged['dock_nat_rank'] = merged['dock_nat'].rank(pct=True, ascending=True)
         print(merged)
-        ax = axs[i]
+
+        fig, ax = plt.subplots(figsize=(6,6))
 
         #ax.set_xscale('custom')
 
-
-        g = sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', common_norm=False, ax=ax, log_scale=False)
-        ax.set_title(pocket_name)
-        g.legend().remove()
         # g = load_json(f"data/robin_graphs_x3dna/{name}.json")
         # g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
         # print(g.nodes(data=True))
@@ -195,11 +191,41 @@ if __name__ == '__main__':
         actives = merged['split'].isin(['actives'])
 
         # GET EFS
-        frac = 0.02
-        ef = enrichment_factor(scores=scores, is_active=actives,
-                               lower_is_better=False, frac=frac)
+        fracs = [0.01, 0.02, 0.05]
+        linecolors = ['black', 'grey', 'lightgrey']
+
+
+        colors = sns.color_palette("Paired", 4)
+        default_frac = 0.01
+        offset = 0
+        legend_y = 0.9 
+        legend_x = 0.7
+        for _, frac in enumerate(fracs):
+            ef, thresh = enrichment_factor(scores=scores, is_active=actives,
+                                   lower_is_better=False, frac=frac)
+            #ax.axvline(x=thresh, ymin=0, ymax=max(scores), color=linecolors[i])
+
+            ax.fill_between(np.linspace(thresh, 1, 10), 0, 1,
+                color='orange', alpha=0.05, transform=ax.get_xaxis_transform())
+
+            arrow_to_y = legend_y - offset
+
+            ax.text(legend_x, legend_y - offset, f"EF@{int(frac*100)}%: {ef:.2f}", fontsize=10, transform=ax.transAxes)
+
+            offset += 0.05
+
+        ef, thresh = enrichment_factor(scores=scores, is_active=actives,
+                               lower_is_better=False, frac=default_frac)
         all_efs.append(ef)
         print(f'EF@{frac} : ', pocket_name, ef)
+        
+        g = sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', alpha=.9, palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
+        ax.set_title(pocket_name)
+        g.legend().remove()
+        sns.despine()
+        plt.savefig(f"figs/panel_3_{i}.pdf", format="pdf")
+        plt.show()
+
 
         # GET AUROC
         fpr, tpr, thresholds = metrics.roc_curve(actives, scores)
