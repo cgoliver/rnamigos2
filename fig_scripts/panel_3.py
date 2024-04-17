@@ -99,6 +99,8 @@ class MolImage:
 
 if __name__ == "__main__":
 
+    recompute_tsne = False 
+
     robins = ['2GDI_Y_TPP_100',
              '2QWY_A_SAM_100',
              '3FU2_C_PRF_101',
@@ -107,41 +109,44 @@ if __name__ == "__main__":
     robin_ids = ['TPP', 'SAM_ll', 'PreQ1', 'ZTP' ]
 
 
+    # {smiles} {dock_score} {native_score} {fp_score} {mixed_score}
+
     actives = pd.read_csv("outputs/robin/2GDI_Y_TPP_100_actives.txt", delimiter=' ')
     actives.columns = ['smiles', 'dock', 'native', 'fp', 'mixed']
     inactives = pd.read_csv("outputs/robin/2GDI_Y_TPP_100_inactives.txt", delimiter=' ')
-    inactives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
+    inactives.columns = ['smiles', 'dock', 'native', 'fp', 'mixed']
+
+    actives['docknat'] = (actives['dock'] + actives['native']) / 2
+    inactives['docknat'] = (inactives['dock'] + inactives['native']) / 2
 
     smiles_list = sorted(list(set(actives['smiles']))) + sorted(list(set(inactives['smiles'])))
 
-    """
-    print("Making fps")
-    mols = [Chem.MolFromSmiles(s) for s in smiles_list]
-    clean_mols = []
-    clean_smiles = []
-    for mol, sm in zip(mols, smiles_list):
-        if mol is None:
-            continue
-        clean_mols.append(mol)
-        clean_smiles.append(sm)
+    if recompute_tsne:
+        print("Making fps")
+        mols = [Chem.MolFromSmiles(s) for s in smiles_list]
+        clean_mols = []
+        clean_smiles = []
+        for mol, sm in zip(mols, smiles_list):
+            if mol is None:
+                continue
+            clean_mols.append(mol)
+            clean_smiles.append(sm)
 
-    smiles_to_ind = {sm:i for i,sm in enumerate(clean_smiles)}
-    fps = np.array([MACCSkeys.GenMACCSKeys(m) for m in clean_mols])
-    np.save("fps.npy", fps)
-    pickle.dump(smiles_to_ind, open("smiles_to_ind.p", 'wb'))
-    """
+        smiles_to_ind = {sm:i for i,sm in enumerate(clean_smiles)}
+        fps = np.array([MACCSkeys.GenMACCSKeys(m) for m in clean_mols])
+        np.save("fps.npy", fps)
+        pickle.dump(smiles_to_ind, open("smiles_to_ind.p", 'wb'))
 
     smiles_to_ind = pickle.load(open("smiles_to_ind.p", 'rb'))
     ind_to_smiles = {i:sm for i,sm in smiles_to_ind.items()}
     fps = np.load("fps.npy")
 
-    """
-    print("Tsne")
-    X_embedded = TSNE(n_components=2, learning_rate='auto',
-                      init='pca').fit_transform(fps)
+    if recompute_tsne:
+        print("Tsne")
+        X_embedded = TSNE(n_components=2, learning_rate='auto',
+                          init='pca').fit_transform(fps)
 
-    np.save("x_tsne.npy", X_embedded)
-    """
+        np.save("x_tsne.npy", X_embedded)
 
     X_embedded = np.load("x_tsne.npy")
 
@@ -157,17 +162,20 @@ if __name__ == "__main__":
     for plot_decoys in [True, False]: # cheap hack for putting active points on top
         for i, robin in enumerate(robins):
             actives = pd.read_csv(f"outputs/robin/{robin}_actives.txt", delimiter=' ')
-            actives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
+            actives.columns = ['smiles', 'dock', 'native', 'fp', 'mixed']
             active_smiles_all[robin] = set(actives['smiles'])
             inactives = pd.read_csv(f"outputs/robin/{robin}_inactives.txt", delimiter=' ')
-            inactives.columns = ['smiles', 'score_1', 'score_2', 'score_3', 'score_4']
+            inactives.columns = ['smiles', 'dock', 'native', 'fp', 'mixed']
 
+
+            actives['docknat'] = (actives['dock'] + actives['native']) / 2
+            inactives['docknat'] = (inactives['dock'] + inactives['native']) / 2
 
             inds_active = [smiles_to_ind[s] for s in actives['smiles'] if s in smiles_to_ind]
-            scores_active = [score for sm,score in zip(actives['smiles'], actives['score_4']) if sm in smiles_to_ind]
+            scores_active = [score for sm,score in zip(actives['smiles'], actives['docknat']) if sm in smiles_to_ind]
 
             inds_inactive = [smiles_to_ind[s] for s in inactives['smiles'] if s in smiles_to_ind]
-            scores_inactive = [score for sm,score in zip(inactives['smiles'], inactives['score_4']) if sm in smiles_to_ind]
+            scores_inactive = [score for sm,score in zip(inactives['smiles'], inactives['docknat']) if sm in smiles_to_ind]
 
             ranks = ss.rankdata(scores_active + scores_inactive)
             ranks_active = ranks[:len(scores_active)]
@@ -182,6 +190,7 @@ if __name__ == "__main__":
             colors_inactive = [colors[i] if ((r / N) > 0.9) else inactive_color for r in ranks_inactive] 
 
             corrects = sum([c != dead_color for c in colors_active])
+
 
 
             accs.append(f"{corrects}/{len(ranks_active)}, {corrects/len(colors_active)*100:.2f}%")

@@ -173,13 +173,16 @@ if __name__ == '__main__':
         swap = False
         merged = get_dfs_migos(pocket_name=pocket_name, swap=swap)
         merged['dock_nat'] = (merged['is_native'] + merged['dock'])/2
+        merged['dock_nat_rank'] = merged['dock_nat'].rank(pct=True, ascending=True)
+        print(merged)
         ax = axs[i]
 
-        ax.set_xscale('custom')
+        #ax.set_xscale('custom')
 
 
-        sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', common_norm=False, ax=ax, log_scale=False)
+        g = sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', common_norm=False, ax=ax, log_scale=False)
         ax.set_title(pocket_name)
+        g.legend().remove()
         # g = load_json(f"data/robin_graphs_x3dna/{name}.json")
         # g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
         # print(g.nodes(data=True))
