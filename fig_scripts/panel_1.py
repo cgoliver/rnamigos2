@@ -1,3 +1,4 @@
+import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -6,9 +7,8 @@ import pandas as pd
 import seaborn as sns
 from seaborn.palettes import dark_palette, light_palette, blend_palette
 
-
-if __name__=='__main__':
-    sys.path.append(".")
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from fig_scripts.plot_utils import group_df, get_smooth_order
 
@@ -31,20 +31,21 @@ def custom_diverging_palette(h_neg, h_pos, s_neg=75, s_pos=75, l_neg=50, l_pos=5
 def barcodes(grouped=True):
     # TEST SET
     name_runs = {
-<<<<<<< HEAD
-        r"fp": "fp_42.csv",
-        r"native": "native_42.csv",
-        r"dock": "dock_42.csv",
-        r"rDock": "rdock.csv",
-        r"mixed": "mixed_grouped_42.csv",
-=======
-        # r"\texttt{fp}": "fp_42.csv",
-        r"\texttt{compat}": "native_42.csv",
-        r"\texttt{aff}": "dock_42.csv",
-        r"\texttt{rDock}": "rdock.csv",
-        # r"\texttt{mixed}": "mixed_grouped_42.csv",
-        r"\texttt{mixed}": "docknat_grouped_42.csv",
->>>>>>> 9b2ee8c77a494e6369c2466032eb2b46d4981434
+                << << << < HEAD
+    r"fp": "fp_42.csv",
+    r"native": "native_42.csv",
+    r"dock": "dock_42.csv",
+    r"rDock": "rdock.csv",
+    r"mixed": "mixed_grouped_42.csv",
+    == == == =
+    # r"\texttt{fp}": "fp_42.csv",
+    r"\texttt{compat}": "native_42.csv",
+    r"\texttt{aff}": "dock_42.csv",
+    r"\texttt{rDock}": "rdock.csv",
+    # r"\texttt{mixed}": "mixed_grouped_42.csv",
+    r"\texttt{mixed}": "docknat_grouped_42.csv",
+    >> >> >> > 9
+    b2ee8c77a494e6369c2466032eb2b46d4981434
     }
     rows = []
     prev_pockets = None
@@ -54,7 +55,7 @@ def barcodes(grouped=True):
         if grouped:
             df = group_df(df)
         row = df[df['decoys'] == 'chembl'].sort_values(by='pocket_id')
-        all_pockets= row['pocket_id'].values
+        all_pockets = row['pocket_id'].values
         if prev_pockets is None:
             prev_pockets = all_pockets
         else:

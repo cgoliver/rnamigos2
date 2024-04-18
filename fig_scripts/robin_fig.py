@@ -1,4 +1,5 @@
 import os
+import sys
 
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -11,13 +12,17 @@ from sklearn import metrics
 from rnaglib.drawing import rna_draw
 from rnaglib.utils import load_json
 
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from fig_scripts.plot_utils import PALETTE_DICT, group_df
+
 
 def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_actives = np.sum(is_active)
     n_screened = int(frac * len(scores))
     is_active_sorted = [a for _, a in sorted(zip(scores, is_active), reverse=not lower_is_better)]
-    scores_sorted = [s for s,_ in sorted(zip(scores, is_active), reverse=not lower_is_better)]
+    scores_sorted = [s for s, _ in sorted(zip(scores, is_active), reverse=not lower_is_better)]
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
     ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
     return ef, scores_sorted[n_screened]
@@ -161,23 +166,23 @@ if __name__ == '__main__':
     # score_to_use = 'native_fp'
     print(score_to_use)
 
-    #plt.gca().set_yscale('custom')
+    # fig, axs = plt.subplots(1, 4, figsize=(18, 5))
+    # plt.gca().set_yscale('custom')
     for i, (pocket_name, ligand_name) in enumerate(zip(pocket_names, ligand_names)):
+        # ax = axs[i]
+        fig, ax = plt.subplots(figsize=(6, 6))
+        # ax.set_xscale('custom')
+
         # FOR DOCKING
         # merged = get_dfs_docking(ligand_name=ligand_name)
         # score_to_use = 'docking_score'
 
         # FOR MIGOS
-
         swap = False
         merged = get_dfs_migos(pocket_name=pocket_name, swap=swap)
-        merged['dock_nat'] = (merged['is_native'] + merged['dock'])/2
-        merged['dock_nat_rank'] = merged['dock_nat'].rank(pct=True, ascending=True)
-        print(merged)
-
-        fig, ax = plt.subplots(figsize=(6,6))
-
-        #ax.set_xscale('custom')
+        merged['dock_nat'] = (merged['is_native'] + merged['dock']) / 2
+        # merged['dock_nat_rank'] = merged['dock_nat'].rank(pct=True, ascending=True)
+        # print(merged)
 
         # g = load_json(f"data/robin_graphs_x3dna/{name}.json")
         # g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
@@ -191,55 +196,68 @@ if __name__ == '__main__':
         actives = merged['split'].isin(['actives'])
 
         # GET EFS
+        # fracs = [0.01, 0.05]
         fracs = [0.01, 0.02, 0.05]
         linecolors = ['black', 'grey', 'lightgrey']
 
-
         colors = sns.color_palette("Paired", 4)
+        colors = sns.color_palette(["#149950", "#00c358", "#037938", "#149921"])
+
         default_frac = 0.01
         offset = 0
-        legend_y = 0.9 
+        legend_y = 0.9
         legend_x = 0.7
-        sns.kdeplot(data=merged, x=score_to_use, fill=False, hue='split', alpha=.9, palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
         curve_fill = True
-        if curve_fill:
-            g = sns.kdeplot(data=merged, x=score_to_use,  hue='split')
-            xx, yy = g.lines[1].get_data()
+        # sns.kdeplot(data=merged, x=score_to_use, fill=False, hue='split', alpha=.9,
+        #             palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
+        g = sns.kdeplot(data=merged, x=score_to_use, hue='split', ax=ax,
+                        palette={'actives': colors[i], 'inactives': 'lightgrey'},
+                        # fill=True,
+                        # alpha=0.9,
+                        linewidth=0,
+                        common_norm=False)
+        decoy_xx, decoy_yy = g.lines[0].get_data()
+        ax.fill_between(decoy_xx, 0, decoy_yy, color='lightgrey', alpha=0.5)
+        # ax.plot(decoy_xx, decoy_yy, color='white', alpha=0.9)
+        xx, yy = g.lines[1].get_data()
+        # ax.fill_between(xx, 0, yy, color=colors[i], alpha=0.1)
+        ax.plot(xx, yy, color=colors[i], alpha=1, linewidth=1.5)
+        ax.set_xlim([0.3, 1])
 
         for _, frac in enumerate(fracs):
             ef, thresh = enrichment_factor(scores=scores, is_active=actives,
-                                   lower_is_better=False, frac=frac)
-            #ax.axvline(x=thresh, ymin=0, ymax=max(scores), color=linecolors[i])
+                                           lower_is_better=False, frac=frac)
+            # ax.axvline(x=thresh, ymin=0, ymax=max(scores), color=linecolors[i])
 
             if curve_fill:
                 xy_tail = [(x, y) for x, y in zip(xx, yy) if x > thresh]
-                x_tail = [x for x,y in xy_tail]
-                y_tail = [y for x,y in xy_tail]
+                x_tail = [x for x, y in xy_tail]
+                y_tail = [y for x, y in xy_tail]
 
                 ax.fill_between(x_tail, 0, y_tail,
-                    color='orange', alpha=0.07, )
+                                color=colors[i], alpha=0.25, )
 
             else:
                 ax.fill_between(x_tail, 0, 1,
-                    color='orange', alpha=0.07, )
+                                color=colors[i], alpha=0.07, )
 
             arrow_to_y = legend_y - offset
 
-            ax.text(legend_x, legend_y - offset, f"EF@{int(frac*100)}%: {ef:.2f}", fontsize=10, transform=ax.transAxes)
+            ax.text(legend_x, legend_y - offset, f"EF@{int(frac * 100)}%: {ef:.2f}", fontsize=10,
+                    transform=ax.transAxes)
 
             offset += 0.05
 
         ef, thresh = enrichment_factor(scores=scores, is_active=actives,
-                               lower_is_better=False, frac=default_frac)
+                                       lower_is_better=False, frac=default_frac)
         all_efs.append(ef)
         print(f'EF@{frac} : ', pocket_name, ef)
-        
+
         ax.set_title(pocket_name)
         g.legend().remove()
         sns.despine()
         plt.savefig(f"figs/panel_3_{i}.pdf", format="pdf")
-        plt.show()
-
+        # plt.show()
 
         # GET AUROC
         fpr, tpr, thresholds = metrics.roc_curve(actives, scores)
@@ -258,7 +276,7 @@ if __name__ == '__main__':
     #
     print(np.mean(all_efs))
     print(np.mean(all_aurocs))
-    # plt.tight_layout()
+    plt.tight_layout()
     plt.savefig("figs/fig_3a.pdf", format="pdf")
     plt.show()
 
