@@ -31,21 +31,12 @@ def custom_diverging_palette(h_neg, h_pos, s_neg=75, s_pos=75, l_neg=50, l_pos=5
 def barcodes(grouped=True):
     # TEST SET
     name_runs = {
-                << << << < HEAD
-    r"fp": "fp_42.csv",
-    r"native": "native_42.csv",
-    r"dock": "dock_42.csv",
-    r"rDock": "rdock.csv",
-    r"mixed": "mixed_grouped_42.csv",
-    == == == =
-    # r"\texttt{fp}": "fp_42.csv",
-    r"\texttt{compat}": "native_42.csv",
-    r"\texttt{aff}": "dock_42.csv",
-    r"\texttt{rDock}": "rdock.csv",
-    # r"\texttt{mixed}": "mixed_grouped_42.csv",
-    r"\texttt{mixed}": "docknat_grouped_42.csv",
-    >> >> >> > 9
-    b2ee8c77a494e6369c2466032eb2b46d4981434
+        # r"\texttt{fp}": "fp_42.csv",
+        r"\texttt{compat}": "native_42.csv",
+        r"\texttt{aff}": "dock_42.csv",
+        r"\texttt{rDock}": "rdock.csv",
+        # r"\texttt{mixed}": "mixed_grouped_42.csv",
+        r"\texttt{mixed}": "docknat_grouped_42.csv",
     }
     rows = []
     prev_pockets = None
