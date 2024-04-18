@@ -200,13 +200,28 @@ if __name__ == '__main__':
         offset = 0
         legend_y = 0.9 
         legend_x = 0.7
+        sns.kdeplot(data=merged, x=score_to_use, fill=False, hue='split', alpha=.9, palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
+        curve_fill = True
+        if curve_fill:
+            g = sns.kdeplot(data=merged, x=score_to_use,  hue='split')
+            xx, yy = g.lines[1].get_data()
+
         for _, frac in enumerate(fracs):
             ef, thresh = enrichment_factor(scores=scores, is_active=actives,
                                    lower_is_better=False, frac=frac)
             #ax.axvline(x=thresh, ymin=0, ymax=max(scores), color=linecolors[i])
 
-            ax.fill_between(np.linspace(thresh, 1, 10), 0, 1,
-                color='orange', alpha=0.05, transform=ax.get_xaxis_transform())
+            if curve_fill:
+                xy_tail = [(x, y) for x, y in zip(xx, yy) if x > thresh]
+                x_tail = [x for x,y in xy_tail]
+                y_tail = [y for x,y in xy_tail]
+
+                ax.fill_between(x_tail, 0, y_tail,
+                    color='orange', alpha=0.07, )
+
+            else:
+                ax.fill_between(x_tail, 0, 1,
+                    color='orange', alpha=0.07, )
 
             arrow_to_y = legend_y - offset
 
@@ -219,7 +234,6 @@ if __name__ == '__main__':
         all_efs.append(ef)
         print(f'EF@{frac} : ', pocket_name, ef)
         
-        g = sns.kdeplot(data=merged, x=score_to_use, fill=True, hue='split', alpha=.9, palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
         ax.set_title(pocket_name)
         g.legend().remove()
         sns.despine()
