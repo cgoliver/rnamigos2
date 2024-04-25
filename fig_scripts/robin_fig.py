@@ -202,6 +202,8 @@ if __name__ == '__main__':
 
         colors = sns.color_palette("Paired", 4)
         colors = sns.color_palette(["#149950", "#00c358", "#037938", "#149921"])
+        
+        colors = sns.color_palette(["#33ccff", "#00cccc", "#3366ff", "#9999ff"])
 
         default_frac = 0.01
         offset = 0

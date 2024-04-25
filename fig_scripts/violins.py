@@ -105,9 +105,6 @@ if grouped:
     big_df = group_df(big_df)
 means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 
-print(means_0)
-print(means_2)
-print(means_3)
 # For a detailed score per pocket
 # table = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by=['pocket_id', 'name'])
 # print(table.to_latex(index=False, columns=['pocket_id', 'name', 'score']))

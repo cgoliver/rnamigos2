@@ -26,19 +26,41 @@ def dock_correlation():
     Docking vs rnamigos score correlation
     """
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", 'rb'))
-    dock = pd.read_csv("outputs/docknat_grouped_42_raw.csv")
-    dock_pred = pd.read_csv("outputs/rdock_raw.csv")
-    result = dock.merge(dock_pred, on=['pocket_id', 'decoys', 'smiles'])
+    df_paths = {'docknat': "outputs/docknat_grouped_42_raw.csv",
+                'native': "outputs/native_42_raw.csv",
+                'dock': "outputs/dock_42_raw.csv",
+                }
+    score_keys = {'docknat': 'docknat',
+                  'native': 'raw_score_x',
+                  'dock': 'raw_score_x'
+                  }
+
+    migos_to_use = 'dock'
+    dock_to_use = 'dock_pocket_norm' # raw_score_y
+
+    dock_pred = pd.read_csv(df_paths[migos_to_use])
+    dock = pd.read_csv("outputs/rdock_raw.csv")
+
+    result = dock_pred.merge(dock, on=['pocket_id', 'decoys', 'smiles'])
     result = result.loc[(result['decoys'] == 'chembl') & (result['pocket_id'].isin(grouped_test.keys()))]
+    print(result)
+    if migos_to_use == 'docknat':
+        result['dock_pocket_norm'] = 1 - result.groupby("pocket_id")['raw_score'].transform(lambda x: (x - x.min()) / (x.max() - x.min()))
+    else:
+        result['dock_pocket_norm'] = 1 - result.groupby("pocket_id")['raw_score_y'].transform(lambda x: (x - x.min()) / (x.max() - x.min()))
+
+    if migos_to_use == 'dock':
+        result[score_keys[migos_to_use]] = 1 - result[score_keys[migos_to_use]]
+
     actives = result.loc[result['is_active_x'] == 1.0]
     decoys = result.loc[result['is_active_x'] == 0.0]
-    g = sns.regplot(data=result, x='raw_score', y='docknat', color=".3", ci=99, scatter_kws={"alpha": 0.3, "s": 10}, line_kws={"color": "red"})
-    sns.scatterplot(data=actives, x='raw_score', y='docknat', color="blue", ax=g)
+    g = sns.regplot(data=result, x=dock_to_use, y=score_keys[migos_to_use], color=".3", ci=99, scatter_kws={"alpha": 0.3, "s": 2}, line_kws={"color": "red"})
+    sns.scatterplot(data=actives, x=dock_to_use, y=score_keys[migos_to_use], color="blue", ax=g)
 
 
-    r, p = spearmanr(result['raw_score'], result['docknat'])
+    r, p = spearmanr(result[dock_to_use], result[score_keys[migos_to_use]])
 
-    plt.text(x=np.min(result['raw_score']), y=np.max(result['docknat']) - 0.5,
+    plt.text(x=np.min(result[dock_to_use]), y=np.max(result[score_keys[migos_to_use]]) - 0.59,
          s=f"$\\rho$ = {r:.2f}",
          color='red', fontweight='bold')
 
@@ -48,18 +70,44 @@ def dock_correlation():
                 ]
 
 
-    plt.axvline(x=decoys['raw_score'].mean(), color='grey', linestyle='--')
-    plt.axvline(x=actives['raw_score'].mean(), color='blue', linestyle='--')
+    #plt.axvline(x=decoys[dock_to_use].mean(), color='grey', linestyle='--')
+    #plt.axvline(x=actives[dock_to_use].mean(), color='blue', linestyle='--')
+
+    """
+
+    plt.text(x=-.05, y=decoys[score_keys[migos_to_use]].mean() + 0.02,
+         s=f"$\\mu$ = {decoys[score_keys[migos_to_use]].mean():.2f}",
+         color='grey', fontweight='bold')
+
+    plt.text(x=-.05, y=actives[score_keys[migos_to_use]].mean() + 0.02,
+         s=f"$\\mu$ = {actives[score_keys[migos_to_use]].mean():.2f}",
+         color='blue', fontweight='bold')
+
+
+    plt.text(x=actives[dock_to_use].mean(), y=0.10,
+         s=f"$\\mu$ = {actives[dock_to_use].mean():.2f}",
+         color='blue', fontweight='bold')
+
+    plt.text(x=decoys[dock_to_use].mean() + 0.02, y=0.10,
+         s=f"$\\mu$ = {decoys[dock_to_use].mean():.2f}",
+         color='grey', fontweight='bold')
+
+    """
+    plt.axhline(y=decoys[score_keys[migos_to_use]].mean(), color='grey', linestyle='--')
+    plt.axhline(y=actives[score_keys[migos_to_use]].mean(), color='blue', linestyle='--')
+
+    plt.ylim([0, 1.1])
+
 
     #plt.axhline(y=decoys['mixed'].mean(), color='grey', linestyle='--')
     #plt.axhline(y=actives['mixed'].mean(), color='blue', linestyle='--')
 
-    plt.legend(handles=handles, loc='lower left')
+    plt.legend(handles=handles, loc='lower right')
 
-    plt.xlabel("rDock Intermolecular Term (kcal/mol)")
-    plt.ylabel("score")
-    plt.savefig("figs/dock_corr.pdf", format="pdf")
-    plt.savefig("figs/dock_corr.png", format="png")
+    plt.xlabel("Normalized rDock")
+    plt.ylabel("AFF")
+    plt.savefig(f"figs/dock_corr_{migos_to_use}.pdf", format="pdf")
+    plt.savefig(f"figs/dock_corr_{migos_to_use}.png", format="png")
     plt.show()
     pass
 

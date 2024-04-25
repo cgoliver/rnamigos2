@@ -17,7 +17,7 @@ from rdkit import DataStructs
 from rdkit.Chem import MACCSkeys
 
 # Rdkit can cause segfaults
-use_rdkit_plotting = False
+use_rdkit_plotting = True
 if use_rdkit_plotting:
     from rdkit.Chem import Draw
 
@@ -32,15 +32,17 @@ if __name__ == "__main__":
 from fig_scripts.plot_utils import *
 
 
-
 draw_mols = [{'idx': 113, 'pos': 'top_right'},
              {'idx': 6159, 'pos': 'middle_right'},
              {'idx': 21818, 'pos': 'bottom_right'},
              {'idx': 10613, 'pos': 'top_left'},
              {'idx': 45, 'pos': 'middle_left'},
              {'idx': 16224, 'pos': 'bottom_left'},
+             {'idx': 3648, 'pos': 'bottom_middle'},
              ]
 
+mols_only = False
+do_draw_mols = False
 
 class MolImage:
     mol_zones = {'top_left': (-125, 100),
@@ -48,7 +50,8 @@ class MolImage:
                  'bottom_left': (-125, -100),
                  'top_right': (90, 100),
                  'middle_right': (100, 0),
-                 'bottom_right': (80, -100)
+                 'bottom_right': (80, -100),
+                 'bottom_middle': (40, -130)
                  }
     smiles_to_ind = pickle.load(open("smiles_to_ind.p", 'rb'))
     ind_to_smiles = {i: sm for sm, i in smiles_to_ind.items()}
@@ -80,7 +83,15 @@ class MolImage:
     def draw(self, ax):
 
         # Generate an image of the molecule
-        mol_image = Draw.MolToImage(self.mol, size=(200, 200), options=options)
+        mol_image = Draw.MolToImage(self.mol, size=(800, 800), options=options)
+
+        drawer = Draw.rdMolDraw2D.MolDraw2DSVG(300, 300)
+        drawer.DrawMolecule(self.mol)
+        drawer.FinishDrawing()
+        svg = drawer.GetDrawingText()
+        with open(f"figs/mol_{self.idx}.svg", "w") as svg_file:
+            svg_file.write(svg)
+
         mol_array = np.array(mol_image)
 
         if mol_array.shape[2] == 4:
@@ -110,6 +121,9 @@ class MolImage:
 
         # Display the molecule image in the inset axes
         inset_ax.imshow(mol_array)
+
+        ax.text(self.mol_x, self.mol_y, self.idx)
+        ax.text(self.point_x, self.point_y, self.idx)
 
     pass
 
@@ -165,13 +179,17 @@ if __name__ == "__main__":
 
     X_embedded = np.load("x_tsne.npy")
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 8))
     # fig.set_size_inches(15, 5)
     markers = ["^", "P", "D", "*"]
     # colors = ['green', 'blue', 'red', 'orange']
     # colors = sns.color_palette()
     # colors = sns.color_palette("Paired", 4)
     colors = sns.color_palette(["#149950", "#00c358", "#037938", "#149921"])
+
+    colors = sns.color_palette(["#33ccff", "#b3ffff", "#3366ff", "#9999ff"])
+
+    colors = sns.color_palette(["#33ccff", "#00cccc", "#3366ff", "#9999ff"])
     # colors = sns.color_palette(["#149950"]*4)
     active_smiles_all = {}
     accs = []
@@ -241,21 +259,22 @@ if __name__ == "__main__":
     colnames = ["robin", "color", "pos_x", "pos_y", "selected", "active"]
     df = pd.DataFrame(to_plot, columns=colnames)
 
-    # inactives unselected
-    subset = df.loc[(df['selected'] == False) & (df['active'] == False)]
-    plt.scatter(subset['pos_x'].values, subset['pos_y'].values,
-                c=inactive_color,
-                marker='o',
-                s=.1,
-                alpha=.25)
+    if not mols_only:
+        # inactives unselected
+        subset = df.loc[(df['selected'] == False) & (df['active'] == False)]
+        plt.scatter(subset['pos_x'].values, subset['pos_y'].values,
+                    c=inactive_color,
+                    marker='o',
+                    s=.1,
+                    alpha=.25)
 
-    # inactives selected
-    subset = df.loc[(df['selected'] == True) & (df['active'] == False)]
-    plt.scatter(subset['pos_x'].values, subset['pos_y'].values,
-                c=subset['color'],
-                # marker=markers[i],
-                marker='o',
-                s=1, alpha=0.4)
+        # inactives selected
+        subset = df.loc[(df['selected'] == True) & (df['active'] == False)]
+        plt.scatter(subset['pos_x'].values, subset['pos_y'].values,
+                    c=subset['color'],
+                    # marker=markers[i],
+                    marker='o',
+                    s=1, alpha=0.4)
 
     # actives unselected
     subset = df.loc[(df['selected'] == False) & df['active'] == True]
@@ -286,12 +305,14 @@ if __name__ == "__main__":
         sys.exit()
 
     # draw some mols
-    for mol_info in draw_mols:
-        MolImage(mol_info['idx'], mol_info['pos']).draw(ax)
+    if do_draw_mols:
+        for mol_info in draw_mols:
+            MolImage(mol_info['idx'], mol_info['pos']).draw(ax)
+            # MolImage(random.choice(range(len(X_embedded))), mol_info['pos']).draw(ax)
 
     plt.axis("off")
-    plt.savefig("figs/robin_tsne.pdf", format="pdf")
-    plt.savefig("figs/robin_tsne.png", format="png")
+    #plt.savefig("figs/robin_tsne_mols.pdf", format="pdf")
+    plt.savefig("figs/robin_tsne_bkg.png", dpi=600, format="png")
     plt.show()
 
     vals = []
