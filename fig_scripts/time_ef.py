@@ -229,7 +229,7 @@ def vax_plot(df, mixed_model='combined'):
                        # scale=0.5,
                        )
     ax.axvline(x=0.0, color='red', linestyle='--', label="No effect", linewidth=2)
-    ax.legend(loc="center left")
+    ax.legend(loc="lower right")
     # sns.despine()
     # ax.axvline(x=np.median(efficiency_df['efficiency']), color='grey', linestyle='--')
 
@@ -249,7 +249,7 @@ def vax_plot(df, mixed_model='combined'):
     # ax.set_title(f"{strategy}")
     ax.set_ylabel(r"Pocket")
     ax.set_xlabel(r"Efficiency Gain (\%)")
-    ax.set_xlim([-100, 100])
+    ax.set_xlim([-20, 100])
     ax.set_yticks([])
     ax.grid(True)
     plt.savefig("figs/efficiency_vax.pdf", format="pdf", bbox_inches='tight')
@@ -266,6 +266,6 @@ if __name__ == "__main__":
     # mixed_model = 'combined'
     # mixed_model = 'combined_docknat'
     mixed_model = 'combined_nat'
-    line_plot(df, mixed_model=mixed_model)
+    # line_plot(df, mixed_model=mixed_model)
     vax_plot(df, mixed_model=mixed_model)
     pass

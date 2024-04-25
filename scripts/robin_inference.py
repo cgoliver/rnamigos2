@@ -86,12 +86,7 @@ if __name__ == "__main__":
         # Get dgl pocket
         pocket_path = os.path.join(expanded_path, pocket)
         pocket_graph = graph_io.load_json(pocket_path)
-<<<<<<< HEAD
         dgl_pocket_graph, _ = load_rna_graph(pocket_graph)
-        continue
-=======
-        dgl_pocket_graph, _ = load_rna_graph(pocket_graph, undirected=False)
->>>>>>> 9b2ee8c77a494e6369c2466032eb2b46d4981434
 
         # Get smiles list for decoys
         # decoys_ligands_path = os.path.join(decoys_ligands_dir, f"{ligand_name}_decoys.txt")
@@ -111,3 +106,4 @@ if __name__ == "__main__":
         smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
         inference(dgl_graph=dgl_pocket_graph, smiles_list=smiles_list, out_path=out_path,
                   dump_all=True, models_path=models_path, mixing_coeffs=new_mixing_coeffs)
+

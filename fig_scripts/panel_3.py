@@ -31,7 +31,6 @@ if __name__ == "__main__":
 
 from fig_scripts.plot_utils import *
 
-
 draw_mols = [{'idx': 113, 'pos': 'top_right'},
              {'idx': 6159, 'pos': 'middle_right'},
              {'idx': 21818, 'pos': 'bottom_right'},
@@ -43,6 +42,7 @@ draw_mols = [{'idx': 113, 'pos': 'top_right'},
 
 mols_only = False
 do_draw_mols = False
+
 
 class MolImage:
     mol_zones = {'top_left': (-125, 100),
@@ -185,11 +185,12 @@ if __name__ == "__main__":
     # colors = ['green', 'blue', 'red', 'orange']
     # colors = sns.color_palette()
     # colors = sns.color_palette("Paired", 4)
-    colors = sns.color_palette(["#149950", "#00c358", "#037938", "#149921"])
-
-    colors = sns.color_palette(["#33ccff", "#b3ffff", "#3366ff", "#9999ff"])
-
+    # colors = sns.color_palette(["#149950", "#00c358", "#037938", "#149921"])
+    # colors = sns.color_palette(["#33ccff", "#b3ffff", "#3366ff", "#9999ff"])
     colors = sns.color_palette(["#33ccff", "#00cccc", "#3366ff", "#9999ff"])
+    # #77b553, # #027a38     # #00c458     # #149950    # #149921 #446600
+    # colors = sns.color_palette(["#3cdd2f", "#446600", "#027a38", "#30a600"])
+    # colors = sns.color_palette(["#149950", "#00c358", "#037938", "#149921"])
     # colors = sns.color_palette(["#149950"]*4)
     active_smiles_all = {}
     accs = []
@@ -294,13 +295,14 @@ if __name__ == "__main__":
                 edgecolors='black',
                 # marker=markers[i],
                 marker='o',
-                s=50, alpha=1, label=subset['robin'])
-    # legend_elements = [Line2D([0], [0], linestyle='none', marker='o', color=colors[i], markersize=20, label=f"{r}")
-    #                    for i, r in enumerate(robin_ids)]
-    # fig.legend(handles=legend_elements, ncol=len(robins), loc='lower center')
+                s=50, alpha=1)
+    legend_elements = [Line2D([0], [0], linestyle='none', marker='o', color=colors[i], markersize=20, label=f"{r}")
+                       for i, r in enumerate(robin_ids)]
+    fig.legend(handles=legend_elements, ncol=len(robins), loc='lower center')
 
     # rdkit can cause segfaults
     if not use_rdkit_plotting:
+        plt.legend()
         plt.show()
         sys.exit()
 
@@ -311,7 +313,7 @@ if __name__ == "__main__":
             # MolImage(random.choice(range(len(X_embedded))), mol_info['pos']).draw(ax)
 
     plt.axis("off")
-    #plt.savefig("figs/robin_tsne_mols.pdf", format="pdf")
+    # plt.savefig("figs/robin_tsne_mols.pdf", format="pdf")
     plt.savefig("figs/robin_tsne_bkg.png", dpi=600, format="png")
     plt.show()
 
