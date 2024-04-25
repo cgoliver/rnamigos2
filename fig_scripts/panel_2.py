@@ -35,7 +35,7 @@ def dock_correlation():
                   'dock': 'raw_score_x'
                   }
 
-    migos_to_use = 'dock'
+    migos_to_use = 'docknat'
     dock_to_use = 'dock_pocket_norm' # raw_score_y
 
     dock_pred = pd.read_csv(df_paths[migos_to_use])
@@ -51,6 +51,8 @@ def dock_correlation():
 
     if migos_to_use == 'dock':
         result[score_keys[migos_to_use]] = 1 - result[score_keys[migos_to_use]]
+
+    result[score_keys[migos_to_use]] = result.groupby("pocket_id")[score_keys[migos_to_use]].transform(lambda x:(x - x.min()) / (x.max() - x.min()))
 
     actives = result.loc[result['is_active_x'] == 1.0]
     decoys = result.loc[result['is_active_x'] == 0.0]
@@ -105,7 +107,7 @@ def dock_correlation():
     plt.legend(handles=handles, loc='lower right')
 
     plt.xlabel("Normalized rDock")
-    plt.ylabel("AFF")
+    plt.ylabel("MIXED")
     plt.savefig(f"figs/dock_corr_{migos_to_use}.pdf", format="pdf")
     plt.savefig(f"figs/dock_corr_{migos_to_use}.png", format="png")
     plt.show()
