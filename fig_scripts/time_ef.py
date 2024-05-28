@@ -142,7 +142,7 @@ def plot_mean_std(ax, times, means, stds, label, color):
 
 def line_plot(df, mixed_model='combined'):
     # Get results
-    names = [r'\texttt{rDock}', r'\texttt{mixed+rDock}']
+    names = [r'\texttt{rDock}', r'\texttt{RNAmigos++}']
     palette = [PALETTE_DICT['rdock'], PALETTE_DICT['mixed+rdock']]
     model_res = []
     assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
@@ -170,7 +170,7 @@ def line_plot(df, mixed_model='combined'):
         mixed_means = [0.9848] * 20
     else:
         raise ValueError
-    ax.plot(times, mixed_means, label=r'\texttt{mixed}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
+    ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
 
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
@@ -266,6 +266,6 @@ if __name__ == "__main__":
     # mixed_model = 'combined'
     # mixed_model = 'combined_docknat'
     mixed_model = 'combined_nat'
-    # line_plot(df, mixed_model=mixed_model)
-    vax_plot(df, mixed_model=mixed_model)
+    line_plot(df, mixed_model=mixed_model)
+    # vax_plot(df, mixed_model=mixed_model)
     pass
