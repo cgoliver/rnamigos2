@@ -46,6 +46,8 @@ A local use of the tool is also possible by following the next steps.
 First, create a conda environment:
 
 ```bash
+git clone https://github.com/cgoliver/rnamigos2.git
+cd rnamigos2/
 conda create -n rnamigos2
 conda activate rnamigos2
 pip install -r requirements.txt
