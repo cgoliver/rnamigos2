@@ -43,6 +43,8 @@ You will need to provide a cif file, a binding site in the form of a list of bin
 ## Using the tool locally
 
 A local use of the tool is also possible by following the next steps.
+NOTE: This has been tested on Linux Ubuntu 24 and Mac OS 13 and 14. No special hardware requirement, inference code runs on common desktops and laptops.
+
 First, create a conda environment:
 
 ```bash
@@ -72,7 +74,7 @@ python experiments/inference.py cif_path=sample_files/3ox0.cif \
                                 out_path=scores.txt
 ``` 
 
-Once this executes you will have `scores.txt` that looks like this:
+Once this executes (~10 seconds) you will have `scores.txt` that looks like this:
 
 ```
 CCC[S@](=O)c1ccc2[nH]/c(=N\C(=O)OC)[nH]c2c1 0.2639017701148987
