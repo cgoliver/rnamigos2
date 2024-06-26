@@ -83,6 +83,10 @@ CC(=O)Oc1ccccc1C(=O)O 0.6304176449775696
 CN1[C@H]2CC[C@@H]1CC(OC(=O)[C@H](CO)c1ccccc1)C2 0.47674891352653503
 ...
 ```
+The scores are between 0 and 1 with a higher score represening a better likelihood of binding.
+
+**NOTE:** inference on user-provided structutes has not been validated as it uses fr3d-python as a structute annotation backend which was not used in training. The models provided were trained on structures annotated by x3dna-dssr.
+
 
 ## Reproducting results and figures
 
