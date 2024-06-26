@@ -4,6 +4,7 @@ import networkx as nx
 import numpy as np
 import os
 from pathlib import Path
+from loguru import logger
 import pickle
 from tqdm import tqdm
 import torch
@@ -116,6 +117,18 @@ def get_dgl_graph(cif_path, residue_list, undirected=False):
     ### DATA PREP
     # convert cif to graph and keep only relevant keys
     nx_graph = fr3d_to_graph(cif_path)
+
+    buggy_nodes = []
+    for node in nx_graph.nodes():
+        try:
+            nx_graph.nodes[node]['nt']
+        except KeyError:
+            buggy_nodes.append(node)
+
+    nx_graph.remove_nodes_from(buggy_nodes)
+
+    logger.warning(f"Conversion of mmCIF to graph by fr3d-python created {len(buggy_nodes)} residues with missing residue IDs. Removing {buggy_nodes} from the graph.")
+
     # This is the pdbid used by fr3d
     pdbid = Path(cif_path).stem.lower()
     if residue_list is not None:
