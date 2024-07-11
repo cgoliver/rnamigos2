@@ -17,14 +17,14 @@ RNAmigos is a virtual screening tool : given the binding site of a target and a 
 ranks the compounds so that better ranked compounds have a higher chance to bind the target.
 It is based on a machine learning model using the PyTorch framework and was trained leveraging unsupervised and synthetic data.
 It was shown to display similar enrichment factors to docking while running in a fraction of the time.
-A detailed description of the tool is available on [BioRxiv](https://www.biorxiv.org/content/10.1101/2023.11.23.568394v1).
+A detailed description of the tool is available on [BioRxiv](https://www.biorxiv.org/content/10.1101/2023.11.23.568394v2).
 
 If you find this tool useful, please cite 
 
 ```bib
-@article{carvajal2023semi,
-  title={Semi-supervised learning and large-scale docking data accelerate RNA virtual screening},
-  author={Carvajal-Patino, Juan G and Mallet, Vincent and Becerra, David and Nino, L Fernando and Oliver, Carlos and Waldispuhl, Jerome},
+@article{carvajal2023rnamigos2,
+  title={RNAmigos2: Fast and accurate structure-based RNA virtual screening with semi-supervised graph learning and large-scale docking data},
+  author={Carvajal-Patino, Juan G and Mallet, Vincent and Becerra, David and Ni{\~n}o Vasquez, Luis Fernando and Oliver, Carlos and Waldisp{\"u}hl, J{\'e}r{\^o}me},
   journal={bioRxiv},
   pages={2023--11},
   year={2023},
@@ -83,6 +83,10 @@ CC(=O)Oc1ccccc1C(=O)O 0.6304176449775696
 CN1[C@H]2CC[C@@H]1CC(OC(=O)[C@H](CO)c1ccccc1)C2 0.47674891352653503
 ...
 ```
+The scores are between 0 and 1 with a higher score represening a better likelihood of binding.
+
+**NOTE:** inference on user-provided structutes has not been validated as it uses fr3d-python as a structute annotation backend which was not used in training. The models provided were trained on structures annotated by x3dna-dssr.
+
 
 ## Reproducting results and figures
 
