@@ -1,17 +1,16 @@
 import os
 import sys
-import time
-from pathlib import Path
 
+from dgl.dataloading import GraphDataLoader
+import networkx as nx
 import numpy as np
 import pandas as pd
-from dgl.dataloading import GraphDataLoader
-from yaml import safe_load
+from pathlib import Path
+from rnaglib.utils import graph_from_pdbid, graph_utils, graph_io
 from sklearn import metrics
-
-import hydra
-from omegaconf import DictConfig, OmegaConf
 import torch
+import time
+from tqdm import tqdm
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -19,10 +18,72 @@ if __name__ == "__main__":
 from rnamigos_dock.learning.models import get_model_from_dirpath
 from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
-from fig_scripts.mixing import get_ef_one
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
+
+
+def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
+    expanded_nodes = graph_utils.bfs(rglib_graph, nodelist, depth=bfs_depth, label='LW')
+    new_pocket_graph = rglib_graph.subgraph(expanded_nodes)
+    in_pocket = {node: node in nodelist for node in expanded_nodes}
+    nt_codes = nx.get_node_attributes(new_pocket_graph, 'nt_code')
+    edge_types = nx.get_edge_attributes(new_pocket_graph, 'LW')
+
+    # New graph creation enables removing old attributes. (more lightweight)
+    expanded_graph = nx.DiGraph()  # or whatever type of graph `G` is
+    expanded_graph.add_edges_from(new_pocket_graph.edges())
+    nx.set_node_attributes(expanded_graph, name='in_pocket', values=in_pocket)
+    nx.set_node_attributes(expanded_graph, name='nt_code', values=nt_codes)
+    nx.set_edge_attributes(expanded_graph, name='LW', values=edge_types)
+    return expanded_graph
+
+
+def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded', out_path='figs/perturbed'):
+    test_systems = get_systems(target="is_native",
+                               rnamigos1_split=-2,
+                               use_rnamigos1_train=False,
+                               use_rnamigos1_ligands=False,
+                               return_test=True)
+    test_pockets_redundant = test_systems[['PDB_ID_POCKET']].values.squeeze()
+    test_pockets = set(list(test_pockets_redundant))
+    # print(test_pockets, len(test_pockets))
+
+    computed_pockets = set([pocket.rstrip('.json') for pocket in os.listdir(unperturbed_path)])
+    to_compute = computed_pockets.intersection(test_pockets)
+
+    failed_set = set()
+    for pocket in tqdm(to_compute):
+        # Get rglib grpah
+        pdb_id = pocket[:4].lower()
+        rglib_graph = graph_from_pdbid(pdb_id, redundancy='all')
+        if rglib_graph is None:
+            failed_set.add(pocket)
+
+        # Get pocket graph and hence initial nodelist
+        unperturbed_pocket_path = os.path.join(unperturbed_path, f'{pocket}.json')
+        old_pocket_graph = graph_io.load_json(unperturbed_pocket_path)
+        in_pocket_nodes = {node[:4].lower() + node[4:]
+                           for node, in_pocket in old_pocket_graph.nodes(data='in_pocket')
+                           if in_pocket}
+
+        # Ensure all nodes are valid and expand with a small bfs
+        in_pocket_filtered = in_pocket_nodes.intersection(set(rglib_graph.nodes()))
+        around_pocket = graph_utils.bfs(rglib_graph, in_pocket_filtered, depth=1, label='LW')
+
+        # Now compute the perturbed pockets
+        for fraction in [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]:
+            n_nodes_to_sample = int(fraction * len(in_pocket_filtered))
+            for replicate in range(5):
+                # Setup dirs
+                out_dir = os.path.join(out_path, f'perturbed_{fraction}_{replicate}')
+                os.makedirs(out_dir, exist_ok=True)
+                out_name = os.path.join(out_dir, f'{pocket}.json')
+
+                # Sample a broken binding site
+                noisy_nodelist = list(np.random.choice(list(around_pocket), replace=False, size=n_nodes_to_sample))
+                expanded_graph = get_expanded_subgraph_from_list(rglib_graph=rglib_graph, nodelist=noisy_nodelist)
+                graph_io.dump_json(out_name, expanded_graph)
 
 
 def compute_efs_model(model, dataloader, lower_is_better):
@@ -83,7 +144,7 @@ def mix_two_scores(df, score1, score2):
 #   cache_graphs=True to save time over two model runs
 #   target is set to "is_native" which has no impact since it's just used to get pdb lists
 # The goal here is just to have easy access to the loader and modify its pockets_path
-def get_perf(pocket_path):
+def get_perf(pocket_path, basename=None):
     # Setup loader
     test_systems = get_systems(target="is_native",
                                rnamigos1_split=-2,
@@ -107,7 +168,8 @@ def get_perf(pocket_path):
 
     # Setup path and models
     d = Path("figs/perturbed", parents=True, exist_ok=True)
-    base_name = Path(pocket_path).stem
+    if basename is None:
+        base_name = Path(pocket_path).stem
     dock_model_path = 'results/trained_models/dock/dock_42'
     dock_model = get_model_from_dirpath(dock_model_path)
     native_model_path = 'results/trained_models/is_native/native_42'
@@ -132,9 +194,32 @@ def get_perf(pocket_path):
     mixed_df, mixed_df_raw = mix_two_scores(big_df_raw, score1='dock', score2='native')
     mixed_df.to_csv(d / (base_name + '_mixed.csv'))
     mixed_df_raw.to_csv(d / (base_name + "_mixed_raw.csv"))
+    return np.mean(mixed_df['score'].values)
 
 
 if __name__ == '__main__':
+    get_perturbed_pockets()
+
     # Check that inference works
     os.makedirs("figs/perturbed", exist_ok=True)
-    get_perf(pocket_path="data/json_pockets_expanded")
+    # get_perf(pocket_path="data/json_pockets_expanded")
+
+    list_of_results = []
+    for fraction in [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]:
+        for replicate in range(5):
+            print(fraction, replicate)
+            # Setup dirs
+            perturbed_pocket_path = os.path.join('figs/perturbed', f'perturbed_{fraction}_{replicate}')
+            mean_score = get_perf(pocket_path=perturbed_pocket_path, basename=perturbed_pocket_path)
+            list_of_results.append({"thresh": fraction, "replicate": replicate, "score": mean_score})
+    df = pd.DataFrame(list_of_results)
+    df.to_csv('figs/perturbed/aggregated.csv')
+
+    means = df.groupby('thresh')['score'].mean()
+    labels = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
+
+    import matplotlib.pyplot as plt
+
+    plt.plot(labels, means.values)
+    plt.hlines(y=0.985, xmin=min(labels), xmax=max(labels))
+    plt.show()
