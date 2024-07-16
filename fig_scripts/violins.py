@@ -27,7 +27,7 @@ name_runs = {
     # r"\texttt{native}": "native_0.csv",
     # r"\texttt{toto}": "toto_0.csv",
     # r"\texttt{native}": "native_1.csv",
-     r"COMPAT": "native_42.csv",
+    r"COMPAT": "native_42.csv",
     # r"\texttt{native}": "native_1.csv",
     # r"\texttt{native2}": "native_split_grouped2.csv",
     # r"\texttt{dock_old}": "paper_dock.csv",
@@ -35,12 +35,12 @@ name_runs = {
     # r"\texttt{dock_pre}": "dock_split_grouped1.csv",
     # r"\texttt{dock}": "dock_0.csv",
     # r"\texttt{dock}": "dock_1.csv",
-     r"AFF": "dock_42.csv",
+    r"AFF": "dock_42.csv",
     # r"\texttt{dock2}": "dock_split_grouped2.csv",
-     r"rDock": "rdock.csv",
+    r"rDock": "rdock.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
-     r"MIXED": "docknat_grouped_42.csv",
-     r"MIXED+rDock": "docknat_rdock_grouped_42.csv",
+    r"MIXED": "docknat_grouped_42.csv",
+    r"MIXED+rDock": "docknat_rdock_grouped_42.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
     # r"\texttt{mixed}": "mixed_grouped_42.csv",
     # r"\texttt{mixed\newline+ rDock}": "mixed_rdock_grouped_42.csv",
@@ -80,6 +80,7 @@ grouped = True
 # Parse ef data for the runs and gather them in a big database
 dfs = [pd.read_csv(f"outputs/{f}") for f in runs]
 dfs = [df.assign(name=names[i]) for i, df in enumerate(dfs)]
+
 big_df = pd.concat(dfs)
 big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
 
@@ -103,8 +104,17 @@ big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
 
 if grouped:
     big_df = group_df(big_df)
-means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 
+# Compute pvalue for rev2
+from scipy import stats
+
+mixed_big = big_df[big_df['name'] == 'MIXED']['score'].values
+rdock_big = big_df[big_df['name'] == 'rDock']['score'].values
+# res = stats.ttest_ind(mixed_big, rdock_big)
+res = stats.ttest_rel(mixed_big, rdock_big)
+res_wil = stats.wilcoxon(mixed_big, rdock_big)
+
+means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 # For a detailed score per pocket
 # table = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by=['pocket_id', 'name'])
 # print(table.to_latex(index=False, columns=['pocket_id', 'name', 'score']))

@@ -2,7 +2,7 @@
 
 CMDARRAY=()
 
-# First
+# First undirected
 python_cmd="python experiments/pretrain.py
               model.dropout=0.3
               model.encoder.num_bases=null
