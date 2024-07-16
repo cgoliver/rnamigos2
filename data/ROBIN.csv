@@ -1,0 +1,9 @@
+ROBIN_ID,PDBID,LIGAND,RESLIST
+TPP,2GDI,TPP,
+Glutamine_RS,6QN3,GLN,
+ZTP,5BTP,AMZ,
+SAM_II,2QWY,SAM,
+PreQ1,3FU2,PRF,
+HBV,6VAR,,
+Pre_miR_17,8FCS,,'8fcs.A.31;8fcs.A.32;8fcs.A.33;8fcs.A.34;8fcs.A.35;8fcs.A.36;8fcs.A.37;8fcs.A.38;8fcs.A.39;8fcs.A.40;8fcs.A.41'
+Pre_miR_21,2MNC,,
