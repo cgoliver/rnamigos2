@@ -15,7 +15,7 @@ from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 
 
-def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.3, 0.3, 0.3), models_path=None, dump_all=False):
+def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.5, 0., 0.5), models_path=None, dump_all=False):
     """
     Run inference from python objects
     """
@@ -24,8 +24,8 @@ def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.3, 0.3, 0.3), m
     if models_path is None:
         models_path = {
             'dock': os.path.join(script_dir, '../saved_models/dock'),
+            'native_fp': os.path.join(script_dir, '../saved_models/fp'),
             'is_native': os.path.join(script_dir, '../saved_models/native'),
-            'native_fp': os.path.join(script_dir, '../saved_models/fp')
         }
     models = {model_name: get_model_from_dirpath(model_path) for model_name, model_path in models_path.items()}
 

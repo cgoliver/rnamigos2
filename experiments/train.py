@@ -315,10 +315,9 @@ def main(cfg: DictConfig):
 
     logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
 
-    d = Path("outputs/all", parents=True, exist_ok=True)
-    base_name = Path(cfg.name).stem
-
     df = pd.DataFrame(rows)
+    d = Path(cfg.result_dir, parents=True, exist_ok=True)
+    base_name = Path(cfg.name).stem
     df.to_csv(d / (base_name + '.csv'))
 
     df_raw = pd.DataFrame(raw_rows)
@@ -327,7 +326,7 @@ def main(cfg: DictConfig):
     df = df.loc[df['decoys'] == 'chembl']
     df = group_df(df)
     mean = np.mean(df['score'].values)
-    print(f'Mean EF', mean)
+    print(f'Mean grouped EF', mean)
 
 
 if __name__ == "__main__":

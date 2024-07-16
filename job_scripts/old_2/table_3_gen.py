@@ -8,7 +8,7 @@ def get_runs(run_dir):
     return set(["_".join(r.split("_")[:-1]) for r in os.listdir(run_dir)])
 
 if __name__ == "__main__":
-    RESULTS_DIR = Path('..', 'results', 'trained_models')
+    RESULTS_DIR = Path('../..', 'results', 'trained_models')
 
     targets = ['dock', 'is_native', 'native_fp']
 
