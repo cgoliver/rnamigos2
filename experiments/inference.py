@@ -23,9 +23,9 @@ def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.5, 0., 0.5), mo
     script_dir = os.path.dirname(__file__)
     if models_path is None:
         models_path = {
-            'dock': os.path.join(script_dir, '../saved_models/dock'),
-            'native_fp': os.path.join(script_dir, '../saved_models/fp'),
-            'is_native': os.path.join(script_dir, '../saved_models/native'),
+            'dock': os.path.join(script_dir, '../results/trained_models/dock/dock_42'),
+            'native_fp': os.path.join(script_dir, '../results/trained_models/native_fp/fp_42'),
+            'is_native': os.path.join(script_dir, '../results/trained_models/is_native/native_42'),
         }
     models = {model_name: get_model_from_dirpath(model_path) for model_name, model_path in models_path.items()}
 
