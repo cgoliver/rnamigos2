@@ -70,9 +70,9 @@ if __name__ == "__main__":
     nodelists, ligand_names = get_nodelists_and_ligands()
 
     models_path = {
-        'dock': 'saved_models/dock',
-        'is_native': 'saved_models/native',
-        'native_fp': 'saved_models/fp'
+        'dock': 'results/trained_models/dock/dock_42',
+        'native_fp': 'results/trained_models/native_fp/fp_42',
+        'is_native': 'results/trained_models/is_native/native_42',
     }
     out_dir = 'outputs/robin_docknative'
     os.makedirs(out_dir, exist_ok=True)
@@ -106,4 +106,3 @@ if __name__ == "__main__":
         smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
         inference(dgl_graph=dgl_pocket_graph, smiles_list=smiles_list, out_path=out_path,
                   dump_all=True, models_path=models_path, mixing_coeffs=new_mixing_coeffs)
-

@@ -23,7 +23,7 @@ from rnamigos_dock.tools.graph_utils import load_rna_graph
 
 def cline():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", default="saved_models/paper_dock")
+    parser.add_argument("--model_dir", default="results/trained_models/dock/dock_42")
     parser.add_argument("--ligand-cam", action="store_true", default=False, help="Pass to get the CAM on the ligand side, else returns pocket CAM.")
     parser.add_argument("--layer", default=-1, help="Index of layer in conv model to use.")
     parser.add_argument("--pocket-dir", default="data/json_pockets_expanded")

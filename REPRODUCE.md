@@ -105,7 +105,7 @@ We additionally need to load optimol encoder pretrained weights which are in the
 Then you need to train models using those pretrained models.
 Scripts are available to run all relevant trainings.
 ```bash
-bash job_scripts/split_paper_runs.sh
+bash job_scripts/train.sh
 ```
  
 This will train three models and save them in results/trained_models.
@@ -122,7 +122,7 @@ python job_scripts/rdock_output.py
 
 # Generate the figures from the results
 
-If you followed the previous steps, we expect the *outputs/* directory to hold split_paper_{fp, native, dock, rdock}_{, _raw}.csv files.
+If you followed the previous steps, we expect the *outputs/* directory to hold {native, dock, rdock}_{, _raw}.csv files.
 
 Those files are directly available for download at :
 

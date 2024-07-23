@@ -10,3 +10,5 @@ debug: False
 name: 'default'
 device: 'cpu'
 verbose: False
+result_dir: outputs/
+

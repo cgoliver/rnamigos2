@@ -76,6 +76,8 @@ for i, group in enumerate(reps):
         rna_path = os.path.join(pockets_path, f"{group}.json")
         pocket_graph = graph_io.load_json(rna_path)
         nodes = dict(pocket_graph.nodes(data=True))
+        for key, val in nodes.items():
+            del val['nt_code']
         group_object = {'group': lc.get_group(group),
                         'nodes': nodes,
                         'actives': group_positive,
