@@ -34,8 +34,10 @@ def merge_raw_dfs():
         if method in ['RNAmigos1', 'RNAmigos2', 'rDock']:
             df = df.loc[df['decoys'] == 'chembl']
         if method == 'RLDOCK':
-            df['raw_score'] = df['Total_Energy'] - (df['Self_energy_of_ligand'] + df['Self_energy_of_receptor'])
-        df['raw_score'] = df[score_to_use[method]]
+            df['raw_score'] = (df['Total_Energy'] - (df['Self_energy_of_ligand'] + df['Self_energy_of_receptor']))
+
+        else:
+            df['raw_score'] = df[score_to_use[method]]
         if method in ['RNAmigos2']:
             df['normed_score'] = df.groupby(['pocket_id'])['raw_score'].rank(pct=True)
         else:
@@ -53,6 +55,8 @@ def plot(df):
     df = df.loc[df['pocket_id'].isin(grouped_test)]
     df = df.loc[df['is_active'] > 0]
 
+    print(df.groupby(['method'])['normed_score'].mean())
+
     custom_palette_bar = {method: '#e9e9f8' if method.startswith('RNAmigos') else '#d3d3d3' \
                         for method in df['method'].unique()}
 
@@ -60,7 +64,7 @@ def plot(df):
             for method in df['method'].unique()}
 
     order = ['RLDOCK', 'AutoDock-Vina', 'AnnapuRNA', 'rDock', 'RNAmigos1', 'RNAmigos2']
-    g = sns.barplot(df, x='method', y='normed_score', order=order, palette=custom_palette_bar)
+    g = sns.barplot(df, x='method', y='normed_score', order=order, palette=custom_palette_bar, alpha=0.7)
     sns.stripplot(df, x='method', y='normed_score', ax=g, order=order, palette=custom_palette_point)
     plt.show()
     pass
