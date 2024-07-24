@@ -64,15 +64,17 @@ ligand_names = [
     "PreQ1",
 ]
 
+pocket_to_id = {p:l for p, l in zip(pocket_names, ligand_names)}
+
 
 def get_dfs_docking(ligand_name):
     out_dir = 'outputs/robin'
 
     # Get relevant mapping smiles : normalized score
-    docking_df = pd.read_csv(os.path.join(out_dir, "robin_targets_docking.csv"))
+    docking_df = pd.read_csv(os.path.join(out_dir, "robin_docking_consolidated_v2.csv"))
     # docking_df = pd.read_csv(os.path.join(out_dir, "robin_targets_docking_consolidated.csv"))
     docking_df = docking_df[docking_df["TARGET"] == ligand_name]
-    scores = -docking_df[["TOTAL"]].values.squeeze()
+    scores = -docking_df[["INTER"]].values.squeeze()
 
     # DEAL WITH NANS, ACTUALLY WHEN SORTING NANS, THEY GO THE END
     # count = np.count_nonzero(np.isnan(scores))
@@ -80,46 +82,54 @@ def get_dfs_docking(ligand_name):
     # cropped_scores = np.concatenate((scores[:10], scores[-10:]))
     # print(cropped_scores)
 
-    scores = np.nan_to_num(scores, nan=np.nanmin(scores))
-    # mi = np.nanmin(scores)
-    # ma = np.nanmax(scores)
-    # print(ma, mi)
+    scores[scores < 0] = 0
+    scores = np.nan_to_num(scores, nan=0)
+
+    mi = np.nanmin(scores)
+    ma = np.nanmax(scores)
+    print(ma, mi)
     # normalized_scores = (scores - np.nanmin(scores)) / (np.nanmax(scores) - np.nanmin(scores))
+    normalized_scores = (scores - scores.min()) / (scores.max() - scores.min())
+
+
     # normalized_scores = scores
-    normalized_scores = scores / 80
     mapping = {}
     for smiles, score in zip(docking_df[["SMILE"]].values, normalized_scores):
         mapping[smiles[0]] = score
     mapping = defaultdict(int, mapping)
 
+    all_smiles = []
     # Use this mapping to create our actives/inactives distribution dataframe
     active_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
     # out_path = os.path.join(out_dir, f"{pocket_name}_actives.txt")
     smiles_list = [s.lstrip().rstrip() for s in list(open(active_ligands_path).readlines())]
-    actives_df = pd.DataFrame({"docking_score": [mapping[sm] for sm in smiles_list]})
+    all_smiles.extend(smiles_list)
+    actives_df = pd.DataFrame({"rDock": [mapping[sm] for sm in smiles_list]})
     actives_df['split'] = 'actives'
 
-    # scores = actives_df[["docking_score"]].values.squeeze()
-    # ma = np.nanmax(scores)
-    # mi = np.nanmin(scores)
-    # count = np.count_nonzero(np.isnan(scores))
-    # print(f"actives max/min : {ma} {mi}, nancount : {count} "
-    #       f"scores over 200 : {np.sum(scores > 200)} length : {len(scores)} ")
+    scores = actives_df[["rDock"]].values.squeeze()
+    ma = np.nanmax(scores)
+    mi = np.nanmin(scores)
+    count = np.count_nonzero(np.isnan(scores))
+    print(f"actives max/min : {ma} {mi}, nancount : {count} "
+          f"scores over 200 : {np.sum(scores > 200)} length : {len(scores)} ")
 
     inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
     # out_path = os.path.join(out_dir, f"{pocket_name}_inactives.txt")
     smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
-    inactives_df = pd.DataFrame({"docking_score": [mapping[sm] for sm in smiles_list]})
+    all_smiles.extend(smiles_list)
+    inactives_df = pd.DataFrame({"rDock": [mapping[sm] for sm in smiles_list]})
     inactives_df['split'] = 'inactives'
 
-    # scores = inactives_df[["docking_score"]].values.squeeze()
-    # ma = np.nanmax(scores)
-    # mi = np.nanmin(scores)
-    # count = np.count_nonzero(np.isnan(scores))
-    # print(f"inactives max/min : {ma} {mi}, nancount : {count} "
-    #       f"scores over 200 : {np.sum(scores > 200)} length : {len(scores)} ")
+    scores = inactives_df[["rDock"]].values.squeeze()
+    ma = np.nanmax(scores)
+    mi = np.nanmin(scores)
+    count = np.count_nonzero(np.isnan(scores))
+    print(f"inactives max/min : {ma} {mi}, nancount : {count} "
+          f"scores over 200 : {np.sum(scores > 200)} length : {len(scores)} ")
 
     merged = pd.concat([actives_df, inactives_df]).reset_index()
+    merged['smiles'] = all_smiles 
     return merged
 
 
@@ -153,45 +163,37 @@ def get_dfs_migos(pocket_name, swap=False, swap_on='merged'):
 
     return merged
 
-
-if __name__ == '__main__':
+def make_fig(score_to_use='dock_nat', swap=False, prefix='robin_fig'):
+    # fig, axs = plt.subplots(1, 4, figsize=(18, 5))
+    # plt.gca().set_yscale('custom')
 
     all_efs = list()
     all_aurocs = list()
 
-    score_to_use = 'dock_nat'
-    # score_to_use = 'merged'
-    # score_to_use = 'dock'
-    # score_to_use = 'is_native'
-    # score_to_use = 'native_fp'
-    print(score_to_use)
+    rows = []
 
-    # fig, axs = plt.subplots(1, 4, figsize=(18, 5))
-    # plt.gca().set_yscale('custom')
     for i, (pocket_name, ligand_name) in enumerate(zip(pocket_names, ligand_names)):
         # ax = axs[i]
         fig, ax = plt.subplots(figsize=(6, 6))
         # ax.set_xscale('custom')
 
         # FOR DOCKING
-        # merged = get_dfs_docking(ligand_name=ligand_name)
+        merged_rdock = get_dfs_docking(ligand_name=ligand_name)
         # score_to_use = 'docking_score'
 
         # FOR MIGOS
-        swap = False
-        merged = get_dfs_migos(pocket_name=pocket_name, swap=swap)
-        merged['dock_nat'] = (merged['is_native'] + merged['dock']) / 2
+        merged_migos = get_dfs_migos(pocket_name=pocket_name, swap=swap)
+        merged_migos['dock_nat'] = (merged_migos['is_native'] + merged_migos['dock']) / 2
+        print(merged_rdock)
+
+        merged = pd.merge(merged_migos, merged_rdock, on=['smiles', 'split'], how='outer')
+
+        merged = merged.fillna(0)
+
+        merged['RNAmigos2++'] = (merged['is_native'] + merged['rDock']) / 2
         # merged['dock_nat_rank'] = merged['dock_nat'].rank(pct=True, ascending=True)
         # print(merged)
 
-        # g = load_json(f"data/robin_graphs_x3dna/{name}.json")
-        # g = g.subgraph([n for n,d in g.nodes(data=True) if d['in_pocket'] == True])
-        # print(g.nodes(data=True))
-        # nt_key = 'nt_code'
-        # colors = {'C': 'red', 'G': 'yellow', 'A': 'blue', 'U': 'green'}
-        # rna_draw(g,
-        #          node_colors=[colors[d[nt_key]] for n,d in g.nodes(data=True)],
-        #          ax=axs[i][1])
         scores = merged[score_to_use]
         actives = merged['split'].isin(['actives'])
 
@@ -212,8 +214,9 @@ if __name__ == '__main__':
         curve_fill = True
         # sns.kdeplot(data=merged, x=score_to_use, fill=False, hue='split', alpha=.9,
         #             palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
+        merged = merged.sort_values(by='split')
         g = sns.kdeplot(data=merged, x=score_to_use, hue='split', ax=ax,
-                        palette={'actives': colors[i], 'inactives': 'lightgrey'},
+                        #palette={'actives': colors[i], 'inactives': 'lightgrey'},
                         # fill=True,
                         # alpha=0.9,
                         linewidth=0,
@@ -230,6 +233,7 @@ if __name__ == '__main__':
             ef, thresh = enrichment_factor(scores=scores, is_active=actives,
                                            lower_is_better=False, frac=frac)
             # ax.axvline(x=thresh, ymin=0, ymax=max(scores), color=linecolors[i])
+            rows.append({'pocket': pocket_to_id[pocket_name], 'ef': ef, 'thresh': f"{frac*100:.0f}", 'score': score_to_use})
 
             if curve_fill:
                 xy_tail = [(x, y) for x, y in zip(xx, yy) if x > thresh]
@@ -258,7 +262,7 @@ if __name__ == '__main__':
         ax.set_title(pocket_name)
         g.legend().remove()
         sns.despine()
-        plt.savefig(f"figs/panel_3_{i}.pdf", format="pdf")
+        plt.savefig(f"figs/panel_3_{prefix}_{pocket_to_id[pocket_name]}.pdf", format="pdf")
         # plt.show()
 
         # GET AUROC
@@ -278,8 +282,28 @@ if __name__ == '__main__':
     #
     print(np.mean(all_efs))
     print(np.mean(all_aurocs))
+    # names = ['smiles', 'dock', 'is_native', 'native_fp', 'merged']
     plt.tight_layout()
-    plt.savefig("figs/fig_3a.pdf", format="pdf")
-    plt.show()
+    plt.savefig("figs/fig_3a_{prefix}.pdf", format="pdf")
+    #plt.show()
+    return pd.DataFrame(rows)
 
-#
+
+def make_table(df):
+    df = df.rename(columns={'ef': 'Enrichment Factor', 'thresh': 'cutoff (%)'})
+    df = df.replace('dock_nat', 'RNAmigos2')
+    df = df.replace('is_native', 'Compat')
+    df = df.replace('dock', 'Aff')
+    table = pd.pivot_table(df, values=['Enrichment Factor'], columns=['cutoff (%)'], index=['pocket', 'score'])
+    print(table.to_latex(float_format="{:.2f}".format))
+
+    pass
+
+if __name__ == '__main__':
+
+
+    dfs = []
+    for score in ['dock_nat', 'is_native', 'dock', 'rDock', 'RNAmigos2++']:
+        dfs.append(make_fig(score, prefix=score))
+    make_table(pd.concat(dfs))
+
