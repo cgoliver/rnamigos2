@@ -1,12 +1,15 @@
 import os
+import random
 import sys
 
 from dgl.dataloading import GraphDataLoader
+import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from rnaglib.utils import graph_from_pdbid, graph_utils, graph_io
+import seaborn as sns
 from sklearn import metrics
 import torch
 import time
@@ -18,6 +21,7 @@ if __name__ == "__main__":
 from rnamigos_dock.learning.models import get_model_from_dirpath
 from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
+from fig_scripts.plot_utils import PALETTE_DICT
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
@@ -39,7 +43,13 @@ def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
     return expanded_graph
 
 
-def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded', out_path='figs/perturbed'):
+def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
+                          out_path='figs/perturbed',
+                          fractions=(0.7, 0.8, 0.9, 1.0, 1.1, 1.2),
+                          perturb_bfs_depth=1,
+                          max_replicates=5,
+                          recompute=False,
+                          perturbation='random'):
     test_systems = get_systems(target="is_native",
                                rnamigos1_split=-2,
                                use_rnamigos1_train=False,
@@ -49,11 +59,11 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded', out_pat
     test_pockets = set(list(test_pockets_redundant))
     # print(test_pockets, len(test_pockets))
 
-    computed_pockets = set([pocket.rstrip('.json') for pocket in os.listdir(unperturbed_path)])
-    to_compute = computed_pockets.intersection(test_pockets)
+    existing_pockets = set([pocket.rstrip('.json') for pocket in os.listdir(unperturbed_path)])
+    pockets_to_compute = sorted(list(existing_pockets.intersection(test_pockets)))
 
     failed_set = set()
-    for pocket in tqdm(to_compute):
+    for pocket in tqdm(pockets_to_compute):
         # Get rglib grpah
         pdb_id = pocket[:4].lower()
         rglib_graph = graph_from_pdbid(pdb_id, redundancy='all')
@@ -69,19 +79,42 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded', out_pat
 
         # Ensure all nodes are valid and expand with a small bfs
         in_pocket_filtered = in_pocket_nodes.intersection(set(rglib_graph.nodes()))
-        around_pocket = graph_utils.bfs(rglib_graph, in_pocket_filtered, depth=1, label='LW')
+        around_pocket = graph_utils.bfs(rglib_graph, in_pocket_filtered, depth=perturb_bfs_depth, label='LW')
 
         # Now compute the perturbed pockets
-        for fraction in [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]:
+        for fraction in fractions:
             n_nodes_to_sample = int(fraction * len(in_pocket_filtered))
-            for replicate in range(5):
+            for replicate in range(max_replicates):
                 # Setup dirs
                 out_dir = os.path.join(out_path, f'perturbed_{fraction}_{replicate}')
                 os.makedirs(out_dir, exist_ok=True)
                 out_name = os.path.join(out_dir, f'{pocket}.json')
+                if os.path.exists(out_name) and not recompute:
+                    continue
 
                 # Sample a broken binding site
-                noisy_nodelist = list(np.random.choice(list(around_pocket), replace=False, size=n_nodes_to_sample))
+                # To get reproducible results, we need to sort sets
+                if perturbation == 'random':
+                    # just use random nodes from the list
+                    sorted_around_pocket = sorted(list(around_pocket))
+                    noisy_nodelist = list(np.random.choice(sorted_around_pocket, replace=False, size=n_nodes_to_sample))
+                elif perturbation == 'soft':
+                    # start from the pocket, and subsample/oversample, starting from the pocket
+                    sorted_neighbors_bfs = sorted(list(around_pocket.difference(in_pocket_filtered)))
+                    sorted_in_pocket = sorted(list(in_pocket_filtered))
+
+                    shuffled_in_pocket = list(np.random.choice(sorted_in_pocket,
+                                                               replace=False,
+                                                               size=len(in_pocket_filtered)))
+                    shuffled_neigh = list(np.random.choice(sorted_neighbors_bfs,
+                                                           replace=False,
+                                                           size=len(sorted_neighbors_bfs)))
+                    shuffled_in_pocket.extend(shuffled_neigh)
+                    noisy_nodelist = shuffled_in_pocket[:n_nodes_to_sample]
+                elif perturbation == 'hard':
+                    noisy_nodelist = []
+                else:
+                    raise NotImplementedError
                 expanded_graph = get_expanded_subgraph_from_list(rglib_graph=rglib_graph, nodelist=noisy_nodelist)
                 graph_io.dump_json(out_name, expanded_graph)
 
@@ -144,7 +177,7 @@ def mix_two_scores(df, score1, score2):
 #   cache_graphs=True to save time over two model runs
 #   target is set to "is_native" which has no impact since it's just used to get pdb lists
 # The goal here is just to have easy access to the loader and modify its pockets_path
-def get_perf(pocket_path, basename=None):
+def get_perf(pocket_path, base_name=None, out_dir=None):
     # Setup loader
     test_systems = get_systems(target="is_native",
                                rnamigos1_split=-2,
@@ -167,9 +200,10 @@ def get_perf(pocket_path, basename=None):
     dataloader = GraphDataLoader(dataset=dataset, **loader_args)
 
     # Setup path and models
-    d = Path("figs/perturbed", parents=True, exist_ok=True)
-    if basename is None:
-        base_name = Path(pocket_path).stem
+    out_dir = Path(pocket_path).parent if out_dir is None else Path(out_dir)
+    if base_name is None:
+        base_name = Path(pocket_path).name
+
     dock_model_path = 'results/trained_models/dock/dock_42'
     dock_model = get_model_from_dirpath(dock_model_path)
     native_model_path = 'results/trained_models/is_native/native_42'
@@ -177,13 +211,13 @@ def get_perf(pocket_path, basename=None):
 
     # Get dock performance
     df_dock, df_dock_raw = compute_efs_model(dock_model, dataloader=dataloader, lower_is_better=True)
-    df_dock.to_csv(d / (base_name + '_dock.csv'))
-    df_dock_raw.to_csv(d / (base_name + "_dock_raw.csv"))
+    df_dock.to_csv(out_dir / (base_name + '_dock.csv'))
+    df_dock_raw.to_csv(out_dir / (base_name + "_dock_raw.csv"))
 
     # Get native performance
     df_native, df_native_raw = compute_efs_model(native_model, dataloader=dataloader, lower_is_better=False)
-    df_native.to_csv(d / (base_name + '_native.csv'))
-    df_native_raw.to_csv(d / (base_name + "_native_raw.csv"))
+    df_native.to_csv(out_dir / (base_name + '_native.csv'))
+    df_native_raw.to_csv(out_dir / (base_name + "_native_raw.csv"))
 
     # Now merge those two results to get a final mixed performance
     # Inspired from mixing.py, function find_best_mix and mix_two_scores
@@ -192,34 +226,132 @@ def get_perf(pocket_path, basename=None):
     big_df_raw = df_dock_raw.merge(df_native_raw, on=['pocket_id', 'smiles', 'is_active'], how='outer')
 
     mixed_df, mixed_df_raw = mix_two_scores(big_df_raw, score1='dock', score2='native')
-    mixed_df.to_csv(d / (base_name + '_mixed.csv'))
-    mixed_df_raw.to_csv(d / (base_name + "_mixed_raw.csv"))
+    mixed_df.to_csv(out_dir / (base_name + '_mixed.csv'))
+    mixed_df_raw.to_csv(out_dir / (base_name + "_mixed_raw.csv"))
     return np.mean(mixed_df['score'].values)
 
 
-if __name__ == '__main__':
-    get_perturbed_pockets()
-
-    # Check that inference works
-    os.makedirs("figs/perturbed", exist_ok=True)
-    # get_perf(pocket_path="data/json_pockets_expanded")
-
+def get_efs(all_perturbed_pockets_path='figs/perturbed',
+            out_df='figs/perturbed/aggregated.csv',
+            recompute=False):
     list_of_results = []
-    for fraction in [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]:
-        for replicate in range(5):
-            print(fraction, replicate)
-            # Setup dirs
-            perturbed_pocket_path = os.path.join('figs/perturbed', f'perturbed_{fraction}_{replicate}')
-            mean_score = get_perf(pocket_path=perturbed_pocket_path, basename=perturbed_pocket_path)
-            list_of_results.append({"thresh": fraction, "replicate": replicate, "score": mean_score})
+    todo = list(sorted([x for x in os.listdir(all_perturbed_pockets_path) if not x.endswith('.csv')]))
+    for i, perturbed_pocket in enumerate(todo):
+        print(i, len(todo))
+        perturbed_pocket_path = os.path.join(all_perturbed_pockets_path, perturbed_pocket)
+
+        # Only recompute if the csv ain't here or can't be parsed correclty
+        mean_score = None
+        if not recompute:
+            out_dir = Path(perturbed_pocket_path).parent
+            base_name = Path(perturbed_pocket_path).name
+            out_csv_path = out_dir / (base_name + "_mixed.csv")
+            if os.path.exists(out_csv_path):
+                df = pd.read_csv(out_csv_path)
+                mean_score = np.mean(df['score'].values)
+        if mean_score is None:
+            mean_score = get_perf(pocket_path=perturbed_pocket_path)
+
+        _, fraction, replicate = perturbed_pocket.split('_')
+        list_of_results.append({"thresh": fraction, "replicate": replicate, "score": mean_score})
     df = pd.DataFrame(list_of_results)
-    df.to_csv('figs/perturbed/aggregated.csv')
+    df.to_csv(out_df)
+    return df
 
-    means = df.groupby('thresh')['score'].mean()
-    labels = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
 
-    import matplotlib.pyplot as plt
+def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
+                          recompute=False, use_cached_pockets=True):
+    dfs = []
+    for i in range(1, 4):
+        out_path = f'figs/perturbed_{i}'
+        out_df = f'figs/aggregatex_{i}.csv'
+        if not use_cached_pockets:
+            get_perturbed_pockets(out_path=out_path,
+                                  perturb_bfs_depth=i,
+                                  perturbation='random',
+                                  fractions=fractions,
+                                  max_replicates=max_replicates,
+                                  recompute=recompute)
+        if not recompute and os.path.exists(out_df):
+            df = pd.read_csv(out_df)
+        else:
+            df = get_efs(all_perturbed_pockets_path=out_path, out_df=out_df)
+        dfs.append(df)
+    return dfs
 
-    plt.plot(labels, means.values)
-    plt.hlines(y=0.985, xmin=min(labels), xmax=max(labels))
+
+def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
+                           recompute=False, use_cached_pockets=True):
+    out_path = f'figs/perturbed_soft'
+    out_df = f'figs/aggregatex_soft.csv'
+    if not use_cached_pockets:
+        get_perturbed_pockets(out_path=out_path,
+                              perturb_bfs_depth=2,
+                              fractions=fractions,
+                              max_replicates=max_replicates,
+                              perturbation='soft',
+                              recompute=recompute)
+    if not recompute and os.path.exists(out_df):
+        df = pd.read_csv(out_df)
+    else:
+        df = get_efs(all_perturbed_pockets_path=out_path, out_df=out_df)
+    return df
+
+
+if __name__ == '__main__':
+    random.seed(42)
+    np.random.seed(42)
+
+    # Check that inference works, we should get 0.9848
+    # os.makedirs("figs/perturbed", exist_ok=True)
+    # get_perf(pocket_path="data/json_pockets_expanded", out_dir="figs/perturbed")
+
+    # Check pocket computation works
+    # get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
+    #                       out_path='figs/perturbed_1',
+    #                       fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
+    #                       perturb_bfs_depth=1,
+    #                       max_replicates=2)
+
+    # Get a first result
+    # df = get_efs(all_perturbed_pockets_path='figs/perturbed', out_df='figs/perturbed/aggregated.csv')
+    # df = pd.read_csv('figs/perturbed/aggregated.csv')
+
+    # Now compute perturbed scores using the random BFS approach
+    dfs = get_all_perturbed_bfs(recompute=False, use_cached_pockets=True)
+    dfs = dfs[:-1]
+
+    # Now compute perturbed scores using the soft approach
+    df_soft = get_all_perturbed_soft(recompute=False, use_cached_pockets=True)
+
+    colors = sns.light_palette('royalblue', n_colors=4, reverse=True)
+    labels = (0.7, 0.85, 1.0, 1.15, 1.3)
+
+
+    def get_low_high(df):
+        means = df.groupby('thresh')['score'].mean().values
+        stds = df.groupby('thresh')['score'].std().values
+        means_low = means - stds
+        means_high = means + stds
+        return means, means_low, means_high
+
+
+    for i, df in enumerate(dfs):
+        means, means_low, means_high = get_low_high(df)
+        color = colors[i]
+        plt.plot(labels, means, linewidth=2, color=color, label=rf'Perturbed pockets with BFS:{i + 1}')
+        plt.fill_between(labels, means_low, means_high, alpha=0.2, color=color)
+
+    means, means_low, means_high = get_low_high(df_soft)
+    color = 'purple'
+    plt.plot(labels, means, linewidth=2, color=color, label=rf'Perturbed pockets with soft stategy')
+    plt.fill_between(labels, means_low, means_high, alpha=0.2, color=color)
+
+    plt.hlines(y=0.984845, xmin=min(labels), xmax=max(labels),
+               label=r'Original pockets', color=PALETTE_DICT['mixed'], linestyle='--')
+    # plt.hlines(y=0.9593, xmin=min(labels), xmax=max(labels),
+    #            label=r'rDock', color=PALETTE_DICT['rdock'], linestyle='--')
+    plt.legend(loc='lower right')
+    plt.ylabel(r"mean AuROC over pockets")
+    plt.xlabel(r"Fraction of nodes sampled")
     plt.show()
