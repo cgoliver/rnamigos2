@@ -84,6 +84,7 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
         # Now compute the perturbed pockets
         for fraction in fractions:
             n_nodes_to_sample = int(fraction * len(in_pocket_filtered))
+            n_nodes_to_sample = min(max(n_nodes_to_sample, 1), len(around_pocket))
             for replicate in range(max_replicates):
                 # Setup dirs
                 out_dir = os.path.join(out_path, f'perturbed_{fraction}_{replicate}')
@@ -233,9 +234,14 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
 
 def get_efs(all_perturbed_pockets_path='figs/perturbed',
             out_df='figs/perturbed/aggregated.csv',
-            recompute=False):
+            recompute=False,
+            fractions=None):
     list_of_results = []
     todo = list(sorted([x for x in os.listdir(all_perturbed_pockets_path) if not x.endswith('.csv')]))
+
+    if fractions is not None:
+        fractions = set(fractions)
+        todo = [x for x in todo if float(x.split('_')[1]) in fractions]
     for i, perturbed_pocket in enumerate(todo):
         print(i, len(todo))
         perturbed_pocket_path = os.path.join(all_perturbed_pockets_path, perturbed_pocket)
@@ -265,6 +271,7 @@ def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=
     for i in range(1, 4):
         out_path = f'figs/perturbed_{i}'
         out_df = f'figs/aggregatex_{i}.csv'
+        # out_df = f'figs/aggregatex_{i}_extreme.csv'
         if not use_cached_pockets:
             get_perturbed_pockets(out_path=out_path,
                                   perturb_bfs_depth=i,
@@ -272,10 +279,7 @@ def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=
                                   fractions=fractions,
                                   max_replicates=max_replicates,
                                   recompute=recompute)
-        if not recompute and os.path.exists(out_df):
-            df = pd.read_csv(out_df)
-        else:
-            df = get_efs(all_perturbed_pockets_path=out_path, out_df=out_df)
+        df = get_efs(all_perturbed_pockets_path=out_path, out_df=out_df, fractions=fractions, recompute=recompute)
         dfs.append(df)
     return dfs
 
@@ -291,10 +295,7 @@ def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates
                               max_replicates=max_replicates,
                               perturbation='soft',
                               recompute=recompute)
-    if not recompute and os.path.exists(out_df):
-        df = pd.read_csv(out_df)
-    else:
-        df = get_efs(all_perturbed_pockets_path=out_path, out_df=out_df)
+    df = get_efs(all_perturbed_pockets_path=out_path, out_df=out_df, fractions=fractions, recompute=recompute)
     return df
 
 
@@ -317,18 +318,23 @@ if __name__ == '__main__':
     # df = get_efs(all_perturbed_pockets_path='figs/perturbed', out_df='figs/perturbed/aggregated.csv')
     # df = pd.read_csv('figs/perturbed/aggregated.csv')
 
+    fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
+    # fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
+    # fractions = (0.1, 5)
     # Now compute perturbed scores using the random BFS approach
-    dfs = get_all_perturbed_bfs(recompute=False, use_cached_pockets=True)
+    dfs = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True)
     dfs = dfs[:-1]
 
     # Now compute perturbed scores using the soft approach
-    df_soft = get_all_perturbed_soft(recompute=False, use_cached_pockets=True)
+    df_soft = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True)
 
     colors = sns.light_palette('royalblue', n_colors=4, reverse=True)
-    labels = (0.7, 0.85, 1.0, 1.15, 1.3)
 
 
-    def get_low_high(df):
+    def get_low_high(df, fractions):
+        if not isinstance(fractions, (list, tuple)):
+            fractions = [fractions]
+        df = df[df['thresh'].isin([str(x) for x in fractions])]
         means = df.groupby('thresh')['score'].mean().values
         stds = df.groupby('thresh')['score'].std().values
         means_low = means - stds
@@ -336,20 +342,23 @@ if __name__ == '__main__':
         return means, means_low, means_high
 
 
+    # # Plot BFS perturbed
     for i, df in enumerate(dfs):
-        means, means_low, means_high = get_low_high(df)
+        means, means_low, means_high = get_low_high(df, fractions)
         color = colors[i]
-        plt.plot(labels, means, linewidth=2, color=color, label=rf'Perturbed pockets with BFS:{i + 1}')
-        plt.fill_between(labels, means_low, means_high, alpha=0.2, color=color)
+        plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with BFS:{i + 1}')
+        plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
-    means, means_low, means_high = get_low_high(df_soft)
+    # Plot soft perturbed
+    means, means_low, means_high = get_low_high(df_soft, fractions)
     color = 'purple'
-    plt.plot(labels, means, linewidth=2, color=color, label=rf'Perturbed pockets with soft stategy')
-    plt.fill_between(labels, means_low, means_high, alpha=0.2, color=color)
+    plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with soft stategy')
+    plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
-    plt.hlines(y=0.984845, xmin=min(labels), xmax=max(labels),
+    # End of the plot + pretty plot
+    plt.hlines(y=0.984845, xmin=min(fractions), xmax=max(fractions),
                label=r'Original pockets', color=PALETTE_DICT['mixed'], linestyle='--')
-    # plt.hlines(y=0.9593, xmin=min(labels), xmax=max(labels),
+    # plt.hlines(y=0.9593, xmin=min(fractions), xmax=max(fractions),
     #            label=r'rDock', color=PALETTE_DICT['rdock'], linestyle='--')
     plt.legend(loc='lower right')
     plt.ylabel(r"mean AuROC over pockets")
