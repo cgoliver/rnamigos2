@@ -90,6 +90,7 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
                 out_dir = os.path.join(out_path, f'perturbed_{fraction}_{replicate}')
                 os.makedirs(out_dir, exist_ok=True)
                 out_name = os.path.join(out_dir, f'{pocket}.json')
+
                 if os.path.exists(out_name) and not recompute:
                     continue
 
@@ -113,7 +114,40 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
                     shuffled_in_pocket.extend(shuffled_neigh)
                     noisy_nodelist = shuffled_in_pocket[:n_nodes_to_sample]
                 elif perturbation == 'hard':
-                    noisy_nodelist = []
+                    # Sample a pocket around a random node of the perimeter
+                    smaller_bfs = graph_utils.bfs(rglib_graph,
+                                                  in_pocket_filtered,
+                                                  depth=perturb_bfs_depth - 1,
+                                                  label='LW')
+                    perimeter = sorted(list(around_pocket.difference(smaller_bfs)))
+                    if len(perimeter) == 0:
+                        print(f"Buggy pocket: {pocket}, it spans the whole connected component and cannot be expanded")
+                        continue
+                    seed_pertubed_pocket = np.random.choice(perimeter, size=1).item()
+
+                    # Now expand this seed with increasing radius up to getting more than target node
+                    prev_perturbed_pocket = {}
+                    perturbed_pocket = {seed_pertubed_pocket}
+                    expander = 1
+                    while len(perturbed_pocket) < n_nodes_to_sample and expander <= 10:
+                        prev_perturbed_pocket = perturbed_pocket
+                        perturbed_pocket = graph_utils.bfs(rglib_graph,
+                                                           perturbed_pocket,
+                                                           depth=expander,
+                                                           label='LW')
+                        expander += 1
+                    # When querying with very large fractions, sometimes we cannot return as many nodes as queried
+                    # Note: nx.connected_component does not work for directed graphs...
+                    if expander > 10:
+                        print('Cannot craft a large enough pocket, maybe we seeded using a disconnected component')
+                        break
+
+                    # Finally, subsample the last parameter to get the final pocket.
+                    last_perimeter = sorted(list(perturbed_pocket.difference(prev_perturbed_pocket)))
+                    missing_nbr_nodes = n_nodes_to_sample - len(prev_perturbed_pocket)
+                    last_nodes = list(np.random.choice(list(last_perimeter), replace=False, size=missing_nbr_nodes))
+                    noisy_nodelist = list(prev_perturbed_pocket) + last_nodes
+
                 else:
                     raise NotImplementedError
                 expanded_graph = get_expanded_subgraph_from_list(rglib_graph=rglib_graph, nodelist=noisy_nodelist)
@@ -190,6 +224,15 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
                    'num_workers': 4,
                    'collate_fn': lambda x: x[0]
                    }
+    all_pockets = set(test_systems['PDB_ID_POCKET'].unique())
+    all_pockets_available = set([x[:-5] for x in os.listdir(pocket_path)])
+    missing_pockets = all_pockets - all_pockets_available
+    # When using hard_3, systems that fail are : '6E8S_B_SPM_107' (only for r=5) and '5V3F_B_74G_104', '7REX_C_PRF_102
+    # 5V3F also fails from the ligand perspective,
+    # Others don't and have a ~ bad perf, giving an edge to hard_3.
+    if len(missing_pockets) > 0:
+        print("missing_pockets : ", missing_pockets)
+        test_systems = test_systems[~test_systems["PDB_ID_POCKET"].isin(missing_pockets)]
     dataset = VirtualScreenDataset(pocket_path,
                                    cache_graphs=True,
                                    ligands_path="data/ligand_db",
@@ -243,7 +286,7 @@ def get_efs(all_perturbed_pockets_path='figs/perturbed',
         fractions = set(fractions)
         todo = [x for x in todo if float(x.split('_')[1]) in fractions]
     for i, perturbed_pocket in enumerate(todo):
-        print(i, len(todo))
+        print(all_perturbed_pockets_path, i, len(todo))
         perturbed_pocket_path = os.path.join(all_perturbed_pockets_path, perturbed_pocket)
 
         # Only recompute if the csv ain't here or can't be parsed correclty
@@ -264,18 +307,16 @@ def get_efs(all_perturbed_pockets_path='figs/perturbed',
     df.to_csv(out_df)
     return df
 
-
-def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
+def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10, hard=False,
                           recompute=False, use_cached_pockets=True):
     dfs = []
     for i in range(1, 4):
-        out_path = f'figs/perturbed_{i}'
-        out_df = f'figs/aggregatex_{i}.csv'
-        # out_df = f'figs/aggregatex_{i}_extreme.csv'
+        out_path = f'figs/perturbed{"_hard" if hard else ""}_{i}'
+        out_df = f'figs/aggregated{"_hard" if hard else ""}_{i}.csv'
         if not use_cached_pockets:
             get_perturbed_pockets(out_path=out_path,
                                   perturb_bfs_depth=i,
-                                  perturbation='random',
+                                  perturbation="hard" if hard else "random",
                                   fractions=fractions,
                                   max_replicates=max_replicates,
                                   recompute=recompute)
@@ -287,7 +328,7 @@ def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=
 def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
                            recompute=False, use_cached_pockets=True):
     out_path = f'figs/perturbed_soft'
-    out_df = f'figs/aggregatex_soft.csv'
+    out_df = f'figs/aggregated_soft.csv'
     if not use_cached_pockets:
         get_perturbed_pockets(out_path=out_path,
                               perturb_bfs_depth=2,
@@ -318,12 +359,13 @@ if __name__ == '__main__':
     # df = get_efs(all_perturbed_pockets_path='figs/perturbed', out_df='figs/perturbed/aggregated.csv')
     # df = pd.read_csv('figs/perturbed/aggregated.csv')
 
-    fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
-    # fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
+    # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
+    fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
     # fractions = (0.1, 5)
     # Now compute perturbed scores using the random BFS approach
-    dfs = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True)
-    dfs = dfs[:-1]
+    # dfs = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True)
+    dfs_hard = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True, hard=True)
+    # dfs = dfs[:-1]
 
     # Now compute perturbed scores using the soft approach
     df_soft = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True)
@@ -343,7 +385,7 @@ if __name__ == '__main__':
 
 
     # # Plot BFS perturbed
-    for i, df in enumerate(dfs):
+    for i, df in enumerate(dfs_hard):
         means, means_low, means_high = get_low_high(df, fractions)
         color = colors[i]
         plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with BFS:{i + 1}')
