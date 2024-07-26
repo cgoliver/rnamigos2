@@ -147,6 +147,32 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
                     missing_nbr_nodes = n_nodes_to_sample - len(prev_perturbed_pocket)
                     last_nodes = list(np.random.choice(list(last_perimeter), replace=False, size=missing_nbr_nodes))
                     noisy_nodelist = list(prev_perturbed_pocket) + last_nodes
+                elif perturbation == 'rognan like':
+                    # Sample a pocket around a random node of the perimeter
+                    seed_pertubed_pocket = np.random.choice(rglib_graph.nodes(), size=1).item()
+
+                    # Now expand this seed with increasing radius up to getting more than target node
+                    prev_perturbed_pocket = {}
+                    perturbed_pocket = {seed_pertubed_pocket}
+                    expander = 1
+                    while len(perturbed_pocket) < n_nodes_to_sample and expander <= 10:
+                        prev_perturbed_pocket = perturbed_pocket
+                        perturbed_pocket = graph_utils.bfs(rglib_graph,
+                                                           perturbed_pocket,
+                                                           depth=expander,
+                                                           label='LW')
+                        expander += 1
+                    # When querying with very large fractions, sometimes we cannot return as many nodes as queried
+                    # Note: nx.connected_component does not work for directed graphs...
+                    if expander > 10:
+                        print('Cannot craft a large enough pocket, maybe we seeded using a disconnected component')
+                        break
+
+                    # Finally, subsample the last parameter to get the final pocket.
+                    last_perimeter = sorted(list(perturbed_pocket.difference(prev_perturbed_pocket)))
+                    missing_nbr_nodes = n_nodes_to_sample - len(prev_perturbed_pocket)
+                    last_nodes = list(np.random.choice(list(last_perimeter), replace=False, size=missing_nbr_nodes))
+                    noisy_nodelist = list(prev_perturbed_pocket) + last_nodes
 
                 else:
                     raise NotImplementedError
@@ -307,6 +333,7 @@ def get_efs(all_perturbed_pockets_path='figs/perturbed',
     df.to_csv(out_df)
     return df
 
+
 def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10, hard=False,
                           recompute=False, use_cached_pockets=True):
     dfs = []
@@ -340,6 +367,21 @@ def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates
     return df
 
 
+def get_all_perturbed_rognan(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
+                             recompute=False, use_cached_pockets=True):
+    out_path = f'figs/perturbed_rognan'
+    out_df = f'figs/aggregated_rognan.csv'
+    if not use_cached_pockets:
+        get_perturbed_pockets(out_path=out_path,
+                              perturb_bfs_depth=2,
+                              fractions=fractions,
+                              max_replicates=max_replicates,
+                              perturbation='rognan like',
+                              recompute=recompute)
+    df = get_efs(all_perturbed_pockets_path=out_path, out_df=out_df, fractions=fractions, recompute=recompute)
+    return df
+
+
 if __name__ == '__main__':
     random.seed(42)
     np.random.seed(42)
@@ -359,16 +401,19 @@ if __name__ == '__main__':
     # df = get_efs(all_perturbed_pockets_path='figs/perturbed', out_df='figs/perturbed/aggregated.csv')
     # df = pd.read_csv('figs/perturbed/aggregated.csv')
 
-    # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
-    fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
+    fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
+    # fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
     # fractions = (0.1, 5)
     # Now compute perturbed scores using the random BFS approach
     # dfs = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True)
-    dfs_hard = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True, hard=True)
+    # dfs_hard = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True, hard=True)
     # dfs = dfs[:-1]
 
     # Now compute perturbed scores using the soft approach
-    df_soft = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True)
+    # df_soft = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True)
+
+    # Rognan like
+    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=False, use_cached_pockets=False)
 
     colors = sns.light_palette('royalblue', n_colors=4, reverse=True)
 
@@ -385,16 +430,22 @@ if __name__ == '__main__':
 
 
     # # Plot BFS perturbed
-    for i, df in enumerate(dfs_hard):
-        means, means_low, means_high = get_low_high(df, fractions)
-        color = colors[i]
-        plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with BFS:{i + 1}')
-        plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
+    # for i, df in enumerate(dfs_hard):
+    #     means, means_low, means_high = get_low_high(df, fractions)
+    #     color = colors[i]
+    #     plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with BFS:{i + 1}')
+    #     plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
     # Plot soft perturbed
-    means, means_low, means_high = get_low_high(df_soft, fractions)
-    color = 'purple'
-    plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with soft stategy')
+    # means, means_low, means_high = get_low_high(df_soft, fractions)
+    # color = 'purple'
+    # plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with soft stategy')
+    # plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
+
+    # Plot rognan
+    means, means_low, means_high = get_low_high(df_rognan, fractions)
+    color = 'black'
+    plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with rognan stategy')
     plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
     # End of the plot + pretty plot
