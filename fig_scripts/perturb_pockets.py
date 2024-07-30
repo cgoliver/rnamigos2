@@ -49,7 +49,8 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
                           perturb_bfs_depth=1,
                           max_replicates=5,
                           recompute=False,
-                          perturbation='random'):
+                          perturbation='random',
+                          final_bfs=4):
     test_systems = get_systems(target="is_native",
                                rnamigos1_split=-2,
                                use_rnamigos1_train=False,
@@ -176,7 +177,9 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
 
                 else:
                     raise NotImplementedError
-                expanded_graph = get_expanded_subgraph_from_list(rglib_graph=rglib_graph, nodelist=noisy_nodelist)
+                expanded_graph = get_expanded_subgraph_from_list(rglib_graph=rglib_graph,
+                                                                 nodelist=noisy_nodelist
+                                                                 )
                 graph_io.dump_json(out_name, expanded_graph)
 
 
@@ -353,16 +356,17 @@ def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=
 
 
 def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
-                           recompute=False, use_cached_pockets=True):
-    out_path = f'figs/perturbed_soft'
-    out_df = f'figs/aggregated_soft.csv'
+                           recompute=False, use_cached_pockets=True, final_bfs=4):
+    out_path = f'figs/perturbed_soft_{final_bfs}'
+    out_df = f'figs/aggregated_soft_{final_bfs}.csv'
     if not use_cached_pockets:
         get_perturbed_pockets(out_path=out_path,
                               perturb_bfs_depth=2,
                               fractions=fractions,
                               max_replicates=max_replicates,
                               perturbation='soft',
-                              recompute=recompute)
+                              recompute=recompute,
+                              final_bfs=final_bfs)
     df = get_efs(all_perturbed_pockets_path=out_path, out_df=out_df, fractions=fractions, recompute=recompute)
     return df
 
@@ -401,8 +405,8 @@ if __name__ == '__main__':
     # df = get_efs(all_perturbed_pockets_path='figs/perturbed', out_df='figs/perturbed/aggregated.csv')
     # df = pd.read_csv('figs/perturbed/aggregated.csv')
 
-    fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
-    # fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
+    # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
+    fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
     # fractions = (0.1, 5)
     # Now compute perturbed scores using the random BFS approach
     # dfs = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True)
@@ -413,7 +417,20 @@ if __name__ == '__main__':
     # df_soft = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True)
 
     # Rognan like
-    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=False, use_cached_pockets=False)
+    # df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=False, use_cached_pockets=True)
+
+    # Unexpand
+    df_soft_0 = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True, final_bfs=0)
+    df_soft_1 = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True, final_bfs=1)
+    df_soft_2 = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True, final_bfs=2)
+    df_soft_3 = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True, final_bfs=3)
+    dfs = [
+        df_soft_0,
+        df_soft_1,
+        df_soft_2,
+        # df_soft_3,
+        # df_soft
+    ]
 
     colors = sns.light_palette('royalblue', n_colors=4, reverse=True)
 
@@ -429,12 +446,12 @@ if __name__ == '__main__':
         return means, means_low, means_high
 
 
-    # # Plot BFS perturbed
-    # for i, df in enumerate(dfs_hard):
-    #     means, means_low, means_high = get_low_high(df, fractions)
-    #     color = colors[i]
-    #     plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with BFS:{i + 1}')
-    #     plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
+    # Plot BFS perturbed
+    for i, df in enumerate(dfs):
+        means, means_low, means_high = get_low_high(df, fractions)
+        color = colors[i]
+        plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with BFS:{i + 1}')
+        plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
     # Plot soft perturbed
     # means, means_low, means_high = get_low_high(df_soft, fractions)
@@ -443,10 +460,10 @@ if __name__ == '__main__':
     # plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
     # Plot rognan
-    means, means_low, means_high = get_low_high(df_rognan, fractions)
-    color = 'black'
-    plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with rognan stategy')
-    plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
+    # means, means_low, means_high = get_low_high(df_rognan, fractions)
+    # color = 'black'
+    # plt.plot(fractions, means, linewidth=2, color=color, label=rf'Perturbed pockets with rognan stategy')
+    # plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
     # End of the plot + pretty plot
     plt.hlines(y=0.984845, xmin=min(fractions), xmax=max(fractions),
