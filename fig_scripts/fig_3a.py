@@ -35,9 +35,11 @@ def merge_raw_dfs():
             df = df.loc[df['decoys'] == 'chembl']
         if method == 'RLDOCK':
             df['raw_score'] = (df['Total_Energy'] - (df['Self_energy_of_ligand'] + df['Self_energy_of_receptor']))
-
+            df.loc[df['raw_score'] > 0, 'raw_score'] = 0
         else:
             df['raw_score'] = df[score_to_use[method]]
+
+
         if method in ['RNAmigos2']:
             df['normed_score'] = df.groupby(['pocket_id'])['raw_score'].rank(pct=True)
         else:

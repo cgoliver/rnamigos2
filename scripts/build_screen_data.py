@@ -7,6 +7,11 @@ import pandas as pd
 from loguru import logger
 from rdkit import Chem
 
+ROBIN_POCKETS = {'TPP': '2GDI_Y_TPP_100',
+                 'ZTP': '5BTP_A_AMZ_106',
+                 'SAM_ll': '2QWY_B_SAM_300',
+                 'PreQ1': '3FU2_A_PRF_101'
+                 }
 
 
 def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv"):
@@ -87,11 +92,44 @@ def build_actives_decoys(
 
 pass
 
+def build_actives_decoys_robin(save_path='data/ligand_db/'):
+    """ Build active and decoy list for the ROBIN pockets
+    """
+
+    url = "https://raw.githubusercontent.com/cgoliver/ROBIN/main/SMM_full_results/SMM_Target_Hits.csv"
+    import requests
+    import io
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Check if the request was successful
+        df = pd.read_csv(io.StringIO(response.text))
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}")
+    except Exception as err:
+        print(f"An error occurred: {err}")
+
+    for robin_id, pdb_id_pocket in ROBIN_POCKETS.items():
+        actives = df.loc[df[f'{robin_id}_hit'] == 1]['Smile']
+        decoys = df.loc[df[f'{robin_id}_hit'] == 0]['Smile']
+        
+        dump_path = Path(save_path, pdb_id_pocket, 'robin')
+        dump_path.mkdir(parents=True, exist_ok=True)
+
+        with open(dump_path / 'actives.txt', 'w') as ac:
+            ac.write('\n'.join(actives))
+
+        with open(dump_path / 'decoys.txt', 'w') as ac:
+            ac.write('\n'.join(decoys))
+
+        pass
+    pass
+
 
 def cline():
     parser = argparse.ArgumentParser()
     parser.add_argument('--decoyfinder', action='store_true', default=False)
     parser.add_argument('--pdb', action='store_true', default=False)
+    parser.add_argument('--robin', action='store_true', default=False)
     return parser.parse_args()
 
 

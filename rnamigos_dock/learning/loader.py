@@ -79,7 +79,7 @@ def get_systems(target='dock', rnamigos1_split=-1, return_test=False, use_rnamig
     systems.
     :param group_pockets: When using RMScores, we end up with redundant clusters. Should we train on all elements of
      the clusters ?
-    :return:
+    :return: a Pandas DataFrame with the columns 'PDB_ID_POCKET', 'LIGAND_SMILES', 'IS_NATIVE', 'SPLIT'
     """
     # Can't split twice
     assert rnamigos1_split in {-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}

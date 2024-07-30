@@ -26,6 +26,19 @@ from fig_scripts.plot_utils import PALETTE_DICT
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
 
+ROBIN_SYSTEMS = """2GDI	TPP TPP 
+6QN3	GLN  Glutamine_RS
+5BTP	AMZ  ZTP
+2QWY	SAM  SAM_ll
+3FU2	PRF  PreQ1
+"""
+
+ROBIN_POCKETS = {'TPP': '2GDI_Y_TPP_100',
+                 'ZTP': '5BTP_A_AMZ_106',
+                 'SAM_ll': '2QWY_B_SAM_300',
+                 'PreQ1': '3FU2_A_PRF_101'
+                 }
+
 
 def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
     expanded_nodes = graph_utils.bfs(rglib_graph, nodelist, depth=bfs_depth, label='LW')
@@ -49,14 +62,19 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
                           perturb_bfs_depth=1,
                           max_replicates=5,
                           recompute=False,
-                          perturbation='random'):
-    test_systems = get_systems(target="is_native",
-                               rnamigos1_split=-2,
-                               use_rnamigos1_train=False,
-                               use_rnamigos1_ligands=False,
-                               return_test=True)
-    test_pockets_redundant = test_systems[['PDB_ID_POCKET']].values.squeeze()
-    test_pockets = set(list(test_pockets_redundant))
+                          perturbation='random',
+                          robin=True):
+
+    if robin:
+        test_pockets = ROBIN_POCKETS.values()
+    else:
+        test_systems = get_systems(target="is_native",
+                                   rnamigos1_split=-2,
+                                   use_rnamigos1_train=False,
+                                   use_rnamigos1_ligands=False,
+                                   return_test=True)
+        test_pockets_redundant = test_systems[['PDB_ID_POCKET']].values.squeeze()
+        test_pockets = set(list(test_pockets_redundant))
     # print(test_pockets, len(test_pockets))
 
     existing_pockets = set([pocket.rstrip('.json') for pocket in os.listdir(unperturbed_path)])
@@ -260,10 +278,10 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
         print("missing_pockets : ", missing_pockets)
         test_systems = test_systems[~test_systems["PDB_ID_POCKET"].isin(missing_pockets)]
     dataset = VirtualScreenDataset(pocket_path,
-                                   cache_graphs=True,
+                                   cache_graphs=False,
                                    ligands_path="data/ligand_db",
                                    systems=test_systems,
-                                   decoy_mode='chembl',
+                                   decoy_mode='robin',
                                    use_graphligs=True,
                                    group_ligands=True,
                                    reps_only=True)
@@ -413,7 +431,7 @@ if __name__ == '__main__':
     # df_soft = get_all_perturbed_soft(fractions=fractions, recompute=False, use_cached_pockets=True)
 
     # Rognan like
-    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=False, use_cached_pockets=False)
+    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=True, use_cached_pockets=False)
 
     colors = sns.light_palette('royalblue', n_colors=4, reverse=True)
 
