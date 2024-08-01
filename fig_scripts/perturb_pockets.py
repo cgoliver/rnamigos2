@@ -60,13 +60,14 @@ def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
 
 
 def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
-                          out_path='figs/perturbed',
+                          out_path='figs/perturbed_robin',
                           fractions=(0.7, 0.8, 0.9, 1.0, 1.1, 1.2),
                           perturb_bfs_depth=1,
                           max_replicates=5,
                           recompute=True,
                           perturbation='random',
-                          robin=True):
+                          robin=True,
+                          final_bfs=4):
 
     if robin:
         test_pockets = ROBIN_POCKETS.values()
@@ -296,6 +297,7 @@ def mix_two_scores(df, score1, score2):
 # The goal here is just to have easy access to the loader and modify its pockets_path
 def get_perf(pocket_path, base_name=None, out_dir=None):
     # Setup loader
+    print(f"get_perf {pocket_path}")
     all_pockets_available = set([x[:-5] for x in os.listdir(pocket_path)])
     missing_pockets = ALL_POCKETS - all_pockets_available
 
@@ -313,8 +315,11 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
                                    systems=test_systems,
                                    decoy_mode='robin',
                                    use_graphligs=True,
-                                   group_ligands=True,
-                                   reps_only=True)
+                                   group_ligands=False,
+                                   reps_only=False,
+                                   ligand_cache='data/ligands/robin_lig_graphs.p',
+                                   use_ligand_cache=True,
+                                   )
     dataloader = GraphDataLoader(dataset=dataset, **LOADER_ARGS)
 
     # Setup path and models
@@ -434,7 +439,7 @@ def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates
 
 
 def get_all_perturbed_rognan(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
-                             recompute=True, use_cached_pockets=True, final_bfs=4):
+                             recompute=True, use_cached_pockets=False, final_bfs=4):
     out_path = f'figs/perturbed_rognan'
     out_df = f'figs/aggregated_rognan.csv'
     if not use_cached_pockets:
@@ -537,6 +542,12 @@ if __name__ == '__main__':
                    'collate_fn': lambda x: x[0]
                    }
     ALL_POCKETS = set(TEST_SYSTEMS['PDB_ID_POCKET'].unique())
+    # for robin
+    TEST_SYSTEMS = pd.DataFrame({'PDB_ID_POCKET': list(ROBIN_POCKETS.values())})
+    ALL_POCKETS = set(ROBIN_POCKETS.values())
+
+
+
     ALL_POCKETS_GRAPHS = {
         pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
         for pocket_id in ALL_POCKETS}
@@ -562,15 +573,15 @@ if __name__ == '__main__':
     colors = sns.light_palette('royalblue', n_colors=4, reverse=True)
 
     # Check pocket computation works
-    # get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
-    #                       out_path='figs/perturbed_test',
-    #                       fractions=(0.9, 1.0),
-    #                       perturb_bfs_depth=1,
-    #                       max_replicates=2)
+    get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
+                          out_path='figs/perturbed_robin',
+                          fractions=(0.9, 1.0),
+                          perturb_bfs_depth=1,
+                          max_replicates=2)
     # # Get a first result
-    # df = get_efs(all_perturbed_pockets_path='figs/perturbed_test',
-    #              out_df='figs/perturbed_test/aggregated_test.csv',
-    #              compute_overlap=True)
+    df = get_efs(all_perturbed_pockets_path='figs/perturbed_robin',
+                 out_df='figs/perturbed_robin/aggregated_test.csv',
+                 compute_overlap=True)
 
     # Now compute perturbed scores using the random BFS approach
     # dfs_random = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True)
@@ -588,7 +599,7 @@ if __name__ == '__main__':
     # Vary unexpanding. You can't do BFS0, since this makes small graphs with no edges,
     # resulting in empty graph when subgraphing
     use_cached_pockets = True
-    # df_soft_1 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=1)
+    df_soft_1 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=1)
     # df_soft_2 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=2)
     # df_soft_3 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=3)
     # df_soft_4 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=4)

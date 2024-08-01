@@ -11,22 +11,21 @@ from rdkit.Chem import MACCSkeys, AllChem
 
 class MolFPEncoder:
     """
-    Stateful encoder for using cashed computations
+    Stateful encoder for using cached computations
     """
 
     def __init__(self, fp_type='MACCS'):
         assert fp_type in {'MACCS', 'morgan'}
         self.fp_type = fp_type
-        script_dir = os.path.dirname(__file__)
-        cashed_path = os.path.join(script_dir, f'../../data/ligands/{"maccs" if fp_type == "MACCS" else "morgan"}.p')
+        cached_path = os.path.join(f'../../data/ligands/{"maccs" if fp_type == "MACCS" else "morgan"}.p')
         try:
-            self.cashed_fps = pickle.load(open(cashed_path, 'rb'))
+            self.cached_fps = pickle.load(open(cached_path, 'rb'))
         except FileNotFoundError:
-            self.cashed_fps = {}
+            self.cached_fps = {}
 
     def smiles_to_fp_one(self, smiles):
-        if smiles in self.cashed_fps:
-            return self.cashed_fps[smiles]
+        if smiles in self.cached_fps:
+            return self.cached_fps[smiles]
         try:
             mol = Chem.MolFromSmiles(smiles)
             if self.fp_type == 'MACCS':
@@ -88,23 +87,26 @@ def oh_tensor(category, n):
 
 class MolGraphEncoder:
     """
-    Stateful encoder for using cashed computations
+    Stateful encoder for using cached computations
     """
 
-    def __init__(self, cache=True):
-        script_dir = os.path.dirname(__file__)
-        with open(os.path.join(script_dir, f'../../data/map_files/edges_and_nodes_map.pickle'), "rb") as f:
+    def __init__(self, cache=True, cache_path='data/ligands/lig_graphs.p'):
+        with open(os.path.join(f'data/map_files/edges_and_nodes_map.pickle'), "rb") as f:
             self.edge_map = pickle.load(f)
             self.at_map = pickle.load(f)
             self.chi_map = pickle.load(f)
             self.charges_map = pickle.load(f)
 
         self.cache = cache
+        self.cache_path = os.path.join(cache_path)
         if cache:
-            cashed_path = os.path.join(script_dir, f'../../data/ligands/lig_graphs.p')
-            self.cashed_graphs = pickle.load(open(cashed_path, 'rb'))
+            try:
+                self.cached_graphs = pickle.load(open(self.cache_path, 'rb'))
+            except FileNotFoundError:
+                print(f"Cache {self.cache_path} not found. Creating new one")
+                self.cached_graphs = {}
         else:
-            self.cashed_graphs = list()
+            self.cached_graphs = {}
 
     @staticmethod
     def set_as_one_hot_feat(graph_nx, edge_map, node_label, default_value=None):
@@ -167,10 +169,12 @@ class MolGraphEncoder:
             return dgl.graph(([], []))
 
     def smiles_to_graph_one(self, smiles):
-        if smiles in self.cashed_graphs:
-            return self.cashed_graphs[smiles]
+        if smiles in self.cached_graphs:
+            return self.cached_graphs[smiles]
         graph_nx = smiles_to_nx(smiles)
-        return self.nx_mol_to_dgl(graph_nx)
+        graph_dgl = self.nx_mol_to_dgl(graph_nx)
+        self.cached_graphs[smiles] = graph_dgl
+        return graph_dgl
 
     def smiles_to_graph_list(self, smiles_list):
         graphs = []

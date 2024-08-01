@@ -155,7 +155,9 @@ class DockingDataset(Dataset):
                  debug=False,
                  cache_graphs=True,
                  undirected=False,
-                 use_rings=False
+                 use_rings=False,
+                 ligand_cache='../../data/ligands/lig_graphs.p',
+                 use_ligand_cache=True,
                  ):
         """
             Setup for data loader.
@@ -185,7 +187,7 @@ class DockingDataset(Dataset):
         self.fp_type = fp_type
         self.use_graphligs = use_graphligs
         self.ligand_encoder = MolFPEncoder(fp_type=fp_type)
-        self.ligand_graph_encoder = MolGraphEncoder() if use_graphligs else None
+        self.ligand_graph_encoder = MolGraphEncoder(cache_path=ligand_cache, cache=use_ligand_cache) if use_graphligs else None
 
         # Setup pockets
         self.undirected = undirected
