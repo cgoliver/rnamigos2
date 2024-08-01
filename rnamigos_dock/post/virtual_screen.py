@@ -38,7 +38,7 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
 
 
 def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
-    n_actives = np.sum(is_active.numpy())
+    n_actives = np.sum(is_active)
     n_screened = int(frac * len(scores))
     is_active_sorted = [a for _, a in sorted(zip(scores, is_active), reverse=lower_is_better)]
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
