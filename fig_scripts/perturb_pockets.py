@@ -42,6 +42,7 @@ ROBIN_POCKETS = {'TPP': '2GDI_Y_TPP_100',
                  'PreQ1': '3FU2_A_PRF_101'
                  }
 
+
 def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     """
     ddf = pd.DataFrame({'score': scores, 'is_active': is_active})
@@ -55,7 +56,6 @@ def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
     ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
     return ef, scores_sorted[n_screened]
-
 
 
 def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
@@ -75,29 +75,15 @@ def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
 
 
 def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
-                          out_path='figs/perturbed_robin',
+                          out_path='figs/perturbed',
                           fractions=(0.7, 0.8, 0.9, 1.0, 1.1, 1.2),
                           perturb_bfs_depth=1,
                           max_replicates=5,
                           recompute=True,
                           perturbation='random',
-                          robin=True,
                           final_bfs=4):
-
-    if robin:
-        test_pockets = ROBIN_POCKETS.values()
-    else:
-        test_systems = get_systems(target="is_native",
-                                   rnamigos1_split=-2,
-                                   use_rnamigos1_train=False,
-                                   use_rnamigos1_ligands=False,
-                                   return_test=True)
-        test_pockets_redundant = test_systems[['PDB_ID_POCKET']].values.squeeze()
-        test_pockets = set(list(test_pockets_redundant))
-
     existing_pockets = set([pocket.rstrip('.json') for pocket in os.listdir(unperturbed_path)])
-    pockets_to_compute = sorted(list(existing_pockets.intersection(test_pockets)))
-
+    pockets_to_compute = sorted(list(existing_pockets.intersection(ALL_POCKETS)))
     failed_set = set()
     for pocket in tqdm(pockets_to_compute):
         # Get rglib grpah
@@ -252,6 +238,9 @@ def compute_overlaps(original_pockets, modified_pockets_path, dump_path=None):
 
 
 def compute_efs_model(model, dataloader, lower_is_better):
+    """
+    Given a model and a dataloader, make the inference on all pocket-ligand pairs and dump raw and aggregated csvs
+    """
     rows, raw_rows = [], []
     efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
                                                                        dataloader,
@@ -269,12 +258,11 @@ def compute_efs_model(model, dataloader, lower_is_better):
     ef_rows = []
     for frac in (0.01, 0.02, 0.05):
         for pocket, group in raw_df.groupby('pocket_id'):
-            ef_frac,_ = enrichment_factor(group['raw_score'], group['is_active'], frac=frac, lower_is_better=False)
+            ef_frac, _ = enrichment_factor(group['raw_score'], group['is_active'], frac=frac, lower_is_better=False)
             ef_rows.append({'score': ef_frac,
                             'pocket_id': pocket,
                             'frac': frac
                             })
-
 
     for ef, score, pocket_id in zip(efs, scores, pocket_names):
         grouped = {
@@ -284,14 +272,14 @@ def compute_efs_model(model, dataloader, lower_is_better):
     print('Mean EF :', np.mean(efs))
     df = pd.DataFrame(rows)
     df_ef = pd.DataFrame(ef_rows)
-    print(df_ef)
+    # print(df_ef)
     df_raw = pd.DataFrame(raw_rows)
     return df, df_raw, df_ef
 
 
 def mix_two_scores(df, score1, score2):
     """
-    adapted from mixing to return a raw df
+    Adapted from mixing to return a raw df
     """
 
     def normalize(scores):
@@ -321,14 +309,13 @@ def mix_two_scores(df, score1, score2):
     ef_rows = []
     for frac in (0.01, 0.02, 0.05):
         for pocket, group in mixed_df_raw.groupby('pocket_id'):
-            ef_frac,_ = enrichment_factor(group['mixed'], group['is_active'], frac=frac, lower_is_better=False)
+            ef_frac, _ = enrichment_factor(group['mixed'], group['is_active'], frac=frac, lower_is_better=False)
             ef_rows.append({'score': ef_frac,
                             'pocket_id': pocket,
                             'frac': frac
                             })
 
     mixed_df_ef = pd.DataFrame(ef_rows)
-
     return mixed_df, mixed_df_raw, mixed_df_ef
 
 
@@ -337,6 +324,10 @@ def mix_two_scores(df, score1, score2):
 #   target is set to "is_native" which has no impact since it's just used to get pdb lists
 # The goal here is just to have easy access to the loader and modify its pockets_path
 def get_perf(pocket_path, base_name=None, out_dir=None):
+    """
+    Starting from a pocket path containing pockets, and using global variables to set things like pockets to use or
+    paths, dump the native/dock/mixed results of a virtual screening
+    """
     # Setup loader
     print(f"get_perf {pocket_path}")
     all_pockets_available = set([x[:-5] for x in os.listdir(pocket_path)])
@@ -350,15 +341,17 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
         test_systems = TEST_SYSTEMS[~TEST_SYSTEMS["PDB_ID_POCKET"].isin(missing_pockets)]
     else:
         test_systems = TEST_SYSTEMS
+    decoy_mode = 'robin' if ROBIN else 'chembl'
+    ligand_cache = f'data/ligands/{"robin_" if ROBIN else ""}lig_graphs.p'
     dataset = VirtualScreenDataset(pocket_path,
                                    cache_graphs=False,
                                    ligands_path="data/ligand_db",
                                    systems=test_systems,
-                                   decoy_mode='robin',
+                                   decoy_mode=decoy_mode,
                                    use_graphligs=True,
                                    group_ligands=False,
                                    reps_only=False,
-                                   ligand_cache='data/ligands/robin_lig_graphs.p',
+                                   ligand_cache=ligand_cache,
                                    use_ligand_cache=True,
                                    )
     dataloader = GraphDataLoader(dataset=dataset, **LOADER_ARGS)
@@ -380,7 +373,9 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     df_dock_ef.to_csv(out_dir / (base_name + "_dock_ef.csv"))
 
     # Get native performance
-    df_native, df_native_raw , df_native_ef = compute_efs_model(native_model, dataloader=dataloader, lower_is_better=False)
+    df_native, df_native_raw, df_native_ef = compute_efs_model(native_model,
+                                                               dataloader=dataloader,
+                                                               lower_is_better=False)
     df_native.to_csv(out_dir / (base_name + '_native.csv'))
     df_native_raw.to_csv(out_dir / (base_name + "_native_raw.csv"))
     df_native_ef.to_csv(out_dir / (base_name + "_native_ef.csv"))
@@ -513,7 +508,7 @@ def get_all_perturbed_rognan(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicat
 
 
 def add_delta(df):
-    df = df.merge(df_unperturbed, how="left", on='pocket_id')
+    df = df.merge(DF_UNPERTURBED, how="left", on='pocket_id')
     df['delta'] = df['score'] - df['unpert_score']
     return df
 
@@ -586,10 +581,18 @@ def end_plot():
     plt.show()
 
 
-if __name__ == '__main__':
-    random.seed(42)
-    np.random.seed(42)
+def filter_on_good_pockets(df):
+    return df[df['pocket_id'].isin(GOOD_POCKETS)]
 
+
+def main_chembl():
+    global TEST_SYSTEMS
+    global LOADER_ARGS
+    global ALL_POCKETS
+    global ALL_POCKETS_GRAPHS
+    global DF_UNPERTURBED
+    global ROBIN
+    ROBIN = False
     TEST_SYSTEMS = get_systems(target="is_native",
                                rnamigos1_split=-2,
                                use_rnamigos1_train=False,
@@ -601,30 +604,17 @@ if __name__ == '__main__':
                    'collate_fn': lambda x: x[0]
                    }
     ALL_POCKETS = set(TEST_SYSTEMS['PDB_ID_POCKET'].unique())
-    # for robin
-    TEST_SYSTEMS = pd.DataFrame({'PDB_ID_POCKET': list(ROBIN_POCKETS.values())})
-    ALL_POCKETS = set(ROBIN_POCKETS.values())
-
-
-
     ALL_POCKETS_GRAPHS = {
         pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
         for pocket_id in ALL_POCKETS}
-
     # # Check that inference works, we should get 0.9848
     # os.makedirs("figs/unperturbed", exist_ok=True)
     # get_perf(pocket_path="data/json_pockets_expanded",
     #          out_dir="figs/unperturbed")
-    # df_unperturbed = pd.read_csv("figs/unperturbed/json_pockets_expanded_mixed.csv", index_col=False)
-    # df_unperturbed.rename(columns={'score': 'unpert_score'}, inplace=True)
-    # good_pockets = df_unperturbed[df_unperturbed['unpert_score'] >= 0.98]['pocket_id'].unique()
-
-
-    """
-    def filter_on_good_pockets(df):
-        return df[df['pocket_id'].isin(good_pockets)]
-    """
-
+    DF_UNPERTURBED = pd.read_csv("figs/unperturbed/json_pockets_expanded_mixed.csv", index_col=False)
+    DF_UNPERTURBED.rename(columns={'score': 'unpert_score'}, inplace=True)
+    global GOOD_POCKETS
+    GOOD_POCKETS = DF_UNPERTURBED[DF_UNPERTURBED['unpert_score'] >= 0.98]['pocket_id'].unique()
 
     # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
     fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
@@ -632,7 +622,7 @@ if __name__ == '__main__':
     colors = sns.light_palette('royalblue', n_colors=4, reverse=True)
 
     # Check pocket computation works
-    #get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
+    # get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
     #                      out_path='figs/perturbed_robin',
     #                      fractions=(0.9, 1.0),
     #                      perturb_bfs_depth=1,
@@ -650,9 +640,8 @@ if __name__ == '__main__':
     # dfs_hard = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True, hard=True)
     # plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, label="Hard strategy")
 
-
     use_cached_pockets = False
-    recompute = True 
+    recompute = True
     metric = 'ef'
     # Rognan like
     # df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute, use_cached_pockets=use_cached_pockets)
@@ -661,7 +650,8 @@ if __name__ == '__main__':
     # Now compute perturbed scores using the soft approach.
     # Vary unexpanding. You can't do BFS0, since this makes small graphs with no edges,
     # resulting in empty graph when subgraphing
-    df_soft_1 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=1, recompute=recompute, metric=metric)
+    df_soft_1 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=1,
+                                       recompute=recompute, metric=metric)
     # df_soft_2 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=2, recompute=recompute, metric=metric)
     # df_soft_3 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=3, recompute=recompute, metric=metric)
     # df_soft_4 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=4, recompute=recompute, metric=metric)
@@ -671,10 +661,96 @@ if __name__ == '__main__':
     #     df_soft_3,
     #     df_soft_4
     # ]
-    plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple', label='bfs 1')    # Plot soft perturbed
+    plot_one(df_soft_1, plot_delta=True, filter_good=True, fractions=fractions,
+             color='purple', label='bfs 1')  # Plot soft perturbed
     # plot_list(dfs=dfs_soft, colors=colors, label="Soft strategy")
     end_plot()
 
+    # Compute plots with overlap
+    # With soft strategy
+    # df_soft_4_overlap = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets,
+    #                                            compute_overlap=True)
+    # plot_overlap(df_soft_4_overlap)
+
+    # With hard strategy
+    # dfs_hard_overlap = get_all_perturbed_bfs(fractions=fractions,
+    #                                          hard=True,
+    #                                          use_cached_pockets=use_cached_pockets,
+    #                                          compute_overlap=True)
+    # for i, df_hard in enumerate(dfs_hard_overlap):
+    #     plot_overlap(df_hard, color=colors[i])
+    # plt.show()
+
+
+def main_robin():
+    global TEST_SYSTEMS
+    global LOADER_ARGS
+    global ALL_POCKETS
+    global ALL_POCKETS_GRAPHS
+    global DF_UNPERTURBED
+    global ROBIN
+    TEST_SYSTEMS = pd.DataFrame({'PDB_ID_POCKET': list(ROBIN_POCKETS.values())})
+    ALL_POCKETS = set(ROBIN_POCKETS.values())
+    ROBIN = True
+
+
+if __name__ == '__main__':
+    random.seed(42)
+    np.random.seed(42)
+    TEST_SYSTEMS, LOADER_ARGS, ALL_POCKETS, ALL_POCKETS_GRAPHS, DF_UNPERTURBED, ROBIN = [None, ] * 6
+
+    main_chembl()
+    # main_robin()
+
+    # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
+    fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
+    # fractions = (0.1, 5)
+    colors = sns.light_palette('royalblue', n_colors=4, reverse=True)
+
+    # Check pocket computation works
+    # get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
+    #                      out_path='figs/perturbed_robin',
+    #                      fractions=(0.9, 1.0),
+    #                      perturb_bfs_depth=1,
+    #                      max_replicates=2)
+    # # Get a first result
+    # df = get_efs(all_perturbed_pockets_path='figs/perturbed_robin',
+    #            out_df='figs/perturbed_robin/aggregated_test.csv',
+    #            compute_overlap=True)
+
+    # Now compute perturbed scores using the random BFS approach
+    # dfs_random = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True)
+    # plot_list(dfs=dfs_random, fractions=fractions, colors=colors, label="Random strategy")
+
+    # Hard: sample on the border
+    # dfs_hard = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True, hard=True)
+    # plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, label="Hard strategy")
+
+    use_cached_pockets = False
+    recompute = True
+    metric = 'ef'
+    # Rognan like
+    # df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute, use_cached_pockets=use_cached_pockets)
+    # plot_one(df_rognan, fractions=fractions, color='black', label='Rognan strategy')    # Plot rognan
+
+    # Now compute perturbed scores using the soft approach.
+    # Vary unexpanding. You can't do BFS0, since this makes small graphs with no edges,
+    # resulting in empty graph when subgraphing
+    df_soft_1 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=1,
+                                       recompute=recompute, metric=metric)
+    # df_soft_2 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=2, recompute=recompute, metric=metric)
+    # df_soft_3 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=3, recompute=recompute, metric=metric)
+    # df_soft_4 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=4, recompute=recompute, metric=metric)
+    # dfs_soft = [
+    #     df_soft_1,
+    #     df_soft_2,
+    #     df_soft_3,
+    #     df_soft_4
+    # ]
+    plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple',
+             label='bfs 1')  # Plot soft perturbed
+    # plot_list(dfs=dfs_soft, colors=colors, label="Soft strategy")
+    end_plot()
 
     # Compute plots with overlap
     # With soft strategy
