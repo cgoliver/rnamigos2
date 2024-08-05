@@ -6,6 +6,7 @@ import numpy as np
 from omegaconf import DictConfig, OmegaConf
 import time
 from torch.utils.data import DataLoader
+import pandas as pd
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -15,7 +16,7 @@ from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 
 
-def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.5, 0., 0.5), models_path=None, dump_all=False):
+def inference(dgl_graph, smiles_list, out_path='rnamigos_out.csv', mixing_coeffs=(0.5, 0., 0.5), models_path=None, dump_all=False):
     """
     Run inference from python objects
     """
@@ -70,17 +71,25 @@ def inference(dgl_graph, smiles_list, out_path, mixing_coeffs=(0.5, 0., 0.5), mo
                     + mixing_coeffs[1] * results['native_fp']
                     + mixing_coeffs[2] * results['is_native'])
 
-    with open(out_path, 'w') as out:
-        if not dump_all:
-            for smiles, score in zip(smiles_list, mixed_scores):
-                out.write(f"{smiles} {score}\n")
-        else:
-            for smiles, dock_score, native_score, fp_score, mixed_score in zip(smiles_list,
-                                                                               results['dock'],
-                                                                               results['is_native'],
-                                                                               results['native_fp'],
-                                                                               mixed_scores):
-                out.write(f"{smiles} {dock_score} {native_score} {fp_score} {mixed_score}\n")
+    rows = []
+    if not dump_all:
+        for smiles, score in zip(smiles_list, mixed_scores):
+            rows.append({'smiles': smiles, 'score': score})
+    else:
+        for smiles, dock_score, native_score, fp_score, mixed_score in zip(smiles_list,
+                                                                           results['dock'],
+                                                                           results['is_native'],
+                                                                           results['native_fp'],
+                                                                           mixed_scores):
+            rows.append({'smiles': smiles,
+                         'dock_score': dock_score,
+                         'native_score': native_score,
+                         'fp_score': fp_score,
+                         'mixed_score': mixed_score}
+                         )
+    result_df = pd.DataFrame(rows)
+    result_df.to_csv(out_path)
+    return result_df
 
 
 def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False):

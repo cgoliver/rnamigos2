@@ -7,11 +7,20 @@ import pandas as pd
 from loguru import logger
 from rdkit import Chem
 
-ROBIN_POCKETS = {'TPP': '2GDI_Y_TPP_100',
-                 'ZTP': '5BTP_A_AMZ_106',
-                 'SAM_ll': '2QWY_B_SAM_300',
-                 'PreQ1': '3FU2_A_PRF_101'
-                 }
+pocket_names = [
+    "2GDI_Y_TPP_100",
+    "5BTP_A_AMZ_106",
+    "2QWY_A_SAM_100",
+    "3FU2_C_PRF_101",
+]
+ligand_names = [
+    "TPP",
+    "ZTP",
+    "SAM_ll",
+    "PreQ1",
+]
+
+ROBIN_POCKETS = dict(zip(ligand_names, pocket_names))
 
 
 def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv"):

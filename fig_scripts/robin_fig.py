@@ -54,8 +54,10 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
 pocket_names = [
     "2GDI_Y_TPP_100",
     "5BTP_A_AMZ_106",
-    "2QWY_A_SAM_100",
-    "3FU2_C_PRF_101",
+    #"2QWY_A_SAM_100",
+    "2QWY_B_SAM_300",
+    #"3FU2_C_PRF_101",
+    "3FU2_A_PRF_101",
 ]
 ligand_names = [
     "TPP",
@@ -135,7 +137,7 @@ def get_dfs_docking(ligand_name):
 
 def get_dfs_migos(pocket_name, swap=False, swap_on='merged'):
     names = ['smiles', 'dock', 'is_native', 'native_fp', 'merged']
-    out_dir = 'outputs/robin'
+    out_dir = 'outputs/robin_docknative'
     actives_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_actives.txt"), names=names, sep=' ')
     actives_df['split'] = 'actives'
     inactives_df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_inactives.txt"), names=names, sep=' ')
@@ -304,6 +306,6 @@ if __name__ == '__main__':
 
     dfs = []
     for score in ['dock_nat', 'is_native', 'dock', 'rDock', 'RNAmigos2++']:
-        dfs.append(make_fig(score, prefix=score))
+        dfs.append(make_fig(score, prefix=f'repro_{score}'))
     make_table(pd.concat(dfs))
 
