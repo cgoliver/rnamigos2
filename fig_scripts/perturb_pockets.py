@@ -873,7 +873,7 @@ def main_robin():
                           for pocket_id in ALL_POCKETS}
     # # Check that inference works, we should get 0.9848
     os.makedirs("figs/unperturbed_robin", exist_ok=True)
-    get_perf(pocket_path="data/json_pockets_expanded",
+    get_perf_robin(pocket_path="data/json_pockets_expanded",
              out_dir="figs/unperturbed_robin")
     DF_UNPERTURBED = pd.read_csv("figs/unperturbed_robin/json_pockets_expanded_mixed.csv", index_col=False)
 
