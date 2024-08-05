@@ -42,11 +42,11 @@ def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv")
 
 
 def build_actives_decoys(
-                         pdb=False,
-                         decoyfinder=False,
-                         pdb_data_path='data/rnamigos2_dataset_consolidated.csv', 
-                         save_path='data/ligand_db_preprint',
-                         ):
+        pdb=False,
+        decoyfinder=False,
+        pdb_data_path='data/rnamigos2_dataset_consolidated.csv',
+        save_path='data/ligand_db_preprint',
+):
     """ Build active and decoy lists for every pocket in master dataset `rnamigos2_dataset_consolidated.csv`
 
     Each pocket ID gets a folder:
@@ -98,11 +98,9 @@ def build_actives_decoys(
                 de.write("\n".join(list((pdb_ligands | chembl_ligands) - set(pocket.LIGAND_SMILES))))
 
 
-
-pass
-
 def build_actives_decoys_robin(save_path='data/ligand_db/'):
-    """ Build active and decoy list for the ROBIN pockets
+    """
+    Build active and decoy list for the ROBIN pockets
     """
 
     url = "https://raw.githubusercontent.com/cgoliver/ROBIN/main/SMM_full_results/SMM_Target_Hits.csv"
@@ -120,7 +118,7 @@ def build_actives_decoys_robin(save_path='data/ligand_db/'):
     for robin_id, pdb_id_pocket in ROBIN_POCKETS.items():
         actives = df.loc[df[f'{robin_id}_hit'] == 1]['Smile']
         decoys = df.loc[df[f'{robin_id}_hit'] == 0]['Smile']
-        
+
         dump_path = Path(save_path, pdb_id_pocket, 'robin')
         dump_path.mkdir(parents=True, exist_ok=True)
 
