@@ -16,7 +16,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
-from rnamigos_dock.learning.models import Embedder, LigandGraphEncoder, LigandEncoder, Decoder, RNAmigosModel
+from rnamigos_dock.learning.models import get_model_from_dirpath
 from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -38,55 +38,7 @@ def main(cfg: DictConfig):
     # torch.multiprocessing.set_sharing_strategy('file_system')
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = 'cpu'
-
-    rna_encoder = Embedder(in_dim=params['model']['encoder']['in_dim'],
-                           hidden_dim=params['model']['encoder']['hidden_dim'],
-                           num_hidden_layers=params['model']['encoder']['num_layers'],
-                           batch_norm=params['model']['batch_norm'],
-                           dropout=params['model']['dropout'],
-                           num_bases=params['model']['encoder']['num_bases']
-                           )
-
-    if params['model']['use_graphligs']:
-        graphlig_cfg = params['model']['graphlig_encoder']
-        # For optimol compatibility.
-        if graphlig_cfg['use_pretrained']:
-            lig_encoder = LigandGraphEncoder(features_dim=16,
-                                             l_size=56,
-                                             num_rels=4,
-                                             gcn_hdim=32,
-                                             gcn_layers=3,
-                                             batch_norm=False,
-                                             cut_embeddings=True)
-        else:
-            lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg['features_dim'],
-                                             l_size=graphlig_cfg['l_size'],
-                                             gcn_hdim=graphlig_cfg['gcn_hdim'],
-                                             gcn_layers=graphlig_cfg['gcn_layers'],
-                                             batch_norm=params['model']['batch_norm'])
-
-    else:
-        lig_encoder = LigandEncoder(in_dim=params['model']['lig_encoder']['in_dim'],
-                                    hidden_dim=params['model']['lig_encoder']['hidden_dim'],
-                                    num_hidden_layers=params['model']['lig_encoder']['num_layers'],
-                                    batch_norm=params['model']['batch_norm'],
-                                    dropout=params['model']['dropout'])
-
-    decoder = Decoder(dropout=params['model']['dropout'],
-                      batch_norm=params['model']['batch_norm'],
-                      **params['model']['decoder']
-                      )
-
-    model = RNAmigosModel(encoder=rna_encoder,
-                          decoder=decoder,
-                          lig_encoder=lig_encoder if params['train']['target'] in ['dock', 'is_native'] else None,
-                          pool=params['model']['pool'],
-                          pool_dim=params['model']['encoder']['hidden_dim']
-                          )
-
-    state_dict = torch.load(Path(cfg.saved_model_dir, 'model.pth'), map_location=device)['model_state_dict']
-    model.load_state_dict(state_dict)
-    model.eval()
+    model = get_model_from_dirpath(cfg.saved_model_dir)
     model = model.to(device)
     if cfg.custom_dir:
         test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(g).stem for g in os.listdir(cfg.data.pocket_graphs)]})

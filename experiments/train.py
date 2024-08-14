@@ -34,8 +34,9 @@ if __name__ == "__main__":
 
 from rnamigos_dock.learning.loader import (get_systems, DockingDataset, IsNativeSampler, NativeFPSampler,
                                            RingCollater, VirtualScreenDataset)
+
 from rnamigos_dock.learning import learn
-from rnamigos_dock.learning.models import Embedder, LigandEncoder, LigandGraphEncoder, Decoder, RNAmigosModel
+from rnamigos_dock.learning.models import cfg_to_model
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 from rnamigos_dock.learning.utils import mkdirs
 from fig_scripts.plot_utils import group_df
@@ -169,89 +170,27 @@ def main(cfg: DictConfig):
     test_vs_loader = GraphDataLoader(dataset=test_vs_dataset, **vs_loader_args)
     print('Created data loader')
 
-    '''
-    Model loading
-    '''
-
-    print("creating model")
-    rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
-                           hidden_dim=cfg.model.encoder.hidden_dim,
-                           num_hidden_layers=cfg.model.encoder.num_layers,
-                           batch_norm=cfg.model.batch_norm,
-                           dropout=cfg.model.dropout,
-                           num_bases=cfg.model.encoder.num_bases
-                           )
-    if cfg.model.use_pretrained:
-        print(">>> Using pretrained weights")
-        rna_encoder.from_pretrained(cfg.model.pretrained_path)
-    rna_encoder.subset_pocket_nodes = True
-
-    if cfg.model.use_graphligs:
-        graphlig_cfg = cfg.model.graphlig_encoder
-        if graphlig_cfg.use_pretrained:
-            lig_encoder = LigandGraphEncoder.from_pretrained("pretrained/optimol")
-        else:
-            lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg.features_dim,
-                                             l_size=graphlig_cfg.l_size,
-                                             gcn_hdim=graphlig_cfg.gcn_hdim,
-                                             gcn_layers=graphlig_cfg.gcn_layers,
-                                             batch_norm=cfg.model.batch_norm)
-    else:
-        lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
-                                    hidden_dim=cfg.model.lig_encoder.hidden_dim,
-                                    num_hidden_layers=cfg.model.lig_encoder.num_layers,
-                                    batch_norm=cfg.model.batch_norm,
-                                    dropout=cfg.model.dropout)
-
-    decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
-                      out_dim=cfg.model.decoder.out_dim,
-                      hidden_dim=cfg.model.decoder.hidden_dim,
-                      num_layers=cfg.model.decoder.num_layers,
-                      activation=cfg.model.decoder.activation,
-                      batch_norm=cfg.model.batch_norm,
-                      dropout=cfg.model.dropout)
-
-    model = RNAmigosModel(encoder=rna_encoder,
-                          decoder=decoder,
-                          lig_encoder=lig_encoder if cfg.train.target in ['dock', 'is_native'] else None,
-                          pool=cfg.model.pool,
-                          pool_dim=cfg.model.encoder.hidden_dim
-                          )
-
+    # Model loading
+    model = cfg_to_model(cfg)
     model = model.to(device)
 
-    print(f'Using {model.__class__} as model')
-
-    '''
-    Optimizer instanciation
-    '''
-
+    # Optimizer instanciation
     if cfg.train.loss == 'l2':
         criterion = torch.nn.MSELoss()
     if cfg.train.loss == 'l1':
         criterion = torch.nn.L1Loss()
     if cfg.train.loss == 'bce':
         criterion = torch.nn.BCELoss()
-
     optimizer = optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
 
-    '''
-    Experiment Setup
-    '''
-
+    # Experiment Setup
     name = f"{cfg.name}"
-    print(name)
-    result_folder, save_path = mkdirs(name, prefix=cfg.train.target)
-    writer = SummaryWriter(result_folder)
-    print(f'Saving result in {result_folder}/{name}')
-    OmegaConf.save(cfg, Path(result_folder, "config.yaml"))
+    save_path, save_name = mkdirs(name, prefix=cfg.train.target)
+    writer = SummaryWriter(save_path)
+    print(f'Saving result in {save_path}/{name}')
+    OmegaConf.save(cfg, Path(save_path, "config.yaml"))
 
-    '''
-    Run
-    '''
-    num_epochs = cfg.train.num_epochs
-    save_path = Path(result_folder, 'model.pth')
-
+    # Run
     print("training...")
     _, best_model = learn.train_dock(model=model,
                                      criterion=criterion,
@@ -261,18 +200,16 @@ def main(cfg: DictConfig):
                                      val_loader=val_loader,
                                      val_vs_loader=val_vs_loader,
                                      test_vs_loader=test_vs_loader,
-                                     save_path=save_path,
+                                     save_path=save_name,
                                      writer=writer,
-                                     num_epochs=num_epochs,
+                                     num_epochs=cfg.train.num_epochs,
                                      early_stop_threshold=cfg.train.early_stop,
                                      pretrain_weight=cfg.train.pretrain_weight,
-                                     cfg=cfg,
-                                     )
+                                     cfg=cfg)
 
+    # Final VS validation + file dumping
     logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
     logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")
-
-    # %%%%%%%%%%%%%%%%%%%%%%%
     best_model = best_model.to('cpu')
     rows, raw_rows = [], []
     decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder']

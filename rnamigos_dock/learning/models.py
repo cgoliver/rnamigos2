@@ -8,6 +8,8 @@ import sys
 import json
 
 from pathlib import Path
+
+from omegaconf import OmegaConf
 from yaml import safe_load
 
 import torch
@@ -419,55 +421,73 @@ class RNAmigosModel(nn.Module):
         return self
 
 
-def get_model_from_dirpath(saved_model_dir):
-    with open(Path(saved_model_dir, 'config.yaml'), 'r') as f:
-        params = safe_load(f)
-
-    rna_encoder = Embedder(in_dim=params['model']['encoder']['in_dim'],
-                           hidden_dim=params['model']['encoder']['hidden_dim'],
-                           num_hidden_layers=params['model']['encoder']['num_layers'],
-                           batch_norm=params['model']['batch_norm'],
-                           dropout=params['model']['dropout'],
-                           num_bases=params['model']['encoder']['num_bases']
+def cfg_to_model(cfg, for_loading=False):
+    """
+    for_loading skips pretrained network subparts since it will be used for loading a fully pretrained model
+    """
+    rna_encoder = Embedder(in_dim=cfg.model.encoder.in_dim,
+                           hidden_dim=cfg.model.encoder.hidden_dim,
+                           num_hidden_layers=cfg.model.encoder.num_layers,
+                           batch_norm=cfg.model.batch_norm,
+                           dropout=cfg.model.dropout,
+                           num_bases=cfg.model.encoder.num_bases
                            )
+    if cfg.model.use_pretrained and not for_loading:
+        print(">>> Using pretrained weights")
+        rna_encoder.from_pretrained(cfg.model.pretrained_path)
+    rna_encoder.subset_pocket_nodes = True
 
-    if params['model']['use_graphligs']:
-        graphlig_cfg = params['model']['graphlig_encoder']
-        # For optimol compatibility.
-        if graphlig_cfg['use_pretrained']:
-            lig_encoder = LigandGraphEncoder(features_dim=16,
-                                             l_size=56,
-                                             num_rels=4,
-                                             gcn_hdim=32,
-                                             gcn_layers=3,
-                                             batch_norm=False,
-                                             cut_embeddings=True)
+    if cfg.model.use_graphligs:
+        graphlig_cfg = cfg.model.graphlig_encoder
+        if graphlig_cfg.use_pretrained:
+            if for_loading:
+                lig_encoder = LigandGraphEncoder(features_dim=16,
+                                                 l_size=56,
+                                                 num_rels=4,
+                                                 gcn_hdim=32,
+                                                 gcn_layers=3,
+                                                 batch_norm=False,
+                                                 cut_embeddings=True)
+            else:
+                lig_encoder = LigandGraphEncoder.from_pretrained("pretrained/optimol")
         else:
-            lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg['features_dim'],
-                                             l_size=graphlig_cfg['l_size'],
-                                             gcn_hdim=graphlig_cfg['gcn_hdim'],
-                                             gcn_layers=graphlig_cfg['gcn_layers'],
-                                             batch_norm=params['model']['batch_norm'])
-
+            lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg.features_dim,
+                                             l_size=graphlig_cfg.l_size,
+                                             gcn_hdim=graphlig_cfg.gcn_hdim,
+                                             gcn_layers=graphlig_cfg.gcn_layers,
+                                             batch_norm=cfg.model.batch_norm)
     else:
-        lig_encoder = LigandEncoder(in_dim=params['model']['lig_encoder']['in_dim'],
-                                    hidden_dim=params['model']['lig_encoder']['hidden_dim'],
-                                    num_hidden_layers=params['model']['lig_encoder']['num_layers'],
-                                    batch_norm=params['model']['batch_norm'],
-                                    dropout=params['model']['dropout'])
+        lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
+                                    hidden_dim=cfg.model.lig_encoder.hidden_dim,
+                                    num_hidden_layers=cfg.model.lig_encoder.num_layers,
+                                    batch_norm=cfg.model.batch_norm,
+                                    dropout=cfg.model.dropout)
 
-    decoder = Decoder(dropout=params['model']['dropout'],
-                      batch_norm=params['model']['batch_norm'],
-                      **params['model']['decoder']
-                      )
+    decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
+                      out_dim=cfg.model.decoder.out_dim,
+                      hidden_dim=cfg.model.decoder.hidden_dim,
+                      num_layers=cfg.model.decoder.num_layers,
+                      activation=cfg.model.decoder.activation,
+                      batch_norm=cfg.model.batch_norm,
+                      dropout=cfg.model.dropout)
 
     model = RNAmigosModel(encoder=rna_encoder,
                           decoder=decoder,
-                          lig_encoder=lig_encoder if params['train']['target'] in ['dock', 'is_native'] else None,
-                          pool=params['model']['pool'],
-                          pool_dim=params['model']['encoder']['hidden_dim']
+                          lig_encoder=lig_encoder if cfg.train.target in ['dock', 'is_native'] else None,
+                          pool=cfg.model.pool,
+                          pool_dim=cfg.model.encoder.hidden_dim
                           )
+    return model
 
+
+def get_model_from_dirpath(saved_model_dir):
+    # Create the right model with the right params
+    with open(Path(saved_model_dir, 'config.yaml'), 'r') as f:
+        params = safe_load(f)
+    cfg = OmegaConf.create(params)
+    model = cfg_to_model(cfg, for_loading=True)
+
+    # Load params and use eval()
     state_dict = torch.load(Path(saved_model_dir, 'model.pth'), map_location='cpu')['model_state_dict']
     model.load_state_dict(state_dict)
     model.eval()

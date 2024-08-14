@@ -16,7 +16,8 @@ from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 
 
-def inference(dgl_graph, smiles_list, out_path='rnamigos_out.csv', mixing_coeffs=(0.5, 0., 0.5), models_path=None, dump_all=False):
+def inference(dgl_graph, smiles_list, out_path='rnamigos_out.csv', mixing_coeffs=(0.5, 0., 0.5), models_path=None,
+              dump_all=False):
     """
     Run inference from python objects
     """
@@ -86,7 +87,7 @@ def inference(dgl_graph, smiles_list, out_path='rnamigos_out.csv', mixing_coeffs
                          'native_score': native_score,
                          'fp_score': fp_score,
                          'mixed_score': mixed_score}
-                         )
+                        )
     result_df = pd.DataFrame(rows)
     result_df.to_csv(out_path)
     return result_df
@@ -115,7 +116,6 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    pass
     main()
     # do_inference(cif_path="sample_files/3ox0.cif",
     #              residue_list="A.25,A.26,A.7,A.8".split(','),

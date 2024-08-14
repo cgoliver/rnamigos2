@@ -28,7 +28,7 @@ def mkdirs(name, prefix='', permissive=True):
     except FileExistsError:
         if not permissive:
             raise ValueError('This name is already taken !')
-    save_name = os.path.join(save_path, name + '.pth')
+    save_name = os.path.join(save_path, 'model.pth')
     return save_path, save_name
 
 
@@ -48,3 +48,4 @@ if __name__ == '__main__':
     #     tensor = torch.from_numpy(value)
     #     labels[key] = tensor
     #     tensor.requires_grad = False
+
