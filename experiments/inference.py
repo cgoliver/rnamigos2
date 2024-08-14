@@ -67,10 +67,10 @@ def inference(dgl_graph, smiles_list, out_path='rnamigos_out.csv', mixing_coeffs
         out_scores = (scores - scores.min()) / (scores.max() - scores.min())
         return out_scores
 
-    results = {model_name: normalize(result) for model_name, result in results.items()}
-    mixed_scores = (mixing_coeffs[0] * results['dock']
-                    + mixing_coeffs[1] * results['native_fp']
-                    + mixing_coeffs[2] * results['is_native'])
+    normalized_results = {model_name: normalize(result) for model_name, result in results.items()}
+    mixed_scores = (mixing_coeffs[0] * normalized_results['dock']
+                    + mixing_coeffs[1] * normalized_results['native_fp']
+                    + mixing_coeffs[2] * normalized_results['is_native'])
 
     rows = []
     if not dump_all:
@@ -89,7 +89,8 @@ def inference(dgl_graph, smiles_list, out_path='rnamigos_out.csv', mixing_coeffs
                          'mixed_score': mixed_score}
                         )
     result_df = pd.DataFrame(rows)
-    result_df.to_csv(out_path)
+    if out_path is not None:
+        result_df.to_csv(out_path)
     return result_df
 
 

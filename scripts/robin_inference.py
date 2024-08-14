@@ -33,7 +33,7 @@ ROBIN_SYSTEMS = """2GDI	TPP TPP
 
 def get_nodelists_and_ligands(robin_systems=ROBIN_SYSTEMS, pockets_path='data/json_pockets_expanded'):
     """
-    Get one ligand pocket id and its corresponding ligands from decoyfinder.
+    This was useful to compare pockets appearing in a given ROBIN PDB.
     """
     grouped_pockets = group_reference_pockets(pockets_path=pockets_path)
     nodelists = dict()
@@ -64,21 +64,27 @@ def get_nodelists_and_ligands(robin_systems=ROBIN_SYSTEMS, pockets_path='data/js
     return nodelists, ligand_names
 
 
+def robin_inference(ligand_name, dgl_pocket_graph, out_path=None):
+    actives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
+    actives_smiles_list = [s.lstrip().rstrip() for s in list(open(actives_ligands_path).readlines())]
+    inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
+    inactives_smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
+    smiles_list = actives_smiles_list + inactives_smiles_list
+    is_active = [1 for _ in range(len(actives_smiles_list))] + [0 for _ in range(len(inactives_smiles_list))]
+    final_df = inference(dgl_graph=dgl_pocket_graph,
+                         smiles_list=smiles_list,
+                         dump_all=True,
+                         out_path=out_path)
+    final_df['is_active'] = is_active
+    return final_df
+
+
 if __name__ == "__main__":
     pass
     expanded_path = 'data/json_pockets_expanded'
     nodelists, ligand_names = get_nodelists_and_ligands()
-
-    models_path = {
-        'dock': 'results/trained_models/dock/dock_42',
-        'native_fp': 'results/trained_models/native_fp/fp_42',
-        'is_native': 'results/trained_models/is_native/native_42',
-    }
     out_dir = 'outputs/robin_docknative'
     os.makedirs(out_dir, exist_ok=True)
-    decoys_ligands_dir = "data/robin_decoys_decoyfinder"
-    new_mixing_coeffs = [0.3, 0., 0.3]
-    # new_mixing_coeffs = [0.36841931, 0.26315665, 0.36841931]
     for pocket, ligand_name in ligand_names.items():
         pocket_name = pocket.strip('.json')
         print('Doing pocket : ', pocket_name)
@@ -88,21 +94,6 @@ if __name__ == "__main__":
         pocket_graph = graph_io.load_json(pocket_path)
         dgl_pocket_graph, _ = load_rna_graph(pocket_graph)
 
-        # Get smiles list for decoys
-        # decoys_ligands_path = os.path.join(decoys_ligands_dir, f"{ligand_name}_decoys.txt")
-        # out_path = os.path.join(out_dir, f"{pocket_name}_decoys.txt")
-        # smiles_list = [s.lstrip().rstrip() for s in list(open(decoys_ligands_path).readlines())]
-        # inference(dgl_graph=dgl_pocket_graph, smiles_list=smiles_list, out_path=out_path,
-        #           dump_all=True, models_path=models_path, mixing_coeffs=new_mixing_coeffs)
-
-        active_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
-        out_path = os.path.join(out_dir, f"{pocket_name}_actives.txt")
-        smiles_list = [s.lstrip().rstrip() for s in list(open(active_ligands_path).readlines())]
-        inference(dgl_graph=dgl_pocket_graph, smiles_list=smiles_list, out_path=out_path,
-                  dump_all=True, models_path=models_path, mixing_coeffs=new_mixing_coeffs)
-
-        inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
-        out_path = os.path.join(out_dir, f"{pocket_name}_inactives.txt")
-        smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
-        inference(dgl_graph=dgl_pocket_graph, smiles_list=smiles_list, out_path=out_path,
-                  dump_all=True, models_path=models_path, mixing_coeffs=new_mixing_coeffs)
+        # Do inference
+        out_path = os.path.join(out_dir, f"{pocket_name}_results.txt")
+        robin_inference(ligand_name, dgl_pocket_graph, out_path)

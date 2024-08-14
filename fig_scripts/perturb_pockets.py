@@ -39,7 +39,6 @@ ROBIN_SYSTEMS = """2GDI	TPP TPP
 3FU2	PRF  PreQ1
 """
 
-
 pocket_names = [
     "2GDI_Y_TPP_100",
     "5BTP_A_AMZ_106",
@@ -54,7 +53,6 @@ ligand_names = [
 ]
 
 ROBIN_POCKETS = dict(zip(ligand_names, pocket_names))
-
 
 
 def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
@@ -249,59 +247,36 @@ def compute_overlaps(original_pockets, modified_pockets_path, dump_path=None):
         df.to_csv(dump_path, index=False)
     return resdict
 
-def do_robin(ligand_name, pocket_path, out_dir):
 
-    models_path = {
-        'dock': 'results/trained_models/dock/dock_42',
-        'native_fp': 'results/trained_models/native_fp/fp_42',
-        'is_native': 'results/trained_models/is_native/native_42',
-    }
-    new_mixing_coeffs = [0.3, 0., 0.3]
-    # new_mixing_coeffs = [0.36841931, 0.26315665, 0.36841931]
-
+def do_robin(ligand_name, pocket_path):
+    from scripts.robin_inference import robin_inference
     print('Doing pocket : ', pocket_path)
 
     # Get dgl pocket
     pocket_graph = graph_io.load_json(pocket_path + '.json')
     dgl_pocket_graph, _ = load_rna_graph(pocket_graph)
+
+    # Compute scores and EFs
+    final_df = robin_inference(ligand_name, dgl_pocket_graph)
     pocket_id = Path(pocket_path).stem
-
-    active_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
-    smiles_list = [s.lstrip().rstrip() for s in list(open(active_ligands_path).readlines())]
-    active_df = inference(dgl_graph=dgl_pocket_graph,
-                          smiles_list=smiles_list,
-                          dump_all=True,
-                          models_path=models_path,
-                          mixing_coeffs=new_mixing_coeffs)
-
-    inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
-    smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
-    decoy_df = inference(dgl_graph=dgl_pocket_graph,
-                         smiles_list=smiles_list,
-                         dump_all=True,
-                         models_path=models_path,
-                         mixing_coeffs=new_mixing_coeffs)
-
-    active_df['is_active'] = 1
-    decoy_df['is_active'] = 0
-    final_df = pd.concat([active_df, decoy_df])
     final_df['pocket_id'] = pocket_id
     ef_rows = []
     for frac in (0.01, 0.02, 0.05):
-        ef,_ = enrichment_factor(final_df['mixed_score'],
-                               final_df['is_active'],
-                               lower_is_better=False,
-                               frac=frac)
+        ef, _ = enrichment_factor(final_df['mixed_score'],
+                                  final_df['is_active'],
+                                  lower_is_better=False,
+                                  frac=frac)
         ef_rows.append({'pocket_id': pocket_id, 'score': ef, 'frac': frac})
     ef_df = pd.DataFrame(ef_rows)
     return ef_df, final_df
 
-    pass
 
-def compute_efs_robin(pocket_path, out_dir):
+def compute_efs_robin(pocket_path):
     ef_dfs = []
     raw_dfs = []
-    for ef_df, raw in Parallel(n_jobs=4)(delayed(do_robin)(ligand_name, os.path.join(pocket_path, pocket), out_dir) for ligand_name, pocket in ROBIN_POCKETS.items()):
+    for ef_df, raw in Parallel(n_jobs=4)(
+            delayed(do_robin)(ligand_name, os.path.join(pocket_path, pocket)) for ligand_name, pocket in
+            ROBIN_POCKETS.items()):
         ef_dfs.append(ef_df)
         raw_dfs.append(raw)
     all_raws = pd.concat(raw_dfs)
@@ -332,7 +307,8 @@ def compute_efs_model(model, dataloader, lower_is_better):
     ef_rows = []
     for frac in (0.01, 0.02, 0.05):
         for pocket, group in raw_df.groupby('pocket_id'):
-            ef_frac,_ = enrichment_factor(group['raw_score'], group['is_active'], frac=frac, lower_is_better=lower_is_better)
+            ef_frac, _ = enrichment_factor(group['raw_score'], group['is_active'], frac=frac,
+                                           lower_is_better=lower_is_better)
             ef_rows.append({'score': ef_frac,
                             'pocket_id': pocket,
                             'frac': frac
@@ -394,7 +370,6 @@ def mix_two_scores(df, score1, score2):
     return mixed_df, mixed_df_raw, mixed_df_ef
 
 
-
 def get_perf_robin(pocket_path, base_name=None, out_dir=None):
     # Setup loader
     # Setup path and models
@@ -402,11 +377,12 @@ def get_perf_robin(pocket_path, base_name=None, out_dir=None):
     if base_name is None:
         base_name = Path(pocket_path).name
 
-    df_score, df_raw = compute_efs_robin(pocket_path, out_dir)
+    df_score, df_raw = compute_efs_robin(pocket_path)
     df_raw.to_csv(out_dir / (base_name + "_raw.csv"))
     df_score.to_csv(out_dir / (base_name + "_ef.csv"))
 
     return np.mean(df_score['score'].values)
+
 
 # Copied from evaluate except reps_only=True to save time
 #   cache_graphs=True to save time over two model runs
@@ -481,6 +457,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     mixed_df_ef.to_csv(out_dir / (base_name + "_mixed_ef.csv"))
     return np.mean(mixed_df['score'].values)
 
+
 def get_efs_robin(all_perturbed_pockets_path='figs/perturbed',
                   out_df='figs/perturbed/aggregated.csv',
                   recompute=True,
@@ -490,7 +467,6 @@ def get_efs_robin(all_perturbed_pockets_path='figs/perturbed',
                   ef_frac=0.02):
     list_of_results = []
     todo = list(sorted([x for x in os.listdir(all_perturbed_pockets_path) if not x.endswith('.csv')]))
-
 
     if fractions is not None:
         fractions = set(fractions)
@@ -535,7 +511,6 @@ def get_efs_robin(all_perturbed_pockets_path='figs/perturbed',
     df = pd.concat(list_of_results)
     df.to_csv(out_df)
     return df
-
 
 
 def get_efs(all_perturbed_pockets_path='figs/perturbed',
@@ -615,7 +590,7 @@ def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=
     return dfs
 
 
-def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), 
+def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
                            max_replicates=10,
                            recompute=True,
                            use_cached_pockets=True,
@@ -665,13 +640,13 @@ def get_all_perturbed_rognan(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicat
                               final_bfs=final_bfs)
     if robin:
         df = get_efs_robin(all_perturbed_pockets_path=out_path,
-                               out_df=out_df,
-                               fractions=fractions,
-                               recompute=recompute,
-                               )
+                           out_df=out_df,
+                           fractions=fractions,
+                           recompute=recompute,
+                           )
 
     else:
-        df = get_efs(all_perturbed_pockets_path=out_path, 
+        df = get_efs(all_perturbed_pockets_path=out_path,
                      out_df=out_df,
                      fractions=fractions,
                      recompute=recompute)
@@ -805,18 +780,21 @@ def main_chembl():
     # plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, label="Hard strategy")
 
     use_cached_pockets = False
-    recompute = False 
+    recompute = False
     metric = 'ef'
     robin = True
     # Rognan like
-    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute, use_cached_pockets=use_cached_pockets, robin=True)
+    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute,
+                                         use_cached_pockets=use_cached_pockets, robin=True)
     # plot_one(df_rognan, fractions=fractions, color='black', label='Rognan strategy')    # Plot rognan
 
     # Now compute perturbed scores using the soft approach.
     # Vary unexpanding. You can't do BFS0, since this makes small graphs with no edges,
     # resulting in empty graph when subgraphing
-    df_soft_4 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=4, recompute=recompute, metric=metric, robin=robin)
-    df_soft_1 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=1, recompute=recompute, metric=metric, robin=robin)
+    df_soft_4 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=4,
+                                       recompute=recompute, metric=metric, robin=robin)
+    df_soft_1 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=1,
+                                       recompute=recompute, metric=metric, robin=robin)
     """
     df_soft_2 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=2, recompute=recompute, metric=metric, robin=robin)
     df_soft_3 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=3, recompute=recompute, metric=metric, robin=robin)
@@ -827,7 +805,8 @@ def main_chembl():
     #     df_soft_3,
     #     df_soft_4
     # ]
-    plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple', label='soft 1')    # Plot soft perturbed
+    plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple',
+             label='soft 1')  # Plot soft perturbed
     # plot_list(dfs=dfs_soft, colors=colors, label="Soft strategy")
     end_plot()
 
@@ -874,7 +853,7 @@ def main_robin():
     # # Check that inference works, we should get 0.9848
     os.makedirs("figs/unperturbed_robin", exist_ok=True)
     get_perf_robin(pocket_path="data/json_pockets_expanded",
-             out_dir="figs/unperturbed_robin")
+                   out_dir="figs/unperturbed_robin")
     DF_UNPERTURBED = pd.read_csv("figs/unperturbed_robin/json_pockets_expanded_mixed.csv", index_col=False)
 
     # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
