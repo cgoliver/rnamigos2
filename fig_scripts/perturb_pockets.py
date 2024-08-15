@@ -74,7 +74,7 @@ def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
 
 
 def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
-                          out_path='figs/perturbed',
+                          out_path='figs/perturbations/perturbed',
                           fractions=(0.7, 0.8, 0.9, 1.0, 1.1, 1.2),
                           perturb_bfs_depth=1,
                           max_replicates=5,
@@ -451,8 +451,8 @@ def get_perf_robin(pocket_path, base_name=None, out_dir=None):
     return np.mean(df_score['score'].values)
 
 
-def get_efs(all_perturbed_pockets_path='figs/perturbed',
-            out_df='figs/perturbed/aggregated.csv',
+def get_efs(all_perturbed_pockets_path='figs/perturbations/perturbed',
+            out_df='figs/perturbations/perturbed/aggregated.csv',
             recompute=True,
             fractions=None,
             compute_overlap=False,
@@ -517,8 +517,8 @@ def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=
                           metric='ef', ef_frac=0.02):
     dfs = []
     for i in range(1, 4):
-        out_path = f'figs/perturbed{"_hard" if hard else ""}{"robin_" if ROBIN else ""}_{i}'
-        out_df = f'figs/aggregated{"_hard" if hard else ""}{"robin_" if ROBIN else ""}_{i}.csv'
+        out_path = f'figs/perturbations/perturbed{"_hard" if hard else ""}{"robin_" if ROBIN else ""}_{i}'
+        out_df = f'figs/perturbations/aggregated{"_hard" if hard else ""}{"robin_" if ROBIN else ""}_{i}.csv'
         if not use_cached_pockets:
             get_perturbed_pockets(out_path=out_path,
                                   perturb_bfs_depth=i,
@@ -545,8 +545,8 @@ def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
                            compute_overlap=False,
                            metric='ef',
                            ef_frac=0.02):
-    out_path = f'figs/perturbed_soft_robin_{final_bfs}'
-    out_df = f'figs/aggregated_soft_robin_{final_bfs}.csv'
+    out_path = f'figs/perturbations/perturbed_soft_robin_{final_bfs}'
+    out_df = f'figs/perturbations/aggregated_soft_robin_{final_bfs}.csv'
     if not use_cached_pockets:
         get_perturbed_pockets(out_path=out_path,
                               perturb_bfs_depth=2,
@@ -568,8 +568,8 @@ def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
 def get_all_perturbed_rognan(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
                              recompute=True, use_cached_pockets=False, final_bfs=4,
                              metric='ef', ef_frac=0.02):
-    out_path = f'figs/perturbed_rognan_robin'
-    out_df = f'figs/aggregated_rognan_robin.csv'
+    out_path = f'figs/perturbations/perturbed_rognan_robin'
+    out_df = f'figs/perturbations/aggregated_rognan_robin.csv'
     if not use_cached_pockets:
         get_perturbed_pockets(out_path=out_path,
                               perturb_bfs_depth=2,
@@ -681,10 +681,10 @@ def main_chembl():
     ALL_POCKETS_GRAPHS = {pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
                           for pocket_id in ALL_POCKETS}
     # # Check that inference works, we should get 0.9848
-    os.makedirs("figs/unperturbed", exist_ok=True)
+    os.makedirs("figs/perturbations/unperturbed", exist_ok=True)
     get_perf(pocket_path="data/json_pockets_expanded",
-             out_dir="figs/unperturbed")
-    DF_UNPERTURBED = pd.read_csv("figs/unperturbed/json_pockets_expanded_mixed.csv", index_col=False)
+             out_dir="figs/perturbations/unperturbed")
+    DF_UNPERTURBED = pd.read_csv("figs/perturbations/unperturbed/json_pockets_expanded_mixed.csv", index_col=False)
     DF_UNPERTURBED.rename(columns={'score': 'unpert_score'}, inplace=True)
     global GOOD_POCKETS
     GOOD_POCKETS = DF_UNPERTURBED[DF_UNPERTURBED['unpert_score'] >= 0.98]['pocket_id'].unique()
@@ -696,13 +696,13 @@ def main_chembl():
 
     # Check pocket computation works
     # get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
-    #                      out_path='figs/perturbed_robin',
+    #                      out_path='figs/perturbations/perturbed_robin',
     #                      fractions=(0.9, 1.0),
     #                      perturb_bfs_depth=1,
     #                      max_replicates=2)
     # # Get a first result
-    # df = get_efs(all_perturbed_pockets_path='figs/perturbed_robin',
-    #            out_df='figs/perturbed_robin/aggregated_test.csv',
+    # df = get_efs(all_perturbed_pockets_path='figs/perturbations/perturbed_robin',
+    #            out_df='figs/perturbations/perturbed_robin/aggregated_test.csv',
     #            compute_overlap=True)
 
     # Now compute perturbed scores using the random BFS approach
@@ -779,10 +779,10 @@ def main_robin():
     ROBIN = True
     ALL_POCKETS_GRAPHS = {pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
                           for pocket_id in ALL_POCKETS}
-    os.makedirs("figs/unperturbed_robin", exist_ok=True)
+    os.makedirs("figs/perturbations/unperturbed_robin", exist_ok=True)
     get_perf_robin(pocket_path="data/json_pockets_expanded",
-                   out_dir="figs/unperturbed_robin")
-    DF_UNPERTURBED = pd.read_csv("figs/unperturbed_robin/json_pockets_expanded_mixed.csv", index_col=False)
+                   out_dir="figs/perturbations/unperturbed_robin")
+    DF_UNPERTURBED = pd.read_csv("figs/perturbations/unperturbed_robin/json_pockets_expanded_mixed.csv", index_col=False)
 
     # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
     fractions = (0.7, 0.85, 1.0, 1.15, 1.3)

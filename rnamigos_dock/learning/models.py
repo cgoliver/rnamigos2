@@ -5,11 +5,10 @@ Script for RGCN model.
 
 import os
 import sys
+
 import json
-
-from pathlib import Path
-
 from omegaconf import OmegaConf
+from pathlib import Path
 from yaml import safe_load
 
 import torch

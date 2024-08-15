@@ -7,16 +7,6 @@ import networkx as nx
 import torch
 
 
-def dgl_to_nx(g_dgl, edge_map):
-    hot_to_label = {v: k for k, v in edge_map.items()}
-    hots = g_dgl.edata['one_hot'].detach().numpy()
-    G = dgl.to_networkx(g_dgl)
-    labels = {e: hot_to_label[i] for i, e in zip(hots, G.edges())}
-    nx.set_edge_attributes(G, labels, 'label')
-    G = nx.to_undirected(G)
-    return G
-
-
 def mkdirs(name, prefix='', permissive=True):
     """
     Try to make the logs folder
@@ -66,10 +56,27 @@ def setup_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
+def send_graph_to_device(g, device):
+    """
+    Send dgl graph to device
+    :param g: :param device:
+    :return:
+    """
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.set_e_initializer(dgl.init.zero_initializer)
+
+    g = g.to(device)
+    # nodes
+    labels = g.node_attr_schemes()
+    for l in labels.keys():
+        g.ndata[l] = g.ndata.pop(l).to(device, non_blocking=True)
+
+    # edges
+    labels = g.edge_attr_schemes()
+    for i, l in enumerate(labels.keys()):
+        g.edata[l] = g.edata.pop(l).to(device, non_blocking=True)
+    return g
+
+
 if __name__ == '__main__':
     pass
-
-    # for key, value in labels.items():
-    #     tensor = torch.from_numpy(value)
-    #     labels[key] = tensor
-    #     tensor.requires_grad = False
