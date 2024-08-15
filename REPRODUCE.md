@@ -36,7 +36,7 @@ Once equiped with this initial data, we select the decoys corresponding to our a
 This is done by running :
 
 ```
-python scripts/build_screen_data.py --pdb --decoyfinder
+python scripts_prepare/build_screen_data.py --pdb --decoyfinder
 ```
 
 We save them in `data/ligand_db/`
@@ -55,7 +55,7 @@ These decoys can be downloaded [here](https://drive.proton.me/urls/6XCM553QBC#1N
 We can now proceed to docking all relevant pairs.
 The docking experiment can be launched using :
 
-[//]: # (TODO : upload docking scripts)
+[//]: # (TODO : upload docking scripts_prepare)
 
 and the corresponding docking scores can be obtained [here](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
 
@@ -64,7 +64,7 @@ and the corresponding docking scores can be obtained [here](https://drive.proton
 To split this initial data into csvs adapted for each of our training scenarios, one can run
 
 ```bash
-python scripts/build_csvs.py
+python scripts_prepare/build_csvs.py
 ```
 
 This should take about 3 minutes.
@@ -79,7 +79,7 @@ This can be obtained using our scripts.
 [//]: # (TODO : This requires having rnaglib_all data, maybe we should mention how to get that)
 
 ```bash
-python scripts/get_pocket_graphs.py
+python scripts_prepare/get_pocket_graphs.py
 ```
 
 ## Splitting the data
@@ -92,7 +92,7 @@ Now that we have the file data/rmscore_normalized_by_average_length_complete_dat
 final splits. Simply run:
 
 ```bash
-python scripts/split.py
+python scripts_prepare/split.py
 ```
 
 ## Model training
@@ -102,7 +102,7 @@ Fetch the whole RNAs for pretraining [here](https://drive.proton.me/urls/Y8TTCWK
 Pretrain a model, by running :
 
 ```bash    
-python experiments/pretrain.py name=pretrained_hungarian_64
+python rnamigos/pretrain.py name=pretrained_hungarian_64
 ```
 
 We additionally need to load optimol encoder pretrained weights which are in the `pretrained/optimol/` path already
@@ -112,7 +112,7 @@ Then you need to train models using those pretrained models.
 Scripts are available to run all relevant trainings.
 
 ```bash
-bash job_scripts/train.sh
+bash scripts_run/train.sh
 ```
 
 This will train three models and save them in results/trained_models.
@@ -125,7 +125,7 @@ and predicted score.
 To get results in a similar format for rDock, please run:
 
 ```bash
-python job_scripts/rdock_output.py
+python scripts_run/rdock_output.py
 ```
 
 # Generate the figures from the results
@@ -140,7 +140,7 @@ Those files are directly available for download at :
 The first step is to produce ensembling results, by running
 
 ```bash
-python fig_scripts/mixing.py
+python scripts_fig/mixing.py
 ```
 
 We now have the table of mixing results as well as the best ensemble models.
@@ -149,8 +149,8 @@ In addition, we have blended our models to produce csvs with mixed and mixed+rdo
 We can now run :
 
 ```bash
-python fig_scripts/violins.py
-python fig_scripts/ef_time.py
+python scripts_fig/violins.py
+python scripts_fig/ef_time.py
 ```
 
 to produce the remaining Figures of the paper.
@@ -159,11 +159,11 @@ For the ROBIN experiment, we will first need to produce predictions for four ROB
 To get these predictions, please run (takes about 20 minutes):
 
 ```
-python scripts/robin_inference.py
+python scripts_fig/robin_inference.py
 ```
 
 Finally, you will obtain the ROBIN plot with :
 
 ```
-python fig_scripts/robin_fig.py
+python scripts_fig/robin_fig.py
 ```

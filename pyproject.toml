@@ -17,4 +17,4 @@ classifiers = [
 dynamic = ["version"]
 
 [tool.setuptools]
-packages = ["rnamigos_dock"]
+packages = ["rnamigos"]
