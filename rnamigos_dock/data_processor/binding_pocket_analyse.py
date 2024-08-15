@@ -15,41 +15,45 @@ import pandas as pd
 from Bio.PDB import *
 
 amino_acids = [
-        'ALA',
-        'ARG',
-        'ASN',
-        'ASP',
-        'CYS',
-        'GLU',
-        'GLN',
-        'GLY',
-        'HIS',
-        'ILE',
-        'LEU',
-        'LYS',
-        'MET',
-        'PHE',
-        'PRO',
-        'SER',
-        'THR',
-        'TRP',
-        'TYR',
-        'VAL'
-        ]
+    'ALA',
+    'ARG',
+    'ASN',
+    'ASP',
+    'CYS',
+    'GLU',
+    'GLN',
+    'GLY',
+    'HIS',
+    'ILE',
+    'LEU',
+    'LYS',
+    'MET',
+    'PHE',
+    'PRO',
+    'SER',
+    'THR',
+    'TRP',
+    'TYR',
+    'VAL'
+]
+
 
 def ligand_center(residue):
     return np.mean(np.array([atom.coord for atom in residue.get_atoms()]), axis=0)
 
+
 def is_valid_ligand(ligand_residue):
-    #no ions
+    # no ions
     invalids = ['HOH', 'NCO', 'SO4', 'EPE', 'OHX', 'MPD']
     if ligand_residue.resname in invalids or len(ligand_residue.resname) != 3:
         return False
     return True
 
+
 def _is_valid_ligand(ligand_residue):
-    #no ions
+    # no ions
     return ligand_residue.resname.strip() == 'MG'
+
 
 def pocket_res_count(struct, ligand_residue, radius=12):
     """
@@ -64,19 +68,18 @@ def pocket_res_count(struct, ligand_residue, radius=12):
         Returns:
             pocket_rescount (list): list of protein/rna residue counts for each cutoff.
     """
-    #get all residues within cutoff
+    # get all residues within cutoff
     kd = NeighborSearch(list(struct.get_atoms()))
     center = ligand_center(ligand_residue)
 
-
-    #list of rna and protein concentrations in region (cutoff, rna_res, protein_res)
+    # list of rna and protein concentrations in region (cutoff, rna_res, protein_res)
     pocket_rescount = []
     for c in range(1, radius):
         pocket = kd.search(ligand_center(ligand_residue), c, level='R')
 
         rna_res = []
         protein_res = []
-        #if there is protein pocket is no bueno
+        # if there is protein pocket is no bueno
         for res in pocket:
             res_name = res.resname.strip()
             info = f"{res.get_parent().id}:{res.resname.strip()}:{res.id[1]}"
@@ -86,11 +89,12 @@ def pocket_res_count(struct, ligand_residue, radius=12):
                 protein_res.append(info)
             else:
                 continue
-        pocket_rescount.append({'cutoff': c, 'rna': len(rna_res), 'rna_res': rna_res, 
+        pocket_rescount.append({'cutoff': c, 'rna': len(rna_res), 'rna_res': rna_res,
                                 'protein': len(protein_res),
                                 'protein_res': protein_res})
 
     return pocket_rescount
+
 
 def full_struc_analyse(strucpath):
     """
@@ -105,14 +109,14 @@ def full_struc_analyse(strucpath):
 
     """
     try:
-        #load mmCIF structure
+        # load mmCIF structure
         struc_dict = MMCIF2Dict.MMCIF2Dict(strucpath)
-        #load PDB
+        # load PDB
         parser = MMCIFParser(QUIET=True)
         pdbstruc = parser.get_structure("", strucpath)
     except Exception as e:
         print("Structure loading error {e}")
-        return None 
+        return None
 
     ligand_dict = {}
     try:
@@ -123,14 +127,14 @@ def full_struc_analyse(strucpath):
 
     except:
         print("Ligand not detected.")
-        return None 
+        return None
 
     num_models = len(pdbstruc)
     model = pdbstruc[0]
     try:
         ligand_df = pd.DataFrame.from_dict(ligand_dict)
-    #pandas complains when dictionary values are not lists
-    #this happens when there is only one ligand in PDB
+    # pandas complains when dictionary values are not lists
+    # this happens when there is only one ligand in PDB
     except ValueError:
         ligand_df = pd.DataFrame(ligand_dict, index=[0])
 
@@ -138,17 +142,18 @@ def full_struc_analyse(strucpath):
     pdbid = os.path.basename(strucpath).split(".")[0]
     ligand_df['pdbid'] = pdbid
 
-    #check ligands
+    # check ligands
     invalid_ligands = 0
     valid_ligands = []
     for ligand in ligand_df.itertuples():
         ligand_res = None
-        #find the residue corresponding to ligand
+        # find the residue corresponding to ligand
         for res in model[ligand.chain].get_residues():
             if res.id[1] == ligand.position:
                 ligand_res = res
                 if is_valid_ligand(ligand_res):
-                    valid_ligands.append((ligand_res, f"#{'0' if num_models == 1 else '0.1'}", pocket_res_count(model, ligand_res)))
+                    valid_ligands.append(
+                        (ligand_res, f"#{'0' if num_models == 1 else '0.1'}", pocket_res_count(model, ligand_res)))
                 else:
                     invalid_ligands += 1
     return valid_ligands, strucpath
@@ -162,6 +167,7 @@ def binding_wrapper(strucpath):
     except Exception as e:
         print(f"Failed on {strucpath} :: {e}")
         return None
+
 
 def process_all(pdb_path, dump_path, restart=None, parallel=False):
     """
@@ -191,7 +197,7 @@ def process_all(pdb_path, dump_path, restart=None, parallel=False):
 
     pool = multiprocessing.Pool(processes=20)
     for result in pool.imap_unordered(full_struc_analyse, todo):
-    # for result in map(binding_wrapper, todo):
+        # for result in map(binding_wrapper, todo):
         if result is None:
             print("failed")
             continue
@@ -205,7 +211,9 @@ def process_all(pdb_path, dump_path, restart=None, parallel=False):
         lig_dict[os.path.basename(p)] = lig_ids
         pickle.dump(lig_dict, open(dump_path, 'wb'))
     pass
+
+
 if __name__ == "__main__":
-    #pdb_path = os.path.join("..", '..', 'carlos_dock', "data", "all_rna_with_lig_2019")
+    # pdb_path = os.path.join("..", '..', 'carlos_dock', "data", "all_rna_with_lig_2019")
     pdb_path = '/home/mcb/users/jcarva4/rnamigos2/rnamigos1/rnamigos_gcn/data/cif_files'
     process_all(pdb_path, "../data/binding_pocket_analyse.p")

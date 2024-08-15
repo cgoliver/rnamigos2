@@ -7,7 +7,7 @@ import time
 import torch
 
 from rnamigos_dock.learning.decoy_utils import *
-from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
+from rnamigos_dock.utils.virtual_screen import mean_active_rank, run_virtual_screen
 
 
 def send_graph_to_device(g, device):

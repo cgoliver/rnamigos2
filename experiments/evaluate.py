@@ -1,11 +1,8 @@
 import os
 import sys
-import time
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-from dgl.dataloading import GraphDataLoader
 from yaml import safe_load
 
 import hydra
@@ -15,10 +12,10 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos_dock.learning.dataset import VirtualScreenDataset, get_systems_from_cfg
+from rnamigos_dock.learning.dataset import get_systems_from_cfg
 from rnamigos_dock.learning.dataloader import get_vs_loader
 from rnamigos_dock.learning.models import get_model_from_dirpath
-from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen,get_efs
+from rnamigos_dock.utils.virtual_screen import get_efs
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)

@@ -38,13 +38,11 @@ import networkx as nx
 import numpy as np
 from pathlib import Path
 import pandas as pd
-import pickle
 import random
 from rnaglib.utils import graph_from_pdbid, graph_utils, graph_io
 import seaborn as sns
 from sklearn import metrics
 import torch
-import time
 from tqdm import tqdm
 
 if __name__ == "__main__":
@@ -52,10 +50,8 @@ if __name__ == "__main__":
 
 from rnamigos_dock.learning.models import get_model_from_dirpath
 from rnamigos_dock.learning.dataset import VirtualScreenDataset, get_systems
-from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
+from rnamigos_dock.utils.virtual_screen import mean_active_rank, run_virtual_screen
 from rnamigos_dock.tools.graph_utils import load_rna_graph
-
-from fig_scripts.plot_utils import PALETTE_DICT
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)

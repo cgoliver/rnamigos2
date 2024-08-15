@@ -33,7 +33,7 @@ from rnamigos_dock.learning.dataloader import IsNativeSampler, NativeFPSampler, 
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import cfg_to_model
 from rnamigos_dock.learning.utils import mkdirs, setup_device, setup_seed
-from rnamigos_dock.post.virtual_screen import get_efs
+from rnamigos_dock.utils.virtual_screen import get_efs
 
 from fig_scripts.plot_utils import group_df
 

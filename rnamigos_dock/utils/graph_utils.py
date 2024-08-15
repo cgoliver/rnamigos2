@@ -15,17 +15,6 @@ from rnaglib.utils import NODE_FEATURE_MAP
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
 
 
-def get_edge_map(graphs_dir):
-    edge_labels = set()
-    print("Collecting edge labels.")
-    for g in tqdm(os.listdir(graphs_dir)):
-        graph, _, _ = pickle.load(open(os.path.join(graphs_dir, g), 'rb'))
-        edges = {e_dict['label'] for _, _, e_dict in graph.edges(data=True)}
-        edge_labels = edge_labels.union(edges)
-
-    return {label: i for i, label in enumerate(sorted(edge_labels))}
-
-
 # Adapted from rglib
 def to_undirected(edge_map):
     """
