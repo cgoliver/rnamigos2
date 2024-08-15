@@ -4,41 +4,37 @@ We have 3 options for training modes (`train.target`):
 * `dock`: predict the docking INTER score (regression)
 * `is_native`: predict whether the given ligand is the native for the given pocket (binary classification)
 * `native_fp`: given only a pocket, predict the native ligand's fingerprint. This is the RNAmigos1.0 setting (multi-label classification)`
-
 Make sure to set the correct `train.loss` given the target you chose. Options:
-
 * `l1`: L2 loss
 * `l2`: L1 loss
 * `bce`: Binary crossentropy
 """
 import os
 import sys
-from pathlib import Path
-
-import numpy.random
-from dgl.dataloading import GraphDataLoader
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from loguru import logger
 
+from dgl.dataloading import GraphDataLoader
+import numpy as np
+import pathlib
+import pandas as pd
 from rnaglib.kernels.node_sim import SimFunctionNode
 import torch
-import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
-import numpy as np
-import pandas as pd
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos_dock.learning.loader import (get_systems, DockingDataset, IsNativeSampler, NativeFPSampler,
-                                           RingCollater, VirtualScreenDataset)
+from rnamigos_dock.learning.dataset import get_systems_from_cfg
+from rnamigos_dock.learning.dataset import DockingDataset, train_val_split
+from rnamigos_dock.learning.dataloader import IsNativeSampler, NativeFPSampler, RingCollater, get_vs_loader
 
 from rnamigos_dock.learning import learn
 from rnamigos_dock.learning.models import cfg_to_model
-from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
-from rnamigos_dock.learning.utils import mkdirs
+from rnamigos_dock.learning.utils import mkdirs, setup_device, setup_seed
+from rnamigos_dock.post.virtual_screen import get_efs
+
 from fig_scripts.plot_utils import group_df
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -49,45 +45,14 @@ torch.set_num_threads(1)
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
     print('Done importing')
-
-    if cfg.train.seed > 0:
-        numpy.random.seed(cfg.train.seed)
-        torch.manual_seed(cfg.train.seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-
-    '''
-    Hardware settings
-    '''
-
-    if torch.cuda.is_available():
-        if cfg.device != 'cpu':
-            try:
-                gpu_number = int(cfg.device)
-            except:
-                gpu_number = 0
-            device = f'cuda:{gpu_number}'
-        else:
-            device = 'cpu'
-    else:
-        device = 'cpu'
-        print("No GPU found, running on the CPU")
+    setup_seed(cfg.train.seed)
+    device = setup_device(cfg.device)
 
     '''
     Dataloader creation
     '''
-
-    train_val_systems = get_systems(target=cfg.train.target,
-                                    rnamigos1_split=cfg.train.rnamigos1_split,
-                                    use_rnamigos1_train=cfg.train.use_rnamigos1_train,
-                                    use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
-                                    group_pockets=cfg.train.group_pockets,
-                                    filter_robin=cfg.train.filter_robin)
-    test_systems = get_systems(target=cfg.train.target,
-                               rnamigos1_split=cfg.train.rnamigos1_split,
-                               use_rnamigos1_train=cfg.train.use_rnamigos1_train,
-                               use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
-                               return_test=True)
+    train_val_systems = get_systems_from_cfg(cfg)
+    test_systems = get_systems_from_cfg(cfg, return_test=True)
 
     if cfg.train.simfunc not in {'R_iso', 'R_1', 'hungarian'}:
         node_simfunc = None
@@ -104,20 +69,9 @@ def main(cfg: DictConfig):
                     'stretch_scores': cfg.train.stretch_scores,
                     'undirected': cfg.data.undirected}
 
-    def split(train, frac=0.8, system_based=True):
-        if system_based:
-            train_names = train['PDB_ID_POCKET'].unique()
-            train_names = np.random.choice(train_names, size=int(frac * len(train_names)), replace=False)
-            train_systems = train[train['PDB_ID_POCKET'].isin(train_names)]
-            validation_systems = train[~train['PDB_ID_POCKET'].isin(train_names)]
-        else:
-            train_systems, validation_systems = np.split(train.sample(frac=1, random_state=42),
-                                                         [int(frac * len(train))])
-        return train_systems, validation_systems
-
-    train_systems, validation_systems = split(train_val_systems.copy(), frac=0.8, system_based=False)
+    train_systems, validation_systems = train_val_split(train_val_systems.copy(), frac=0.8, system_based=False)
     # This avoids having too many pockets in the VS validation
-    _, vs_validation_systems = split(train_val_systems.copy(), frac=0.8, system_based=True)
+    _, vs_validation_systems = train_val_split(train_val_systems.copy(), frac=0.8, system_based=True)
     train_dataset = DockingDataset(systems=train_systems, use_rings=node_simfunc is not None, **dataset_args)
     validation_dataset = DockingDataset(systems=validation_systems, use_rings=False, **dataset_args)
     # These one cannot be a shared object
@@ -146,29 +100,14 @@ def main(cfg: DictConfig):
                                  collate_fn=val_collater.collate,
                                  **loader_args)
 
-    vs_loader_args = {'shuffle': False,
-                      'batch_size': 1,
-                      'num_workers': 4,
-                      'collate_fn': lambda x: x[0]
-                      }
-
-    val_vs_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
-                                          decoy_mode='chembl',
-                                          ligands_path=cfg.data.ligand_db,
-                                          systems=vs_validation_systems,
-                                          use_graphligs=cfg.model.use_graphligs,
-                                          group_ligands=True,
-                                          reps_only=True)
-    val_vs_loader = GraphDataLoader(dataset=val_vs_dataset, **vs_loader_args)
-    test_vs_dataset = VirtualScreenDataset(cfg.data.pocket_graphs,
-                                           decoy_mode='chembl',
-                                           ligands_path=cfg.data.ligand_db,
-                                           systems=test_systems,
-                                           use_graphligs=cfg.model.use_graphligs,
-                                           group_ligands=True,
-                                           reps_only=True)
-    test_vs_loader = GraphDataLoader(dataset=test_vs_dataset, **vs_loader_args)
-    print('Created data loader')
+    val_vs_loader = get_vs_loader(systems=vs_validation_systems,
+                                  decoy_mode=cfg.decoy_mode,
+                                  reps_only=True,
+                                  cfg=cfg)
+    test_vs_loader = get_vs_loader(systems=vs_validation_systems,
+                                   decoy_mode=cfg.decoy_mode,
+                                   reps_only=True,
+                                   cfg=cfg)
 
     # Model loading
     model = cfg_to_model(cfg)
@@ -177,21 +116,23 @@ def main(cfg: DictConfig):
     # Optimizer instanciation
     if cfg.train.loss == 'l2':
         criterion = torch.nn.MSELoss()
-    if cfg.train.loss == 'l1':
+    elif cfg.train.loss == 'l1':
         criterion = torch.nn.L1Loss()
-    if cfg.train.loss == 'bce':
+    elif cfg.train.loss == 'bce':
         criterion = torch.nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
+    else:
+        raise ValueError(f'Unsupported loss function: {cfg.train.loss}')
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
 
     # Experiment Setup
     name = f"{cfg.name}"
     save_path, save_name = mkdirs(name, prefix=cfg.train.target)
-    writer = SummaryWriter(save_path)
+    writer = torch.utils.tensorboard.SummaryWriter(save_path)
     print(f'Saving result in {save_path}/{name}')
-    OmegaConf.save(cfg, Path(save_path, "config.yaml"))
+    OmegaConf.save(cfg, pathlib.Path(save_path, "config.yaml"))
 
     # Run
-    print("training...")
+    print("Training...")
     _, best_model = learn.train_dock(model=model,
                                      criterion=criterion,
                                      optimizer=optimizer,
@@ -214,56 +155,28 @@ def main(cfg: DictConfig):
     rows, raw_rows = [], []
     decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder']
     for decoy_mode in decoys:
-        pocket_path = cfg.data.pocket_graphs
-        final_vs_dataset = VirtualScreenDataset(pocket_path,
-                                                cache_graphs=False,
-                                                ligands_path=cfg.data.ligand_db,
-                                                systems=test_systems,
-                                                decoy_mode=decoy_mode,
-                                                fp_type='MACCS',
-                                                use_graphligs=cfg.model.use_graphligs,
-                                                group_ligands=True,
-                                                reps_only=False)
-        dataloader = GraphDataLoader(dataset=final_vs_dataset, **vs_loader_args)
+        dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg)
 
-        print('Created data loader')
+        # Experiment Setup
+        decoy_rows, decoys_raw_rows = get_efs(model=best_model, dataloader=dataloader, decoy_mode=decoy_mode, cfg=cfg,
+                                              verbose=True)
+        rows += decoy_rows
+        raw_rows += decoys_raw_rows
 
-        '''
-        Experiment Setup
-        '''
-        lower_is_better = cfg.train.target in ['dock', 'native_fp']
-        efs, scores, status, pocket_names, all_smiles = run_virtual_screen(best_model,
-                                                                           dataloader,
-                                                                           metric=mean_active_rank,
-                                                                           lower_is_better=lower_is_better,
-                                                                           )
-        for pocket_id, score_list, status_list, smiles_list in zip(pocket_names, scores, status, all_smiles):
-            for score, status, smiles in zip(score_list, status_list, smiles_list):
-                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id, 'smiles': smiles,
-                                 'decoys': decoy_mode})
-
-        for ef, score, pocket_id in zip(efs, scores, pocket_names):
-            rows.append({
-                'score': ef,
-                'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
-                'decoys': decoy_mode,
-                'pocket_id': pocket_id})
-        print(f'Mean EF for {decoy_mode}:', np.mean(efs))
-
-    logger.info(f"{cfg.name} mean EF {np.mean(efs)}")
-
+    # Make it a df
     df = pd.DataFrame(rows)
-    d = Path(cfg.result_dir, parents=True, exist_ok=True)
-    base_name = Path(cfg.name).stem
-    df.to_csv(d / (base_name + '.csv'))
-
     df_raw = pd.DataFrame(raw_rows)
+
+    # Dump csvs
+    d = pathlib.Path(cfg.result_dir, parents=True, exist_ok=True)
+    base_name = pathlib.Path(cfg.name).stem
+    df.to_csv(d / (base_name + '.csv'))
     df_raw.to_csv(d / (base_name + "_raw.csv"))
 
     df = df.loc[df['decoys'] == 'chembl']
+    print(f"{cfg.name} Mean EF : {np.mean(df['score'].values)}")
     df = group_df(df)
-    mean = np.mean(df['score'].values)
-    print(f'Mean grouped EF', mean)
+    print(f"{cfg.name} Mean grouped EF : {np.mean(df['score'].values)}")
 
 
 if __name__ == "__main__":

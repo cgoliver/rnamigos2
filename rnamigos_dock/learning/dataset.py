@@ -1,18 +1,14 @@
 import os
 
-import pandas
 import dgl
-from dgl.dataloading import GraphCollator
-import itertools
 import numpy as np
-from numpy import random
 from pathlib import Path
 import pandas as pd
 import pickle
 from rdkit import RDLogger
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
 import torch
-from torch.utils.data import Dataset, Sampler
+from torch.utils.data import Dataset
 
 from rnamigos_dock.learning.ligand_encoding import MolFPEncoder, MolGraphEncoder
 from rnamigos_dock.tools.graph_utils import load_rna_graph
@@ -131,6 +127,18 @@ def get_systems(target='dock', rnamigos1_split=-1, return_test=False, use_rnamig
     return systems
 
 
+def get_systems_from_cfg(cfg, return_test=False):
+    group_pockets = False if return_test else cfg.train.group_pockets
+    systems = get_systems(target=cfg.train.target,
+                          rnamigos1_split=cfg.train.rnamigos1_split,
+                          use_rnamigos1_train=cfg.train.use_rnamigos1_train,
+                          use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
+                          group_pockets=group_pockets,
+                          filter_robin=cfg.train.filter_robin,
+                          return_test=return_test)
+    return systems
+
+
 def stretch_values(value):
     """
     Takes a value in 0,1 and strech lower ones
@@ -138,6 +146,25 @@ def stretch_values(value):
     :return:
     """
     return value ** (1 / 3)
+
+
+def train_val_split(train_val_systems, frac=0.8, system_based=True):
+    """
+
+    :param train_val_systems: a system dataframe
+    :param frac:
+    :param system_based: If true, all pairs containing a given pocket, are in a given split
+    :return:
+    """
+    if system_based:
+        train_names = train_val_systems['PDB_ID_POCKET'].unique()
+        train_names = np.random.choice(train_names, size=int(frac * len(train_names)), replace=False)
+        train_systems = train_val_systems[train_val_systems['PDB_ID_POCKET'].isin(train_names)]
+        validation_systems = train_val_systems[~train_val_systems['PDB_ID_POCKET'].isin(train_names)]
+    else:
+        train_systems, validation_systems = np.split(train_val_systems.sample(frac=1),
+                                                     [int(frac * len(train_val_systems))])
+    return train_systems, validation_systems
 
 
 class DockingDataset(Dataset):
@@ -187,7 +214,8 @@ class DockingDataset(Dataset):
         self.fp_type = fp_type
         self.use_graphligs = use_graphligs
         self.ligand_encoder = MolFPEncoder(fp_type=fp_type)
-        self.ligand_graph_encoder = MolGraphEncoder(cache_path=ligand_cache, cache=use_ligand_cache) if use_graphligs else None
+        self.ligand_graph_encoder = MolGraphEncoder(cache_path=ligand_cache,
+                                                    cache=use_ligand_cache) if use_graphligs else None
 
         # Setup pockets
         self.undirected = undirected
@@ -242,154 +270,6 @@ class DockingDataset(Dataset):
                 'target': target,
                 'rings': rings,
                 'idx': [idx]}
-
-
-class IsNativeSampler(Sampler):
-    def __init__(self, systems_dataframe, group_sampling=True):
-        super().__init__(data_source=None)
-        self.group_sampling = group_sampling
-        positives = (systems_dataframe['IS_NATIVE'] == 1).values
-        negatives = 1 - positives
-        if not group_sampling:
-            self.positive_rows = np.where(positives)[0]
-            self.negative_rows = np.where(negatives)[0]
-            self.num_pos_examples = len(self.positive_rows)
-        else:
-            script_dir = os.path.dirname(__file__)
-            splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
-            _, _, train_names_grouped, _ = pickle.load(open(splits_file, 'rb'))
-            #  Build positive and negative rows for each group as the list of positive and negative indices
-            # Useful for sampling, also keep track of the amount of positive and negative for each group
-            self.all_positives = list()
-            self.all_negatives = list()
-            num_pos, num_neg = [], []
-            for group_rep, group in train_names_grouped.items():
-                in_group = (systems_dataframe['PDB_ID_POCKET'].isin(group)).values
-                group_positive = np.logical_and(in_group, positives)
-                group_negative = np.logical_and(in_group, negatives)
-                positive_rows = np.where(group_positive)[0]
-                # This can happen (rarely) if all positives are in validation.
-                if len(positive_rows) == 0:
-                    continue
-                negative_rows = np.where(group_negative)[0]
-                self.all_positives.append(positive_rows)
-                self.all_negatives.append(negative_rows)
-                num_pos.append(len(positive_rows))
-                num_neg.append(len(negative_rows))
-            self.num_pos = np.array(num_pos)
-            self.num_neg = np.array(num_neg)
-            # Computing length now avoids problem with empty examples
-            self.num_pos_examples = len(self.num_pos)
-
-    def __iter__(self):
-        if not self.group_sampling:
-            selected_neg_rows = np.random.choice(self.negative_rows,
-                                                 self.num_pos_examples,
-                                                 replace=False)
-            selected_positive_rows = self.positive_rows
-        else:
-            selected_pos = np.random.randint(0, self.num_pos)
-            selected_neg = np.random.randint(0, self.num_neg)
-            selected_positive_rows = []
-            selected_neg_rows = []
-            for i, (group_pos, group_neg) in enumerate(zip(self.all_positives, self.all_negatives)):
-                selected_positive_rows.append(group_pos[selected_pos[i]])
-                selected_neg_rows.append(group_neg[selected_neg[i]])
-            selected_positive_rows = np.array(selected_positive_rows)
-            selected_neg_rows = np.array(selected_neg_rows)
-        systems = np.concatenate((selected_neg_rows, selected_positive_rows))
-        np.random.shuffle(systems)
-        yield from systems
-
-    def __len__(self) -> int:
-        return self.num_pos_examples * 2
-
-
-class NativeFPSampler(Sampler):
-    def __init__(self, systems_dataframe, group_sampling=True):
-        super().__init__(data_source=None)
-        self.group_sampling = group_sampling
-        if not group_sampling:
-            self.num_examples = len(systems_dataframe)
-        else:
-            script_dir = os.path.dirname(__file__)
-            splits_file = os.path.join(script_dir, '../../data/train_test_75.p')
-            _, _, train_names_grouped, _ = pickle.load(open(splits_file, 'rb'))
-            #  Build positive and negative rows for each group as the list of positive and negative indices
-            # Useful for sampling, also keep track of the amount of positive and negative for each group
-            self.grouped_rows = list()
-            num_group = []
-            for group_rep, group in train_names_grouped.items():
-                in_group = (systems_dataframe['PDB_ID_POCKET'].isin(group)).values
-                group_rows = np.where(in_group)[0]
-                # This can happen (rarely) if all positives are in validation.
-                if len(group_rows) == 0:
-                    continue
-                self.grouped_rows.append(group_rows)
-                num_group.append(len(group_rows))
-            self.num_group = np.array(num_group)
-            self.num_examples = len(self.num_group)
-
-    def __iter__(self):
-        if not self.group_sampling:
-            systems = np.arange(self.num_examples)
-        else:
-            selected = np.random.randint(0, self.num_group)
-            selected_rows = []
-            for i, group_selected in enumerate(self.grouped_rows):
-                selected_rows.append(group_selected[selected[i]])
-            systems = np.array(selected_rows)
-        np.random.shuffle(systems)
-        yield from systems
-
-    def __len__(self) -> int:
-        return self.num_examples
-
-
-class RingCollater():
-    def __init__(self, node_simfunc=None, max_size_kernel=None):
-        self.node_simfunc = node_simfunc
-        self.max_size_kernel = max_size_kernel
-        self.graph_collator = GraphCollator()
-
-    def k_block(self, node_rings):
-        # We need to reimplement because current one expects dicts
-        block = np.zeros((len(node_rings), len(node_rings)))
-        assert self.node_simfunc.compare(node_rings[0],
-                                         node_rings[0]) > 0.99, "Identical rings giving non 1 similarity."
-        sims = [self.node_simfunc.compare(n1, n2)
-                for i, (n1, n2) in enumerate(itertools.combinations(node_rings, 2))]
-        block[np.triu_indices(len(node_rings), 1)] = sims
-        block += block.T
-        block += np.eye(len(node_rings))
-        return block
-
-    def collate(self, items):
-        batch = {}
-        for key, value in items[0].items():
-            values = [d[key] for d in items]
-            if key == 'rings':
-                if self.node_simfunc is None:
-                    batch[key] = None, None
-                    continue
-                # Taken from rglib
-                flat_rings = list()
-                for ring in values:
-                    flat_rings.extend(ring)
-                if self.max_size_kernel is None or len(flat_rings) < self.max_size_kernel:
-                    # Just take them all
-                    node_ids = [1 for _ in flat_rings]
-                else:
-                    # Take only 'max_size_kernel' elements
-                    node_ids = [1 for _ in range(self.max_size_kernel)] + \
-                               [0 for _ in range(len(flat_rings) - self.max_size_kernel)]
-                    random.shuffle(node_ids)
-                    flat_rings = [node for i, node in enumerate(flat_rings) if node_ids[i] == 1]
-                k_block = self.k_block(flat_rings)
-                batch[key] = torch.from_numpy(k_block).detach().float(), node_ids
-            else:
-                batch[key] = self.graph_collator.collate(items=values)
-        return batch
 
 
 class VirtualScreenDataset(DockingDataset):

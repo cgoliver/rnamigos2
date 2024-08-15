@@ -13,7 +13,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from rnamigos_dock.post.virtual_screen import mean_active_rank
-from rnamigos_dock.learning.loader import get_systems
+from rnamigos_dock.learning.dataset import get_systems
 
 
 # JUST ADAPT THE EVALUATE SCRIPT

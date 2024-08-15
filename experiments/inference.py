@@ -11,7 +11,7 @@ import pandas as pd
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos_dock.learning.loader import InferenceDataset
+from rnamigos_dock.learning.dataset import InferenceDataset
 from rnamigos_dock.tools.graph_utils import get_dgl_graph
 from rnamigos_dock.learning.models import get_model_from_dirpath
 

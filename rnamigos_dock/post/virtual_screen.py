@@ -84,3 +84,29 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     # print(failed)
     # print(efs)
     return efs, all_scores, status, pocket_names, all_smiles
+
+
+def get_efs(model, dataloader, decoy_mode, cfg, verbose=False):
+    rows, raw_rows = list(), list()
+    lower_is_better = cfg.train.target in ['dock', 'native_fp']
+    metric = enrichment_factor if decoy_mode == 'robin' else mean_active_rank
+    efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
+                                                                       dataloader,
+                                                                       metric=metric,
+                                                                       lower_is_better=lower_is_better,
+                                                                       )
+    for pocket_id, score_list, status_list, smiles_list in zip(pocket_names, scores, status, all_smiles):
+        for score, status, smiles in zip(score_list, status_list, smiles_list):
+            raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id, 'smiles': smiles,
+                             'decoys': decoy_mode})
+
+    for ef, score, pocket_id in zip(efs, scores, pocket_names):
+        rows.append({
+            'score': ef,
+            'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
+            'decoys': decoy_mode,
+            'pocket_id': pocket_id})
+    if verbose:
+        print(f'Mean EF for {decoy_mode}:', np.mean(efs))
+    return rows, raw_rows
+

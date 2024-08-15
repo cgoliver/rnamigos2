@@ -51,7 +51,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from rnamigos_dock.learning.models import get_model_from_dirpath
-from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
+from rnamigos_dock.learning.dataset import VirtualScreenDataset, get_systems
 from rnamigos_dock.post.virtual_screen import mean_active_rank, run_virtual_screen
 from rnamigos_dock.tools.graph_utils import load_rna_graph
 

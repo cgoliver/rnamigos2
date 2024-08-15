@@ -15,9 +15,10 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos_dock.learning.loader import VirtualScreenDataset, get_systems
+from rnamigos_dock.learning.dataset import VirtualScreenDataset, get_systems_from_cfg
+from rnamigos_dock.learning.dataloader import get_vs_loader
 from rnamigos_dock.learning.models import get_model_from_dirpath
-from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen
+from rnamigos_dock.post.virtual_screen import mean_active_rank, enrichment_factor, run_virtual_screen,get_efs
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
@@ -25,84 +26,54 @@ torch.set_num_threads(1)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="evaluate")
 def main(cfg: DictConfig):
-    # print(OmegaConf.to_yaml(cfg))
-    # print('Done importing')
-    '''
-    Hardware settings
-    '''
+    # Setup hardware, cpu is fastest for inference
+    torch.multiprocessing.set_sharing_strategy('file_system')
+    device = 'cpu'
 
+    # Load params from file
+    print(OmegaConf.to_yaml(cfg))
+    print('Done importing')
     with open(Path(cfg.saved_model_dir, 'config.yaml'), 'r') as f:
         params = safe_load(f)
         print(params['train'])
+        if cfg.custom_dir:
+            params['data']['pocket_path'] = cfg.data.pocket_graphs
+        cfg_load = OmegaConf.create(params)
 
-    # torch.multiprocessing.set_sharing_strategy('file_system')
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cpu'
+    # Get model
     model = get_model_from_dirpath(cfg.saved_model_dir)
     model = model.to(device)
+
+    # Setup data
     if cfg.custom_dir:
         test_systems = pd.DataFrame({'PDB_ID_POCKET': [Path(g).stem for g in os.listdir(cfg.data.pocket_graphs)]})
     else:
-        test_systems = get_systems(target=params['train']['target'],
-                                   rnamigos1_split=params['train']['rnamigos1_split'],
-                                   use_rnamigos1_train=params['train']['use_rnamigos1_train'],
-                                   use_rnamigos1_ligands=False,
-                                   return_test=True)
-    # Loader is asynchronous
-    loader_args = {'shuffle': False,
-                   'batch_size': 1,
-                   'num_workers': 4,
-                   'collate_fn': lambda x: x[0]
-                   }
+        test_systems = get_systems_from_cfg(cfg=cfg_load, return_test=True)
 
-    rows, raw_rows = [], []
+    # Run VS
     if cfg.decoys == 'all':
         decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder']
     else:
         decoys = [cfg.decoys]
 
+    rows, raw_rows = [], []
     for decoy_mode in decoys:
-        pocket_path = cfg.data.pocket_graphs if cfg.custom_dir else params['data']['pocket_graphs']
-        dataset = VirtualScreenDataset(pocket_path,
-                                       cache_graphs=False,
-                                       ligands_path=params['data']['ligand_db'],
-                                       systems=test_systems,
-                                       decoy_mode=decoy_mode,
-                                       use_graphligs=params['model']['use_graphligs'],
-                                       group_ligands=True,
-                                       reps_only=False)
-        dataloader = GraphDataLoader(dataset=dataset, **loader_args)
+        dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg_load, rognan=cfg.rognan)
 
-        print('Created data loader')
+        # Experiment Setup
+        decoy_rows, decoys_raw_rows = get_efs(model=model, dataloader=dataloader, decoy_mode=decoy_mode, cfg=cfg,
+                                              verbose=True)
+        rows += decoy_rows
+        raw_rows += decoys_raw_rows
 
-        '''
-        Experiment Setup
-        '''
-        lower_is_better = params['train']['target'] in ['dock', 'native_fp']
-        efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
-                                                                           dataloader,
-                                                                           metric=enrichment_factor if decoy_mode == 'robin' else mean_active_rank,
-                                                                           lower_is_better=lower_is_better,
-                                                                           )
-        for pocket_id, score_list, status_list, smiles_list in zip(pocket_names, scores, status, all_smiles):
-            for score, status, smiles in zip(score_list, status_list, smiles_list):
-                raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id, 'smiles': smiles,
-                                 'decoys': decoy_mode})
-
-        for ef, score, pocket_id in zip(efs, scores, pocket_names):
-            rows.append({
-                'score': ef,
-                'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
-                'decoys': decoy_mode,
-                'pocket_id': pocket_id})
-        print('Mean EF :', np.mean(efs))
-
+    # Make it a df
     df = pd.DataFrame(rows)
+    df_raw = pd.DataFrame(raw_rows)
+
+    # Dump csvs
     d = Path(cfg.result_dir, parents=True, exist_ok=True)
     base_name = Path(cfg.csv_name).stem
     df.to_csv(d / (base_name + '.csv'))
-
-    df_raw = pd.DataFrame(raw_rows)
     df_raw.to_csv(d / (base_name + "_raw.csv"))
 
 

@@ -103,7 +103,6 @@ def train_dock(model,
     :param writer: a Tensorboard object (defined in utils)
     :param num_epochs: int number of epochs
     :param wall_time: The number of hours you want the model to run
-    :param embed_only: number of epochs before starting attributor training.
     :return:
     """
     epochs_from_best = 0
