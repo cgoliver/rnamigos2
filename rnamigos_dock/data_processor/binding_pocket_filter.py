@@ -6,6 +6,7 @@
 from collections import defaultdict
 import pickle
 
+
 def ligand_filter(name, kill):
     """
        Filter out ligands in kill list.
@@ -19,6 +20,7 @@ def ligand_filter(name, kill):
     if name in kill:
         return False
     return True
+
 
 def get_valids(lig_dict, max_dist, min_conc, min_size=4):
     """
@@ -38,10 +40,10 @@ def get_valids(lig_dict, max_dist, min_conc, min_size=4):
     kill = ['IRI', 'UNL', 'UNX', 'XXX']
     unique_ligs = set()
     for pdb, ligands in lig_dict.items():
-        for lig_id,lig_cuts in ligands:
+        for lig_id, lig_cuts in ligands:
             # lig_name = lig_id.split(":")[1]
             lig_name = lig_id.split(":")[2]
-            #go over each distance cutoff
+            # go over each distance cutoff
             for c in lig_cuts:
                 tot = c['rna'] + c['protein']
                 if tot == 0:
@@ -49,7 +51,7 @@ def get_valids(lig_dict, max_dist, min_conc, min_size=4):
                 if c['rna'] < min_size:
                     continue
                 rna_conc = c['rna'] / tot
-                #scan until concentration is met and still under maximum distance.
+                # scan until concentration is met and still under maximum distance.
                 if (rna_conc >= min_conc and c['cutoff'] <= max_dist) and ligand_filter(lig_name, kill):
                     ok_ligs[pdb].append(lig_id)
                     print(lig_id)
@@ -60,10 +62,11 @@ def get_valids(lig_dict, max_dist, min_conc, min_size=4):
     print(f">>> maximum distance from ligand {max_dist}")
     print(f">>> minimum RNA concentration {min_conc}")
     print(f">>> retained {len(ok_ligs)} PDBs")
-    print(f">>> with a total of {sum(map(len,ok_ligs.values()))} binding sites")
+    print(f">>> with a total of {sum(map(len, ok_ligs.values()))} binding sites")
     print(f">>> and {len(unique_ligs)} unique ligands.")
     print(f">>> passed ligands", unique_ligs)
     return ok_ligs
+
 
 def ligs_to_txt(d, dest="../data/ligs.txt"):
     """
@@ -73,12 +76,14 @@ def ligs_to_txt(d, dest="../data/ligs.txt"):
         for pdb, ligs in d.items():
             o.write(" ".join([pdb, *ligs]) + "\n")
     pass
+
+
 if __name__ == "__main__":
-    #d = pickle.load(open('lig_dict_mg.p', 'rb'))
+    # d = pickle.load(open('lig_dict_mg.p', 'rb'))
     d = pickle.load(open('../data/binding_pocket_analyse.p', 'rb'))
     c = 10
     conc = .6
     ligs = get_valids(d, c, conc, min_size=4)
-    #pickle.dump(ligs, open("lig_dict_mg_filter.p", "wb"))
+    # pickle.dump(ligs, open("lig_dict_mg_filter.p", "wb"))
     pickle.dump(ligs, open("../data/lig_dict_filter.p", "wb"))
     # ligs_to_txt(ligs)

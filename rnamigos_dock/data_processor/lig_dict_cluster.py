@@ -17,11 +17,11 @@ def ligands_cluster(bs_dict, fp_dict, n_clusters=8):
         Create new fingerprint dictionary {'lig_id': cluster_id}
 
     """
-    #get which ligands to use in clustering
+    # get which ligands to use in clustering
     binding_sites = pickle.load(open(bs_dict, 'rb'))
     fingerprints = pickle.load(open(fp_dict, 'rb'))
     ligs_2_cluster = []
-    for _,ligs in binding_sites.items():
+    for _, ligs in binding_sites.items():
         pocket_ids = [f.split(":")[2] for f in ligs]
         ligs_2_cluster.extend(pocket_ids)
     # ligs_2_cluster_unique = list(set(ligs_2_cluster))
@@ -33,7 +33,7 @@ def ligands_cluster(bs_dict, fp_dict, n_clusters=8):
         except:
             print(l)
 
-    #do the clustering
+    # do the clustering
     clusterer = AgglomerativeClustering(n_clusters=n_clusters)
     clusterer.fit(fps)
     labels = clusterer.labels_
@@ -43,6 +43,7 @@ def ligands_cluster(bs_dict, fp_dict, n_clusters=8):
 
     return clustered_fp_dict
     pass
+
 
 if __name__ == "__main__":
     clustered_fp_dict = ligands_cluster("../data/lig_dict_c_8A_06rna.p", "../data/all_ligs_maccs.p")
