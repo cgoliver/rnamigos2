@@ -1,30 +1,35 @@
+# general
 seed: 42
-parallel: false
+result_dir: outputs/
+
+#loader
+shuffle: true
 batch_size: 32
 num_workers: 0
-clf_lam: 1.0
-reconstruction_lam: 1.0
-kfold: 5
-num_epochs: 100
-vs_every: 20
-embed_only: false
-early_stop: 10
-use_nucs: true
-target: dock # dock or native_fp or is_native
+
+# dataset
 use_normalized_score: False # To use quantiles instead of scores
 stretch_scores: False # To put more emphasis on better scores
-shuffle: true
-loss: 'l2'
+group_pockets: False
+group_sample: False
 use_rnamigos1_train: False
 use_rnamigos1_ligands: False
 filter_robin: False
 rnamigos1_split: -1
-group_pockets: False
-group_sample: False
-learning_rate: 1e-3
-pretrain_weight: 0.
 simfunc: None
 simfunc_depth: 2
 max_kernel: 20
-result_dir: outputs/
 
+# learning
+loss: 'l2'
+num_epochs: 100
+learning_rate: 1e-3
+pretrain_weight: 0.
+clf_lam: 1.0
+reconstruction_lam: 1.0
+early_stop: 10
+target: dock # dock or native_fp or is_native
+
+# Validation
+vs_every: 20
+vs_decoy_mode: 'chembl'
