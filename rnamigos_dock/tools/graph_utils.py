@@ -1,10 +1,9 @@
-import dgl
-import itertools
-import networkx as nx
-import numpy as np
 import os
-from pathlib import Path
+
+import dgl
 from loguru import logger
+import networkx as nx
+from pathlib import Path
 import pickle
 from tqdm import tqdm
 import torch
@@ -25,30 +24,6 @@ def get_edge_map(graphs_dir):
         edge_labels = edge_labels.union(edges)
 
     return {label: i for i, label in enumerate(sorted(edge_labels))}
-
-
-def nx_to_dgl_(graph, edge_map, embed_dim):
-    """
-        Networkx graph to DGL.
-    """
-    import torch
-    import dgl
-
-    graph, _, ring = pickle.load(open(graph, 'rb'))
-    one_hot = {edge: edge_map[label] for edge, label in (nx.get_edge_attributes(graph, 'label')).items()}
-    nx.set_edge_attributes(graph, name='one_hot', values=one_hot)
-    g_dgl = dgl.DGLGraph()
-    g_dgl.from_networkx(nx_graph=graph, edge_attrs=['one_hot'])
-    n_nodes = len(g_dgl.nodes())
-    g_dgl.ndata['h'] = torch.ones((n_nodes, embed_dim))
-    return graph, g_dgl
-
-
-def dgl_to_nx(graph, edge_map):
-    g = dgl.to_networkx(graph, edge_attrs=['one_hot'])
-    edge_map_r = {v: k for k, v in edge_map.items()}
-    nx.set_edge_attributes(g, {(n1, n2): edge_map_r[d['one_hot'].item()] for n1, n2, d in g.edges(data=True)}, 'label')
-    return g
 
 
 # Adapted from rglib
@@ -127,7 +102,8 @@ def get_dgl_graph(cif_path, residue_list, undirected=False):
 
     nx_graph.remove_nodes_from(buggy_nodes)
 
-    logger.warning(f"Conversion of mmCIF to graph by fr3d-python created {len(buggy_nodes)} residues with missing residue IDs. Removing {buggy_nodes} from the graph.")
+    logger.warning(
+        f"Conversion of mmCIF to graph by fr3d-python created {len(buggy_nodes)} residues with missing residue IDs. Removing {buggy_nodes} from the graph.")
 
     # This is the pdbid used by fr3d
     pdbid = Path(cif_path).stem.lower()
