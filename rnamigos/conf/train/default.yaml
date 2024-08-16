@@ -3,7 +3,7 @@ seed: 42
 result_dir: outputs/
 
 #loader
-shuffle: true
+shuffle: True
 batch_size: 32
 num_workers: 0
 
@@ -33,3 +33,4 @@ target: dock # dock or native_fp or is_native
 # Validation
 vs_every: 20
 vs_decoy_mode: 'chembl'
+do_rognan: True

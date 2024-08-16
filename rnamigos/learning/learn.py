@@ -59,6 +59,7 @@ def train_dock(model,
                val_vs_loader,
                test_vs_loader,
                save_path,
+               val_vs_loader_rognan=None,
                writer=None,
                device='cpu',
                num_epochs=25,
@@ -129,7 +130,7 @@ def train_dock(model,
 
             if batch_idx % 200 == 0:
                 time_elapsed = time.time() - start_time
-                print(f'Train Epoch: { epoch + 1} [{(batch_idx + 1) * batch_size}/{num_batches * batch_size} '
+                print(f'Train Epoch: {epoch + 1} [{(batch_idx + 1) * batch_size}/{num_batches * batch_size} '
                       f'({100. * (batch_idx + 1) / num_batches:.0f}%)]'
                       f'\tLoss: {batch_loss:.6f}  Time: {time_elapsed:.2f}')
 
@@ -184,6 +185,13 @@ def train_dock(model,
                                                                                metric=mean_active_rank,
                                                                                lower_is_better=lower_is_better)
             writer.add_scalar("Val EF during training", np.mean(efs), epoch)
+
+            if val_vs_loader_rognan is not None:
+                efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
+                                                                                   val_vs_loader,
+                                                                                   metric=mean_active_rank,
+                                                                                   lower_is_better=lower_is_better)
+                writer.add_scalar("Val EF Rognan", np.mean(efs), epoch)
 
             efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
                                                                                test_vs_loader,

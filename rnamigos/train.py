@@ -68,6 +68,14 @@ def main(cfg: DictConfig):
                                    decoy_mode=cfg.train.vs_decoy_mode,
                                    reps_only=True,
                                    cfg=cfg)
+    # Maybe monitor rognan's performance ?
+    val_vs_loader_rognan = None
+    if cfg.train.do_rognan:
+        val_vs_loader_rognan = get_vs_loader(systems=vs_validation_systems,
+                                             decoy_mode=cfg.train.vs_decoy_mode,
+                                             reps_only=True,
+                                             rognan=True,
+                                             cfg=cfg)
 
     # Optimizer instantiation
     if cfg.train.loss == 'l2':
@@ -95,6 +103,7 @@ def main(cfg: DictConfig):
                                      train_loader=train_loader,
                                      val_loader=val_loader,
                                      val_vs_loader=val_vs_loader,
+                                     val_vs_loader_rognan=val_vs_loader_rognan,
                                      test_vs_loader=test_vs_loader,
                                      save_path=save_name,
                                      writer=writer,
