@@ -99,6 +99,7 @@ def train_dock(model,
 
         # switch off embedding grads, turn on attributor
         running_loss = 0.0
+        val_ef = 0
         for batch_idx, (batch) in enumerate(train_loader):
             graph, ligand_input, target, idx = batch['graph'], batch['ligand_input'], batch['target'], batch['idx']
             node_sim_block, subsampled_nodes = batch['rings']
@@ -147,12 +148,29 @@ def train_dock(model,
         # Validation phase
         val_loss = validate(model, val_loader, criterion, device)
         print(">> val loss ", val_loss)
+        writer.add_scalar("Val loss", val_loss, epoch)
 
-        writer.add_scalar("Validation loss during training", val_loss, epoch)
+        # Run VS metrics
+        if not epoch % vs_every:
+            lower_is_better = cfg.train.target in ['dock', 'native_fp']
+            efs, *_ = run_virtual_screen(model, val_vs_loader, lower_is_better=lower_is_better)
+            val_ef = np.mean(efs)
+            writer.add_scalar("Val EF", val_ef, epoch)
+
+            if val_vs_loader_rognan is not None:
+                efs, *_ = run_virtual_screen(model, val_vs_loader_rognan, lower_is_better=lower_is_better)
+                writer.add_scalar("Val EF Rognan", np.mean(efs), epoch)
+
+            efs, *_ = run_virtual_screen(model, test_vs_loader, lower_is_better=lower_is_better)
+            writer.add_scalar("Test EF", np.mean(efs), epoch)
+
+        # Finally do checkpointing based on vs performance, we negate it since higher efs are better
+        # loss_to_track = val_loss
+        loss_to_track = -val_ef
 
         # Checkpointing
-        if val_loss < best_loss:
-            best_loss = val_loss
+        if loss_to_track < best_loss:
+            best_loss = loss_to_track
             epochs_from_best = 0
             model.cpu()
             torch.save({
@@ -177,27 +195,6 @@ def train_dock(model,
             if time_elapsed * (1 + 1 / (epoch + 1)) > .95 * wall_time * 3600:
                 break
         del val_loss
-
-        if not epoch % vs_every:
-            lower_is_better = cfg.train.target in ['dock', 'native_fp']
-            efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
-                                                                               val_vs_loader,
-                                                                               metric=mean_active_rank,
-                                                                               lower_is_better=lower_is_better)
-            writer.add_scalar("Val EF during training", np.mean(efs), epoch)
-
-            if val_vs_loader_rognan is not None:
-                efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
-                                                                                   val_vs_loader,
-                                                                                   metric=mean_active_rank,
-                                                                                   lower_is_better=lower_is_better)
-                writer.add_scalar("Val EF Rognan", np.mean(efs), epoch)
-
-            efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
-                                                                               test_vs_loader,
-                                                                               metric=mean_active_rank,
-                                                                               lower_is_better=lower_is_better)
-            writer.add_scalar("Test EF during training", np.mean(efs), epoch)
 
     best_state_dict = torch.load(save_path)['model_state_dict']
     model.load_state_dict(best_state_dict)
