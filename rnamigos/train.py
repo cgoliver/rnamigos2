@@ -135,10 +135,15 @@ def main(cfg: DictConfig):
     df.to_csv(d / (base_name + '.csv'))
     df_raw.to_csv(d / (base_name + "_raw.csv"))
 
-    df = df.loc[df['decoys'] == 'chembl']
-    print(f"{cfg.name} Mean EF on chembl: {np.mean(df['score'].values)}")
-    df = group_df(df)
-    print(f"{cfg.name} Mean grouped EF on chembl: {np.mean(df['score'].values)}")
+    df_chembl = df.loc[df['decoys'] == 'chembl']
+    print(f"{cfg.name} Mean EF on chembl: {np.mean(df_chembl['score'].values)}")
+    df_chembl = group_df(df_chembl)
+    print(f"{cfg.name} Mean grouped EF on chembl: {np.mean(df_chembl['score'].values)}")
+
+    df_pdbchembl = df.loc[df['decoys'] == 'pdb_chembl']
+    print(f"{cfg.name} Mean EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
+    df_pdbchembl = group_df(df_pdbchembl)
+    print(f"{cfg.name} Mean grouped EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
 
 
 if __name__ == "__main__":

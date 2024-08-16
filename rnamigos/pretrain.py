@@ -1,15 +1,19 @@
-from pathlib import Path
+import os
+import sys
 
-import torch
-
-from omegaconf import DictConfig, OmegaConf
 import hydra
+from omegaconf import DictConfig, OmegaConf
+from pathlib import Path
+import torch
 
 from rnaglib.kernels import node_sim
 from rnaglib.data_loading import rna_dataset, rna_loader
 from rnaglib.representations import GraphRepresentation, RingRepresentation
 from rnaglib.learning import learning_utils, learn
 from rnaglib.config.graph_keys import GRAPH_KEYS, TOOL
+
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from rnamigos.learning.models import Embedder
 from rnamigos.utils.graph_utils import to_undirected
@@ -18,12 +22,9 @@ from rnamigos.utils.graph_utils import to_undirected
 @hydra.main(version_base=None, config_path="conf", config_name="pretrain")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
-    # Choose the data, features and targets to use
-    node_features = ['nt_code']
 
-    ###### Unsupervised phase : ######
-    # Choose the data and kernel to use for pretraining
-    print('Starting to pretrain the network')
+    # Choose the data, features and targets to use from graphs and kernel for pretraining
+    node_features = ['nt_code']
     node_simfunc = node_sim.SimFunctionNode(method=cfg.simfunc, depth=cfg.depth)
     edge_map = GRAPH_KEYS['edge_map'][TOOL]
     edge_map = to_undirected(edge_map) if cfg.data.undirected else edge_map
@@ -41,8 +42,8 @@ def main(cfg: DictConfig):
                      dropout=cfg.model.dropout,
                      subset_pocket_nodes=False
                      )
-
     optimizer = torch.optim.Adam(model.parameters())
+
     learn.pretrain_unsupervised(model=model,
                                 optimizer=optimizer,
                                 train_loader=train_loader,
