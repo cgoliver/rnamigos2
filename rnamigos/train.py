@@ -64,10 +64,11 @@ def main(cfg: DictConfig):
                                   decoy_mode=cfg.train.vs_decoy_mode,
                                   reps_only=True,
                                   cfg=cfg)
-    test_vs_loader = get_vs_loader(systems=vs_validation_systems,
+    test_vs_loader = get_vs_loader(systems=test_systems,
                                    decoy_mode=cfg.train.vs_decoy_mode,
                                    reps_only=True,
                                    cfg=cfg)
+
     # Maybe monitor rognan's performance ?
     val_vs_loader_rognan = None
     if cfg.train.do_rognan:
