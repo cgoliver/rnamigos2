@@ -1,18 +1,25 @@
-import itertools
 import os
-import pickle
 
+from dgl.dataloading import GraphCollator, GraphDataLoader
+import itertools
 import numpy as np
+import pickle
+from rnaglib.kernels.node_sim import SimFunctionNode
 import torch
-from dgl.dataloading import GraphCollator
-from numpy import random
 from torch.utils.data import Sampler
 
-from dgl.dataloading import GraphDataLoader
 from rnamigos.learning.dataset import VirtualScreenDataset
 
 
 class IsNativeSampler(Sampler):
+    """
+    In the is_native task:
+    - without grouping for each pocket, we have one positive and all others are considered negative examples.
+    - with grouping, for each group, we have a little set of positives and all others are considered negative examples.
+
+    At each iteration, we want to draw one positive and one negative for each pocket/group.
+    """
+
     def __init__(self, systems_dataframe, group_sampling=True):
         super().__init__(data_source=None)
         self.group_sampling = group_sampling
@@ -56,6 +63,8 @@ class IsNativeSampler(Sampler):
                                                  replace=False)
             selected_positive_rows = self.positive_rows
         else:
+            # self.num_pos is a list with the number of positive for each group [2,4,1,1...]
+            # random.randint chooses a number up to those for each group. For instance: selected_pos= [1,2,0,0...]
             selected_pos = np.random.randint(0, self.num_pos)
             selected_neg = np.random.randint(0, self.num_neg)
             selected_positive_rows = []
@@ -65,6 +74,7 @@ class IsNativeSampler(Sampler):
                 selected_neg_rows.append(group_neg[selected_neg[i]])
             selected_positive_rows = np.array(selected_positive_rows)
             selected_neg_rows = np.array(selected_neg_rows)
+            # TODO: could we make a more compact call like self.all_positives[selected_pos,:] ?
         systems = np.concatenate((selected_neg_rows, selected_positive_rows))
         np.random.shuffle(systems)
         yield from systems
@@ -74,6 +84,10 @@ class IsNativeSampler(Sampler):
 
 
 class NativeFPSampler(Sampler):
+    """
+    This is the same as above, except that no negative are selected
+    """
+
     def __init__(self, systems_dataframe, group_sampling=True):
         super().__init__(data_source=None)
         self.group_sampling = group_sampling
@@ -151,13 +165,48 @@ class RingCollater():
                     # Take only 'max_size_kernel' elements
                     node_ids = [1 for _ in range(self.max_size_kernel)] + \
                                [0 for _ in range(len(flat_rings) - self.max_size_kernel)]
-                    random.shuffle(node_ids)
+                    np.random.shuffle(node_ids)
                     flat_rings = [node for i, node in enumerate(flat_rings) if node_ids[i] == 1]
                 k_block = self.k_block(flat_rings)
                 batch[key] = torch.from_numpy(k_block).detach().float(), node_ids
             else:
                 batch[key] = self.graph_collator.collate(items=values)
         return batch
+
+
+def get_loader(cfg, dataset, systems, training=True):
+    """
+    Code factoring the loader creation based on the cfg file.
+
+    It needs to call the right Sampler based on the training target and collater that can potentially handle rings.
+    """
+    # Set up sampler
+    # These one cannot be a shared object
+    if cfg.train.target == 'is_native':
+        sampler = IsNativeSampler(systems, group_sampling=cfg.train.group_sample)
+    elif cfg.train.target == 'native_fp':
+        sampler = NativeFPSampler(systems, group_sampling=cfg.train.group_sample)
+    else:
+        sampler = None
+
+    # Set up collater, optionally with rings for training
+    node_simfunc = None
+    max_size_kernel = None
+    if training:
+        if cfg.train.simfunc in {'R_iso', 'R_1', 'hungarian'}:
+            node_simfunc = SimFunctionNode(cfg.train.simfunc, depth=cfg.train.simfunc_depth)
+            max_size_kernel = cfg.train.max_kernel
+
+    collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=max_size_kernel)
+    loader_args = {'shuffle': sampler is None,
+                   'batch_size': cfg.train.batch_size,
+                   'num_workers': cfg.train.num_workers}
+
+    loader = GraphDataLoader(dataset=dataset,
+                             sampler=sampler,
+                             collate_fn=collater.collate,
+                             **loader_args)
+    return loader
 
 
 VS_LOADER_ARGS = {'shuffle': False,
@@ -168,6 +217,10 @@ VS_LOADER_ARGS = {'shuffle': False,
 
 
 def get_vs_loader(systems, decoy_mode, cfg, reps_only=False, rognan=False):
+    """
+    Just a wrapper to factor boilerplate expansion of the cfg file.
+    We keep decoy_mode exposed to use on a different decoy set than the one used in training
+    """
     global VS_LOADER_ARGS
     vs_dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
                                       ligands_path=cfg.data.ligand_db,

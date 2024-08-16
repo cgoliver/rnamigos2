@@ -48,11 +48,7 @@ def main(cfg: DictConfig):
         test_systems = get_systems_from_cfg(cfg=cfg_load, return_test=True)
 
     # Run VS
-    if cfg.decoys == 'all':
-        decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder']
-    else:
-        decoys = [cfg.decoys]
-
+    decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder'] if cfg.decoys == 'all' else [cfg.decoys]
     rows, raw_rows = [], []
     for decoy_mode in decoys:
         dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg_load, rognan=cfg.rognan)

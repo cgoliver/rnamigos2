@@ -2,8 +2,8 @@ import os
 
 import dgl
 import numpy as np
-from pathlib import Path
 import pandas as pd
+from pathlib import Path
 import pickle
 from rdkit import RDLogger
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
@@ -14,13 +14,6 @@ from rnamigos.learning.ligand_encoding import MolFPEncoder, MolGraphEncoder
 from rnamigos.utils.graph_utils import load_rna_graph
 
 RDLogger.DisableLog('rdApp.*')  # disable warnings
-
-ROBIN_SYSTEMS = """2GDI	TPP
-6QN3	GLN
-5BTP	AMZ
-2QWY	SAM
-3FU2	PRF
-"""
 
 
 def rnamigos_1_split(systems, rnamigos1_test_split=0, return_test=False,
@@ -111,6 +104,12 @@ def get_systems(target='dock', rnamigos1_split=-1, return_test=False, use_rnamig
         systems = systems.loc[systems['SPLIT'] == split]
         # Remove robin systems from the train
         if filter_robin and split == 'TRAIN':
+            ROBIN_SYSTEMS = """2GDI	TPP
+            6QN3	GLN
+            5BTP	AMZ
+            2QWY	SAM
+            3FU2	PRF
+            """
             unique_train = set(systems['PDB_ID_POCKET'].unique())
             shortlist_to_avoid = set()
             for robin_sys in ROBIN_SYSTEMS.splitlines():
@@ -146,25 +145,6 @@ def stretch_values(value):
     :return:
     """
     return value ** (1 / 3)
-
-
-def train_val_split(train_val_systems, frac=0.8, system_based=True):
-    """
-
-    :param train_val_systems: a system dataframe
-    :param frac:
-    :param system_based: If true, all pairs containing a given pocket, are in a given split
-    :return:
-    """
-    if system_based:
-        train_names = train_val_systems['PDB_ID_POCKET'].unique()
-        train_names = np.random.choice(train_names, size=int(frac * len(train_names)), replace=False)
-        train_systems = train_val_systems[train_val_systems['PDB_ID_POCKET'].isin(train_names)]
-        validation_systems = train_val_systems[~train_val_systems['PDB_ID_POCKET'].isin(train_names)]
-    else:
-        train_systems, validation_systems = np.split(train_val_systems.sample(frac=1),
-                                                     [int(frac * len(train_val_systems))])
-    return train_systems, validation_systems
 
 
 class DockingDataset(Dataset):
@@ -392,9 +372,45 @@ class InferenceDataset(Dataset):
 
     def collate(self, ligands):
         batch_graph = dgl.batch([x[0] for x in ligands])
-        batch_vector = np.array([x[1] for x in ligands])
-        batch_vector = torch.tensor(batch_vector)
+        batch_vector = torch.tensor(np.array([x[1] for x in ligands]))
         return batch_graph, batch_vector
+
+
+def train_val_split(train_val_systems, frac=0.8, system_based=True):
+    """
+
+    :param train_val_systems: a system dataframe
+    :param frac:
+    :param system_based: If true, all pairs containing a given pocket, are in a given split
+    :return:
+    """
+    if system_based:
+        train_names = train_val_systems['PDB_ID_POCKET'].unique()
+        train_names = np.random.choice(train_names, size=int(frac * len(train_names)), replace=False)
+        train_systems = train_val_systems[train_val_systems['PDB_ID_POCKET'].isin(train_names)]
+        validation_systems = train_val_systems[~train_val_systems['PDB_ID_POCKET'].isin(train_names)]
+    else:
+        train_systems, validation_systems = np.split(train_val_systems.sample(frac=1),
+                                                     [int(frac * len(train_val_systems))])
+    return train_systems, validation_systems
+
+
+def get_dataset(cfg, systems, training=True):
+    use_rings = False
+    if training:
+        use_rings = cfg.train.simfunc in {'R_iso', 'R_1', 'hungarian'}
+    dataset_args = {'pockets_path': cfg.data.pocket_graphs,
+                    'target': cfg.train.target,
+                    'shuffle': cfg.train.shuffle,
+                    'seed': cfg.train.seed,
+                    'debug': cfg.debug,
+                    'use_graphligs': cfg.model.use_graphligs,
+                    'use_normalized_score': cfg.train.use_normalized_score,
+                    'stretch_scores': cfg.train.stretch_scores,
+                    'undirected': cfg.data.undirected}
+
+    dataset = DockingDataset(systems=systems, use_rings=use_rings, **dataset_args)
+    return dataset
 
 
 if __name__ == '__main__':

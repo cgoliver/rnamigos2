@@ -88,7 +88,7 @@ def train_dock(model,
     vs_every = cfg.train.vs_every if cfg is not None else 10
     # if we delay attributor, start with attributor OFF
     # if <= -1, both always ON.
-
+    num_batches = len(train_loader)
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + 1, num_epochs))
         print('-' * 10)
@@ -98,13 +98,9 @@ def train_dock(model,
 
         # switch off embedding grads, turn on attributor
         running_loss = 0.0
-        time_epoch = time.perf_counter()
-        num_batches = len(train_loader)
         for batch_idx, (batch) in enumerate(train_loader):
             graph, ligand_input, target, idx = batch['graph'], batch['ligand_input'], batch['target'], batch['idx']
             node_sim_block, subsampled_nodes = batch['rings']
-            # Get data on the devices
-            # convert ints to one hots
             graph = send_graph_to_device(graph, device)
             ligand_input = ligand_input.to(device)
             target = target.to(device)
@@ -114,6 +110,7 @@ def train_dock(model,
             else:
                 loss = criterion(pred.squeeze(), target.float())
 
+            # Optionally keep a small weight on the pretraining objective
             if pretrain_weight > 0 and node_sim_block is not None:
                 subsampled_nodes_tensor = torch.tensor(subsampled_nodes, dtype=torch.bool)
                 selected_embs = embeddings[torch.where(subsampled_nodes_tensor == 1)]
@@ -132,13 +129,9 @@ def train_dock(model,
 
             if batch_idx % 200 == 0:
                 time_elapsed = time.time() - start_time
-                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}  Time: {:.2f}'.format(
-                    epoch + 1,
-                    (batch_idx + 1) * batch_size,
-                    num_batches * batch_size,
-                    100. * (batch_idx + 1) / num_batches,
-                    batch_loss,
-                    time_elapsed))
+                print(f'Train Epoch: { epoch + 1} [{(batch_idx + 1) * batch_size}/{num_batches * batch_size} '
+                      f'({100. * (batch_idx + 1) / num_batches:.0f}%)]'
+                      f'\tLoss: {batch_loss:.6f}  Time: {time_elapsed:.2f}')
 
                 # tensorboard logging
                 writer.add_scalar("Training batch loss", batch_loss,
@@ -156,15 +149,6 @@ def train_dock(model,
 
         writer.add_scalar("Validation loss during training", val_loss, epoch)
 
-        """
-        learning_curve_val_df = learning_curve_val_df.append({'EPOCH': str(ne), 
-            'LOSS': str(train_loss), 
-            'TYPE_LOSS':'TRAIN'}, ignore_index=True)
-        
-        learning_curve_val_df = learning_curve_val_df.append({'EPOCH': str(ne), 
-            'LOSS': str(val_loss), 
-            'TYPE_LOSS':'VAL'}, ignore_index=True)
-        """
         # Checkpointing
         if val_loss < best_loss:
             best_loss = val_loss
@@ -195,7 +179,6 @@ def train_dock(model,
 
         if not epoch % vs_every:
             lower_is_better = cfg.train.target in ['dock', 'native_fp']
-
             efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
                                                                                val_vs_loader,
                                                                                metric=mean_active_rank,
