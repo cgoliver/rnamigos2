@@ -80,7 +80,7 @@ def load_rna_graph(rna_path,
             except KeyError:
                 missing_nodes.append(node)
                 pass
-            new_feat[node] = torch.cat((d['nt_features'], torch.tensor(d['rnafm'])))
+            new_feat[node] = torch.tensor(d['rnafm'])
             all_embs.append(d['rnafm'])
 
         # if a node is missing an embedding, use the mean of embeddings
