@@ -13,6 +13,7 @@ from rnaglib.prepare_data import fr3d_to_graph
 from rnaglib.utils import graph_io
 from rnaglib.utils import NODE_FEATURE_MAP
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
+from rnaglib.transforms import RNAFMTransform
 
 
 # Adapted from rglib
@@ -31,7 +32,11 @@ def to_undirected(edge_map):
     return undirected_edge_map
 
 
-def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=False, use_rings=False):
+def load_rna_graph(rna_path, 
+                   edge_map=EDGE_MAP_RGLIB,
+                   undirected=False,
+                   use_rings=False,
+                   use_rnafm=False):
     """
     NetworkX Graph or path to a json => DGL graph
     """
@@ -54,10 +59,37 @@ def load_rna_graph(rna_path, edge_map=EDGE_MAP_RGLIB, undirected=False, use_ring
     one_hot_nucs = {node: NODE_FEATURE_MAP['nt_code'].encode(label) for node, label in
                     (nx.get_node_attributes(pocket_graph, 'nt_code')).items()}
 
+
+
     pocket_nodes = {node: label for node, label in (nx.get_node_attributes(pocket_graph, 'in_pocket')).items()}
     pocket_nodes = {node: True if node not in pocket_nodes else pocket_nodes[node] for node in pocket_graph.nodes()}
     nx.set_node_attributes(pocket_graph, name='nt_features', values=one_hot_nucs)
     nx.set_node_attributes(pocket_graph, name='in_pocket', values=pocket_nodes)
+
+
+    # add rnafm embeddings
+    new_feat = {}
+    if use_rnafm:
+        t = RNAFMTransform()
+        t({'rna': pocket_graph})
+        missing_nodes = []
+        all_embs = []
+        for node, d in pocket_graph.nodes(data=True):
+            try:
+                d['rnafm']
+            except KeyError:
+                missing_nodes.append(node)
+                pass
+            new_feat[node] = torch.cat((d['nt_features'], torch.tensor(d['rnafm'])))
+            all_embs.append(d['rnafm'])
+
+        # if a node is missing an embedding, use the mean of embeddings
+        if missing_nodes:
+            mean_emb = torch.mean(torch.stack(all_embs), dim=0)
+            for node in missing_nodes:
+                new_feat[node] = mean_emb
+        nx.set_node_attributes(pocket_graph, name='nt_features', values=new_feat)
+
     pocket_graph_dgl = dgl.from_networkx(nx_graph=pocket_graph,
                                          edge_attrs=['edge_type'],
                                          node_attrs=['nt_features', 'in_pocket'],
@@ -109,3 +141,7 @@ def get_dgl_graph(cif_path, residue_list, undirected=False):
         nx.set_node_attributes(expanded_graph, name='in_pocket', values=in_pocket)
     dgl_graph, _ = load_rna_graph(expanded_graph, undirected=undirected)
     return dgl_graph
+
+if __name__ == "__main__":
+    g = load_rna_graph("data/json_pockets_expanded/4U3M_1_ANM_4218.json", use_rnafm=True)
+    pass
