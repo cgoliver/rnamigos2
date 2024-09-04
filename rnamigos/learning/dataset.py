@@ -163,6 +163,7 @@ class DockingDataset(Dataset):
                  cache_graphs=True,
                  undirected=False,
                  use_rings=False,
+                 use_rnafm=False,
                  ligand_cache='../../data/ligands/lig_graphs.p',
                  use_ligand_cache=True,
                  ):
@@ -203,11 +204,14 @@ class DockingDataset(Dataset):
         self.pockets_path = pockets_path
         self.cache_graphs = cache_graphs
         self.use_rings = use_rings
+        self.use_rnafm = use_rnafm
+
         if cache_graphs:
             all_pockets = set(self.systems['PDB_ID_POCKET'].unique())
             self.all_pockets = {pocket_id: load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
                                                           undirected=self.undirected,
-                                                          use_rings=self.use_rings) for pocket_id in all_pockets}
+                                                          use_rings=self.use_rings,
+                                                          use_rnafm=self.use_rnafm) for pocket_id in all_pockets}
         print('done caching')
 
     def __len__(self):
