@@ -80,7 +80,7 @@ def robin_inference(ligand_name, dgl_pocket_graph, out_path=None):
 
 
 if __name__ == "__main__":
-    pass
+    use_rnafm = False
     expanded_path = 'data/json_pockets_expanded'
     nodelists, ligand_names = get_nodelists_and_ligands()
     out_dir = 'outputs/robin_docknative'
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         # Get dgl pocket
         pocket_path = os.path.join(expanded_path, pocket)
         pocket_graph = graph_io.load_json(pocket_path)
-        dgl_pocket_graph, _ = load_rna_graph(pocket_graph)
+        dgl_pocket_graph, _ = load_rna_graph(pocket_graph, use_rnafm=use_rnafm)
 
         # Do inference
         out_path = os.path.join(out_dir, f"{pocket_name}_results.txt")

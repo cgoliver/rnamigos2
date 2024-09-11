@@ -4,7 +4,7 @@ from dgl.dataloading import GraphCollator, GraphDataLoader
 import itertools
 import numpy as np
 import pickle
-from rnaglib.kernels.node_sim import SimFunctionNode
+from rnaglib.algorithms.node_sim import SimFunctionNode
 import torch
 from torch.utils.data import Sampler
 

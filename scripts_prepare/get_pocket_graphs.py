@@ -2,7 +2,8 @@ import pandas as pd
 import os
 import networkx as nx
 from rnaglib.config import GRAPH_KEYS, TOOL
-from rnaglib.utils import graph_from_pdbid, graph_utils, graph_io
+from rnaglib.utils import graph_from_pdbid, graph_io
+from rnaglib.algorithms import graph_algos
 from tqdm import tqdm
 
 # This should work but sometimes has missing nodes
@@ -108,7 +109,7 @@ for pocket in tqdm(os.listdir(old_path)):
     new_nodes_filtered = new_nodes.intersection(set(rglib_graph.nodes()))
     if len(new_nodes_filtered) < len(new_nodes):
         print(pocket, len(new_nodes_filtered), len(new_nodes))
-    expanded_nodes = graph_utils.bfs(rglib_graph, new_nodes_filtered, depth=4, label='LW')
+    expanded_nodes = graph_algos.bfs(rglib_graph, new_nodes_filtered, depth=4, label='LW')
     new_pocket_graph = rglib_graph.subgraph(expanded_nodes)
     in_pocket = {node: node in new_nodes_filtered for node in expanded_nodes}
     nt_codes = nx.get_node_attributes(new_pocket_graph, 'nt_code')

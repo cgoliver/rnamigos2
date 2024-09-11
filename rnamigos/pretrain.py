@@ -6,7 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 import torch
 
-from rnaglib.kernels import node_sim
+from rnaglib.algorithms import node_sim
 from rnaglib.data_loading import rna_dataset, rna_loader
 from rnaglib.representations import GraphRepresentation, RingRepresentation
 from rnaglib.learning import learning_utils, learn

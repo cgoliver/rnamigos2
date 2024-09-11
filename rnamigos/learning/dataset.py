@@ -229,7 +229,8 @@ class DockingDataset(Dataset):
         else:
             pocket_graph, rings = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_id}.json"),
                                                  undirected=self.undirected,
-                                                 use_rings=self.use_rings)
+                                                 use_rings=self.use_rings,
+                                                 use_rnafm=self.use_rnafm)
         ligand_fp = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
 
         # Maybe return ligand as a graph.
@@ -333,7 +334,8 @@ class VirtualScreenDataset(DockingDataset):
             else:
                 pocket_graph, _ = load_rna_graph(rna_path=os.path.join(self.pockets_path, f"{pocket_name}.json"),
                                                  undirected=self.undirected,
-                                                 use_rings=False)
+                                                 use_rings=False,
+                                                          use_rnafm=self.use_rnafm)
             # Now we don't Rognan anymore for ligands
             pocket_name = self.all_pockets_names[idx]
             actives_smiles, decoys_smiles = self.get_ligands(pocket_name)
@@ -411,6 +413,7 @@ def get_dataset(cfg, systems, training=True):
                     'use_graphligs': cfg.model.use_graphligs,
                     'use_normalized_score': cfg.train.use_normalized_score,
                     'stretch_scores': cfg.train.stretch_scores,
+                    'use_rnafm': cfg.data.use_rnafm,
                     'undirected': cfg.data.undirected}
 
     dataset = DockingDataset(systems=systems, use_rings=use_rings, **dataset_args)

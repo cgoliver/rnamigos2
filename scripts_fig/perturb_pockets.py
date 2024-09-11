@@ -327,8 +327,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
                                    group_ligands=False,
                                    reps_only=not ROBIN,
                                    ligand_cache=ligand_cache,
-                                   use_ligand_cache=True,
-                                   )
+                                   use_ligand_cache=True)
     dataloader = GraphDataLoader(dataset=dataset, **LOADER_ARGS)
 
     # Setup path and models
@@ -409,11 +408,11 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     return np.mean(mixed_df['score'].values)
 
 
-def do_robin(ligand_name, pocket_path):
+def do_robin(ligand_name, pocket_path, use_rnafm=False):
     print('Doing pocket : ', pocket_path)
 
     # Get dgl pocket
-    dgl_pocket_graph, _ = load_rna_graph(pocket_path + '.json')
+    dgl_pocket_graph, _ = load_rna_graph(pocket_path + '.json', use_rnafm=use_rnafm)
 
     # Compute scores and EFs
     final_df = robin_inference(ligand_name, dgl_pocket_graph)
