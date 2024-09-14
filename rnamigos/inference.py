@@ -49,6 +49,8 @@ def inference(
             model_name: get_model_from_dirpath(model_path)
             for model_name, model_path in models_path.items()
         }
+    else:
+        models = {"model": model}
 
     # Get ready to loop through ligands
     dataset = InferenceDataset(

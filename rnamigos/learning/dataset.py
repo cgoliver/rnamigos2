@@ -425,7 +425,9 @@ class VirtualScreenDataset(DockingDataset):
 
 
 class InferenceDataset(Dataset):
-    def __init__(self, smiles_list, ligand_cache=None, use_ligand_cache=False):
+    def __init__(
+        self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True
+    ):
         self.smiles_list = smiles_list
         self.ligand_graph_encoder = (
             MolGraphEncoder(cache_path=ligand_cache, cache=use_ligand_cache)

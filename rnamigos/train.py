@@ -45,6 +45,24 @@ ROBIN_POCKETS = {
 POCKET_PATH = "data/json_pockets_expanded"
 
 
+def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
+    # ddf = pd.DataFrame({'score': scores, 'is_active': is_active})
+    # sns.kdeplot(ddf, x='score', hue='is_active', common_norm=False)
+    # plt.show()
+
+    n_actives = np.sum(is_active)
+    n_screened = int(frac * len(scores))
+    is_active_sorted = [
+        a for _, a in sorted(zip(scores, is_active), reverse=not lower_is_better)
+    ]
+    scores_sorted = [
+        s for s, _ in sorted(zip(scores, is_active), reverse=not lower_is_better)
+    ]
+    n_actives_screened = np.sum(is_active_sorted[:n_screened])
+    ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
+    return ef, scores_sorted[n_screened]
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="train")
 def main(cfg: DictConfig):
     # General config
@@ -157,14 +175,13 @@ def main(cfg: DictConfig):
         ef_rows = []
         for frac in (0.01, 0.02, 0.05):
             ef, _ = enrichment_factor(
-                final_df["score"],
+                final_df["model"],
                 final_df["is_active"],
                 lower_is_better=False,
                 frac=frac,
             )
             robin_ef_rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
     robin_ef_df = pd.DataFrame(robin_ef_rows)
-    robin_df_score = pd.concat(robin_ef_df)
 
     # Final VS validation on each decoy set
     logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
@@ -193,7 +210,7 @@ def main(cfg: DictConfig):
     base_name = pathlib.Path(cfg.name).stem
     df.to_csv(d / (base_name + ".csv"))
     df_raw.to_csv(d / (base_name + "_raw.csv"))
-    robin_df_score.to_csv(d / (base_name + "_robin.csv"))
+    robin_ef_df.to_csv(d / (base_name + "_robin.csv"))
 
     df_chembl = df.loc[df["decoys"] == "chembl"]
     print(f"{cfg.name} Mean EF on chembl: {np.mean(df_chembl['score'].values)}")
