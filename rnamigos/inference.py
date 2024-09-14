@@ -23,7 +23,6 @@ def inference(
     mixing_coeffs=(0.5, 0.0, 0.5),
     model=None,
     models_path=None,
-    do_mixing=True,
     dump_all=False,
     ligand_cache=None,
     use_ligand_cache=False,

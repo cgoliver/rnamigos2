@@ -105,6 +105,7 @@ def robin_inference(
         out_path=out_path,
         ligand_cache=ligand_cache,
         use_ligand_cache=use_ligand_cache,
+        do_mixing=False,
     )
     final_df["is_active"] = is_active
     return final_df
