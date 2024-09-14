@@ -27,6 +27,7 @@ def inference(
     ligand_cache=None,
     use_ligand_cache=False,
     use_rnafm=False,
+    do_mixing=True,
 ):
     """
     Run inference from python objects
@@ -54,7 +55,6 @@ def inference(
         smiles_list,
         ligand_cache=ligand_cache,
         use_ligand_cache=use_ligand_cache,
-        use_rnafm=use_rnafm,
     )
     batch_size = 64
     loader_args = {

@@ -74,6 +74,7 @@ def train_dock(
     early_stop_threshold=10,
     monitor_robin=False,
     pretrain_weight=0.1,
+    debug=False,
     cfg=None,
 ):
     """
@@ -115,6 +116,10 @@ def train_dock(
                 batch["target"],
                 batch["idx"],
             )
+
+            if debug and batch_idx > 5:
+                break
+
             node_sim_block, subsampled_nodes = batch["rings"]
             graph = send_graph_to_device(graph, device)
             ligand_input = ligand_input.to(device)

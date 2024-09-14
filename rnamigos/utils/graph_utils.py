@@ -57,7 +57,7 @@ def load_rna_graph(
     """
     NetworkX Graph or path to a json => DGL graph
     """
-    if isinstance(rna_path, str):
+    if isinstance(rna_path, (str, Path)):
         pocket_graph = graph_io.load_json(rna_path)
     if isinstance(rna_path, nx.Graph):
         pocket_graph = rna_path

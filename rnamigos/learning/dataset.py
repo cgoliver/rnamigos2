@@ -279,7 +279,7 @@ class DockingDataset(Dataset):
         elif self.target == "dock":
             if not self.use_normalized_score:
                 # !!! replace back to INTER
-                target = row["TOTAL"] / 40
+                target = row["INTER"] / 40
             else:
                 target = row["normalized_values"]
                 if self.stretch_scores:
