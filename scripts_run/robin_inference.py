@@ -13,12 +13,12 @@ from rnamigos.utils.graph_utils import load_rna_graph
 
 
 # GET REFERENCE POCKETS
-def group_reference_pockets(pockets_path='data/json_pockets_expanded'):
+def group_reference_pockets(pockets_path="data/json_pockets_expanded"):
     all_pockets = os.listdir(pockets_path)
     # Group pockets by pdb_id
     grouped_pockets = defaultdict(list)
     for pocket in all_pockets:
-        pdb_id = pocket.split('_')[0]
+        pdb_id = pocket.split("_")[0]
         grouped_pockets[pdb_id].append(pocket)
     return grouped_pockets
 
@@ -31,7 +31,9 @@ ROBIN_SYSTEMS = """2GDI	TPP TPP
 """
 
 
-def get_nodelists_and_ligands(robin_systems=ROBIN_SYSTEMS, pockets_path='data/json_pockets_expanded'):
+def get_nodelists_and_ligands(
+    robin_systems=ROBIN_SYSTEMS, pockets_path="data/json_pockets_expanded"
+):
     """
     This was useful to compare pockets appearing in a given ROBIN PDB.
     """
@@ -55,39 +57,68 @@ def get_nodelists_and_ligands(robin_systems=ROBIN_SYSTEMS, pockets_path='data/js
             representative_pocket = copies[0]
             pocket_path = os.path.join(pockets_path, representative_pocket)
             pocket_graph = graph_io.load_json(pocket_path)
-            colors = ['blue' if in_pocket else 'white' for n, in_pocket in pocket_graph.nodes(data='in_pocket')]
-            rna_draw(pocket_graph, node_colors=colors, layout='spring', show=True)
+            colors = [
+                "blue" if in_pocket else "white"
+                for n, in_pocket in pocket_graph.nodes(data="in_pocket")
+            ]
+            rna_draw(pocket_graph, node_colors=colors, layout="spring", show=True)
 
-            node_list = [node[5:] for node, in_pocket in pocket_graph.nodes(data='in_pocket') if in_pocket]
+            node_list = [
+                node[5:]
+                for node, in_pocket in pocket_graph.nodes(data="in_pocket")
+                if in_pocket
+            ]
             nodelists[representative_pocket] = node_list
             ligand_names[representative_pocket] = ligand_name
     return nodelists, ligand_names
 
 
-def robin_inference(ligand_name, dgl_pocket_graph, out_path=None):
-    actives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
-    actives_smiles_list = [s.lstrip().rstrip() for s in list(open(actives_ligands_path).readlines())]
-    inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
-    inactives_smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
+def robin_inference(
+    ligand_name,
+    dgl_pocket_graph,
+    model=None,
+    out_path=None,
+    ligand_cache=None,
+    use_ligand_cache=False,
+):
+    actives_ligands_path = os.path.join(
+        "data", "ligand_db", ligand_name, "robin", "actives.txt"
+    )
+    actives_smiles_list = [
+        s.lstrip().rstrip() for s in list(open(actives_ligands_path).readlines())
+    ]
+    inactives_ligands_path = os.path.join(
+        "data", "ligand_db", ligand_name, "robin", "decoys.txt"
+    )
+    inactives_smiles_list = [
+        s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())
+    ]
     smiles_list = actives_smiles_list + inactives_smiles_list
-    is_active = [1 for _ in range(len(actives_smiles_list))] + [0 for _ in range(len(inactives_smiles_list))]
-    final_df = inference(dgl_graph=dgl_pocket_graph,
-                         smiles_list=smiles_list,
-                         dump_all=True,
-                         out_path=out_path)
-    final_df['is_active'] = is_active
+    is_active = [1 for _ in range(len(actives_smiles_list))] + [
+        0 for _ in range(len(inactives_smiles_list))
+    ]
+    final_df = inference(
+        model=model,
+        dgl_graph=dgl_pocket_graph,
+        smiles_list=smiles_list,
+        dump_all=True,
+        out_path=out_path,
+        ligand_cache=ligand_cache,
+        use_ligand_cache=use_ligand_cache,
+    )
+    final_df["is_active"] = is_active
     return final_df
 
 
 if __name__ == "__main__":
     use_rnafm = False
-    expanded_path = 'data/json_pockets_expanded'
+    expanded_path = "data/json_pockets_expanded"
     nodelists, ligand_names = get_nodelists_and_ligands()
-    out_dir = 'outputs/robin_docknative'
+    out_dir = "outputs/robin_docknative"
     os.makedirs(out_dir, exist_ok=True)
     for pocket, ligand_name in ligand_names.items():
-        pocket_name = pocket.strip('.json')
-        print('Doing pocket : ', pocket_name)
+        pocket_name = pocket.strip(".json")
+        print("Doing pocket : ", pocket_name)
 
         # Get dgl pocket
         pocket_path = os.path.join(expanded_path, pocket)

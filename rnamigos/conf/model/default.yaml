@@ -31,3 +31,4 @@ batch_norm: True
 use_pretrained: False
 pretrained_path: pretrained/R_1_16/model.pth
 use_graphligs: False
+use_rnafm: False

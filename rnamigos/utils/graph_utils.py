@@ -1,10 +1,11 @@
 import os
+from pathlib import Path
 
 import dgl
+import torch
 from loguru import logger
 import networkx as nx
-from pathlib import Path
-import torch
+import numpy as np
 
 import rnaglib
 from rnaglib.prepare_data import fr3d_to_graph
@@ -32,24 +33,18 @@ def to_undirected(edge_map):
     return undirected_edge_map
 
 
-def add_rnafm(rna_graph):
-    # Do we need to recompute anything or is it in the graph already ?
-    existing = len(nx.get_node_attributes(rna_graph, "rnafm"))
-    missing_number = len(rna_graph.nodes()) - existing
-    if missing_number > 0:
-        t = RNAFMTransform()
-        # This adds rnafm as a new graph property
-        t.forward({"rna": rna_graph})
-
+def add_rnafm(pocket_nx, rna_path, cache_path="data/pocket_embeddings"):
+    embs = np.load(Path("data/pocket_embeddings") / Path(Path(rna_path).stem + ".npz"))
     # Now if some nodes are still missing and complement those with the mean embedding
+    nx.set_node_attributes(pocket_nx, embs, "rnafm")
     existing_nodes, existing_embs = list(
-        zip(*nx.get_node_attributes(rna_graph, "rnafm").items())
+        zip(*nx.get_node_attributes(pocket_nx, "rnafm").items())
     )
-    missing_nodes = set(rna_graph.nodes()) - set(existing_nodes)
+    missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
     if len(missing_nodes) > 0:
         mean_emb = torch.mean(torch.stack(existing_embs), dim=0)
     missing_embs = {node: mean_emb for node in missing_nodes}
-    nx.set_node_attributes(rna_graph, name="rnafm", values=missing_embs)
+    nx.set_node_attributes(pocket_nx, name="rnafm", values=missing_embs)
 
 
 def load_rna_graph(
@@ -106,7 +101,7 @@ def load_rna_graph(
     # Optionally add rna_fm embs
     node_attrs = ["nt_features", "in_pocket"]
     if use_rnafm:
-        add_rnafm(pocket_graph)
+        add_rnafm(pocket_graph, rna_path)
         node_attrs.append("rnafm")
 
     pocket_graph_dgl = dgl.from_networkx(

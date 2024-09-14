@@ -34,3 +34,4 @@ target: dock # dock or native_fp or is_native
 vs_every: 20
 vs_decoy_mode: 'chembl'
 do_rognan: True
+monitor_robin: False
