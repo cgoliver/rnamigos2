@@ -8,6 +8,7 @@ import sys
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
+from joblib import Parallel, delayed
 from loguru import logger
 
 import numpy as np
@@ -61,6 +62,32 @@ def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
     ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
     return ef, scores_sorted[n_screened]
+
+
+def one_robin(pocket_id, ligand_name, model, cfg):
+    dgl_pocket_graph, _ = load_rna_graph(
+        POCKET_PATH / Path(pocket_id).with_suffix(".json"),
+        use_rnafm=cfg.model.use_rnafm,
+    )
+    final_df = robin_inference(
+        ligand_name,
+        dgl_pocket_graph,
+        model=model,
+        use_ligand_cache=True,
+        ligand_cache="data/ligands/robin_lig_graphs.p",
+    )
+    final_df["pocket_id"] = pocket_id
+    rows = []
+    for frac in (0.01, 0.02, 0.05):
+        ef, _ = enrichment_factor(
+            final_df["model"],
+            final_df["is_active"],
+            lower_is_better=False,
+            frac=frac,
+        )
+        rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
+
+    return pd.DataFrame(rows)
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")
@@ -158,30 +185,14 @@ def main(cfg: DictConfig):
     )
 
     # Final ROBIN validation
-    robin_ef_rows = []
-    for ligand_name, pocket_id in ROBIN_POCKETS.items():
-        dgl_pocket_graph, _ = load_rna_graph(
-            POCKET_PATH / Path(pocket_id).with_suffix(".json"),
-            use_rnafm=cfg.model.use_rnafm,
+    robin_dfs = [
+        df
+        for df in Parallel(n_jobs=4)(
+            delayed(one_robin)(pocket_id, ligand_name, model, cfg)
+            for ligand_name, pocket_id in ROBIN_POCKETS.items()
         )
-        final_df = robin_inference(
-            ligand_name,
-            dgl_pocket_graph,
-            model=model,
-            use_ligand_cache=True,
-            ligand_cache="data/ligands/robin_lig_graphs.p",
-        )
-        final_df["pocket_id"] = pocket_id
-        ef_rows = []
-        for frac in (0.01, 0.02, 0.05):
-            ef, _ = enrichment_factor(
-                final_df["model"],
-                final_df["is_active"],
-                lower_is_better=False,
-                frac=frac,
-            )
-            robin_ef_rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
-    robin_ef_df = pd.DataFrame(robin_ef_rows)
+    ]
+    robin_ef_df = pd.concat(robin_dfs)
 
     # Final VS validation on each decoy set
     logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
