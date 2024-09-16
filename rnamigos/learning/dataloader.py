@@ -224,6 +224,7 @@ def get_vs_loader(systems, decoy_mode, cfg, reps_only=False, rognan=False):
     global VS_LOADER_ARGS
     vs_dataset = VirtualScreenDataset(pockets_path=cfg.data.pocket_graphs,
                                       ligands_path=cfg.data.ligand_db,
+                                      use_rnafm=cfg.model.use_rnafm,
                                       systems=systems,
                                       decoy_mode=decoy_mode,
                                       use_graphligs=cfg.model.use_graphligs,

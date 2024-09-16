@@ -1,26 +1,27 @@
 import os
-import json
-import glob
-from pathlib import Path
 
-from tqdm import tqdm
 import numpy as np
+from pathlib import Path
 import torch
-import networkx as nx
+from tqdm import tqdm
 
 from rnaglib.utils import load_json
-from rnaglib.algorithms import get_sequences
 from rnaglib.transforms import RNAFMTransform
 from rnaglib.data_loading import RNADataset
 
 # grab the RNAs
 pockets_dir = "data/json_pockets_expanded"
+out_dir = "data/pocket_embeddings"
+os.makedirs(out_dir, exist_ok=True)
 
 dset = RNADataset(redundancy="all", in_memory=False)
 t = RNAFMTransform()
 
 emb_cache = {}
 for pocket in tqdm(os.listdir(pockets_dir)):
+    outname = os.path.join(out_dir, f"{Path(pocket).stem}.npz")
+    if os.path.exists(outname):
+        continue
     g = load_json(Path(pockets_dir) / pocket)
     pocket_embs = {}
     embs_list, missing_nodes = [], []
@@ -37,7 +38,7 @@ for pocket in tqdm(os.listdir(pockets_dir)):
             except IndexError:
                 break
 
-        # try to get a node's embedding and remmeber if it was mising
+        # try to get a node's embedding and remember if it was mising
         try:
             z = g["rna"].nodes[node]["rnafm"]
         except KeyError:
@@ -53,5 +54,4 @@ for pocket in tqdm(os.listdir(pockets_dir)):
         for node in missing_nodes:
             pocket_embs[node] = mean_emb
     # finally dump
-    np.savez(f"data/pocket_embeddings/{Path(pocket).stem}.npz", **pocket_embs)
-    pass
+    np.savez(outname, **pocket_embs)

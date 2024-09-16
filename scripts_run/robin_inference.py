@@ -1,14 +1,15 @@
 import os
 import sys
 
-from rnaglib.utils import graph_io
 from collections import defaultdict
+
+from rnaglib.utils import graph_io
+from rnaglib.drawing import rna_draw
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from rnamigos.inference import inference
-from rnaglib.drawing import rna_draw
 from rnamigos.utils.graph_utils import load_rna_graph
 
 

@@ -29,8 +29,8 @@ from rnamigos.learning.models import cfg_to_model
 from rnamigos.utils.learning_utils import mkdirs, setup_device, setup_seed
 from rnamigos.utils.virtual_screen import get_efs
 from rnamigos.utils.graph_utils import load_rna_graph
-from scripts_run.robin_inference import robin_inference
 
+from scripts_run.robin_inference import robin_inference
 from scripts_fig.plot_utils import group_df
 
 torch.multiprocessing.set_sharing_strategy("file_system")

@@ -37,23 +37,27 @@ def add_rnafm(pocket_nx, rna_path, cache_path="data/pocket_embeddings"):
     embs = np.load(Path("data/pocket_embeddings") / Path(Path(rna_path).stem + ".npz"))
     # Now if some nodes are still missing and complement those with the mean embedding
     nx.set_node_attributes(pocket_nx, embs, "rnafm")
-    existing_nodes, existing_embs = list(
-        zip(*nx.get_node_attributes(pocket_nx, "rnafm").items())
-    )
+    existing_nodes, existing_embs = list(zip(*nx.get_node_attributes(pocket_nx, "rnafm").items()))
     missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
     if len(missing_nodes) > 0:
         mean_emb = torch.mean(torch.stack(existing_embs), dim=0)
     missing_embs = {node: mean_emb for node in missing_nodes}
     nx.set_node_attributes(pocket_nx, name="rnafm", values=missing_embs)
+    rnafm_embs = nx.get_node_attributes(pocket_nx, name="rnafm")
+    pre_feats = nx.get_node_attributes(pocket_nx, name="nt_features")
+    combined = {}
+    for node, pre_feat in pre_feats.items():
+        tensor_emb = torch.tensor(rnafm_embs[node])
+        combined[node] = torch.cat((pre_feat, tensor_emb))
+    nx.set_node_attributes(pocket_nx, name="nt_features", values=combined)
 
 
-def load_rna_graph(
-    rna_path,
-    edge_map=EDGE_MAP_RGLIB,
-    undirected=False,
-    use_rings=False,
-    use_rnafm=False,
-):
+def load_rna_graph(rna_path,
+                   edge_map=EDGE_MAP_RGLIB,
+                   undirected=False,
+                   use_rings=False,
+                   use_rnafm=False,
+                   ):
     """
     NetworkX Graph or path to a json => DGL graph
     """
@@ -99,15 +103,15 @@ def load_rna_graph(
     nx.set_node_attributes(pocket_graph, name="in_pocket", values=pocket_nodes)
 
     # Optionally add rna_fm embs
-    node_attrs = ["nt_features", "in_pocket"]
     if use_rnafm:
         add_rnafm(pocket_graph, rna_path)
-        node_attrs.append("rnafm")
+    a = list(pocket_graph.nodes(data=True))
+    # b = pocket_graph_dgl.ndata['rnafm']
 
     pocket_graph_dgl = dgl.from_networkx(
         nx_graph=pocket_graph,
         edge_attrs=["edge_type"],
-        node_attrs=node_attrs,
+        node_attrs=["nt_features", "in_pocket"],
     )
     rings = []
     if use_rings:
