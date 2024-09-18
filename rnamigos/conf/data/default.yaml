@@ -6,3 +6,4 @@ rnamigos1_test: False
 rnamigos1_only: False
 undirected: False
 rnafm_cache: data/pocket_embeddings
+rnafm_cache_pretrain: data/pretrain_data/whole_embeddings

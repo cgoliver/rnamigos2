@@ -22,7 +22,6 @@ do
     python_cmd="python rnamigos/pretrain.py
                   model.dropout=0.3
                   model.encoder.hidden_dim=${dim}
-                  model.encoder.subset_pocket_nodes=True
                   simfunc=${simfunc}
                   name=${simfunc}_${dim}"
     python_cmd=$(echo $python_cmd) # to replace newlines
@@ -30,6 +29,14 @@ do
     done
 done
 
+python_cmd="python rnamigos/pretrain.py
+              model.dropout=0.3
+              model.use_rnafm=True
+              model.encoder.hidden_dim=64
+              simfunc=hungarian
+              name=hungarian_64_rnafm"
+python_cmd=$(echo $python_cmd) # to replace newlines
+CMDARRAY+=("$python_cmd")
 
 #echo "${CMDARRAY[0]}"
 

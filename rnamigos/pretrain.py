@@ -20,26 +20,34 @@ if __name__ == "__main__":
 
 from rnamigos.learning.models import Embedder
 from rnamigos.utils.graph_utils import to_undirected
+from rnamigos.utils.learning_utils import setup_seed
 
 
+# Timing:
+# no_rnafm caching, nw0 for 41 examples: 137
+# rnafm caching, nw0 for 41 examples: 95
+# no_rnafm caching, nw0 for 41 examples: 127
+# rnafm caching, nw4 for 41 examples: 95 too
 @hydra.main(version_base=None, config_path="conf", config_name="pretrain")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
+    setup_seed(0)
 
     # Choose the data, features and targets to use from graphs and kernel for pretraining
-    node_features = ['nt_code']
-    node_simfunc = node_sim.SimFunctionNode(method=cfg.simfunc, depth=cfg.depth)
-    edge_map = GRAPH_KEYS['edge_map'][TOOL]
-    edge_map = to_undirected(edge_map) if cfg.data.undirected else edge_map
-    graph_representation = GraphRepresentation(framework='dgl', edge_map=edge_map)
-    ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
     nt_features = ['nt_code']
     transforms = None
     if cfg.model.use_rnafm:
-        transforms = RNAFMTransform()
+        transforms = RNAFMTransform(cache_path=cfg.data.rnafm_cache_pretrain)
         nt_features.append('rnafm')
-    features_computer = FeaturesComputer(nt_features=['nt_code', 'rnafm'],
+    features_computer = FeaturesComputer(nt_features=nt_features,
                                          custom_encoders={"rnafm": ListEncoder(640)})
+
+    # Choose representations
+    edge_map = GRAPH_KEYS['edge_map'][TOOL]
+    edge_map = to_undirected(edge_map) if cfg.data.undirected else edge_map
+    graph_representation = GraphRepresentation(framework='dgl', edge_map=edge_map)
+    node_simfunc = node_sim.SimFunctionNode(method=cfg.simfunc, depth=cfg.depth)
+    ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
     unsupervised_dataset = rna_dataset.RNADataset(features_computer=features_computer,
                                                   dataset_path=cfg.data.pretrain_graphs,
                                                   representations=[ring_representation, graph_representation],

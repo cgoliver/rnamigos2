@@ -3,6 +3,7 @@ defaults:
   - tokens: default 
   - paths: default
   - model: default
+  - _self_
 
 name: 'default' 
 seed: 42
