@@ -8,7 +8,10 @@ import torch
 
 from rnaglib.algorithms import node_sim
 from rnaglib.data_loading import rna_dataset, rna_loader
-from rnaglib.representations import GraphRepresentation, RingRepresentation
+from rnaglib.encoders import ListEncoder
+from rnaglib.transforms.represent import GraphRepresentation, RingRepresentation
+from rnaglib.transforms import FeaturesComputer
+from rnaglib.transforms import RNAFMTransform
 from rnaglib.learning import learning_utils, learn
 from rnaglib.config.graph_keys import GRAPH_KEYS, TOOL
 
@@ -30,12 +33,21 @@ def main(cfg: DictConfig):
     edge_map = to_undirected(edge_map) if cfg.data.undirected else edge_map
     graph_representation = GraphRepresentation(framework='dgl', edge_map=edge_map)
     ring_representation = RingRepresentation(node_simfunc=node_simfunc, max_size_kernel=50)
-    unsupervised_dataset = rna_dataset.RNADataset(nt_features=node_features,
-                                                  data_path=cfg.data.pretrain_graphs,
-                                                  representations=[ring_representation, graph_representation])
+    nt_features = ['nt_code']
+    transforms = None
+    if cfg.model.use_rnafm:
+        transforms = RNAFMTransform()
+        nt_features.append('rnafm')
+    features_computer = FeaturesComputer(nt_features=['nt_code', 'rnafm'],
+                                         custom_encoders={"rnafm": ListEncoder(640)})
+    unsupervised_dataset = rna_dataset.RNADataset(features_computer=features_computer,
+                                                  dataset_path=cfg.data.pretrain_graphs,
+                                                  representations=[ring_representation, graph_representation],
+                                                  transforms=transforms)
     train_loader = rna_loader.get_loader(dataset=unsupervised_dataset, split=False, num_workers=cfg.num_workers)
 
-    model = Embedder(in_dim=cfg.model.encoder.in_dim,
+    model_indim = cfg.model.encoder.in_dim + 640 if cfg.model.use_rnafm else cfg.model.encoder.in_dim
+    model = Embedder(in_dim=model_indim,
                      hidden_dim=cfg.model.encoder.hidden_dim,
                      num_hidden_layers=cfg.model.encoder.num_layers,
                      batch_norm=cfg.model.batch_norm,

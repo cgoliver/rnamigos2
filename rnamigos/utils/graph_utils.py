@@ -12,8 +12,6 @@ from rnaglib.prepare_data import fr3d_to_graph
 from rnaglib.utils import graph_io
 from rnaglib.config import NODE_FEATURE_MAP
 from rnaglib.config.graph_keys import EDGE_MAP_RGLIB
-from rnaglib.transforms import RNAFMTransform
-
 
 # Adapted from rglib
 def to_undirected(edge_map):
