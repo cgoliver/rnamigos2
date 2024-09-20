@@ -27,7 +27,7 @@ from rnamigos.learning.dataloader import get_loader, get_vs_loader
 from rnamigos.learning import learn
 from rnamigos.learning.models import cfg_to_model
 from rnamigos.utils.learning_utils import mkdirs, setup_device, setup_seed
-from rnamigos.utils.virtual_screen import get_efs
+from rnamigos.utils.virtual_screen import get_efs, enrichment_factor
 from rnamigos.utils.graph_utils import load_rna_graph
 
 from scripts_run.robin_inference import robin_inference
@@ -46,28 +46,10 @@ ROBIN_POCKETS = {
 POCKET_PATH = "data/json_pockets_expanded"
 
 
-def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
-    # ddf = pd.DataFrame({'score': scores, 'is_active': is_active})
-    # sns.kdeplot(ddf, x='score', hue='is_active', common_norm=False)
-    # plt.show()
-
-    n_actives = np.sum(is_active)
-    n_screened = int(frac * len(scores))
-    is_active_sorted = [
-        a for _, a in sorted(zip(scores, is_active), reverse=not lower_is_better)
-    ]
-    scores_sorted = [
-        s for s, _ in sorted(zip(scores, is_active), reverse=not lower_is_better)
-    ]
-    n_actives_screened = np.sum(is_active_sorted[:n_screened])
-    ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
-    return ef, scores_sorted[n_screened]
-
-
-def one_robin(pocket_id, ligand_name, model, cfg):
+def one_robin(pocket_id, ligand_name, model, use_rnafm):
     dgl_pocket_graph, _ = load_rna_graph(
         POCKET_PATH / Path(pocket_id).with_suffix(".json"),
-        use_rnafm=cfg.model.use_rnafm,
+        use_rnafm=use_rnafm,
     )
     final_df = robin_inference(
         ligand_name,
@@ -79,14 +61,12 @@ def one_robin(pocket_id, ligand_name, model, cfg):
     final_df["pocket_id"] = pocket_id
     rows = []
     for frac in (0.01, 0.02, 0.05):
-        ef, _ = enrichment_factor(
-            final_df["model"],
-            final_df["is_active"],
-            lower_is_better=False,
-            frac=frac,
-        )
+        ef = enrichment_factor(final_df["model"],
+                               final_df["is_active"],
+                               lower_is_better=False,
+                               frac=frac,
+                               )
         rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
-
     return pd.DataFrame(rows)
 
 
@@ -188,7 +168,7 @@ def main(cfg: DictConfig):
     robin_dfs = [
         df
         for df in Parallel(n_jobs=4)(
-            delayed(one_robin)(pocket_id, ligand_name, model, cfg)
+            delayed(one_robin)(pocket_id, ligand_name, model, cfg.model.use_rnafm)
             for ligand_name, pocket_id in ROBIN_POCKETS.items()
         )
     ]
@@ -231,9 +211,7 @@ def main(cfg: DictConfig):
     df_pdbchembl = df.loc[df["decoys"] == "pdb_chembl"]
     print(f"{cfg.name} Mean EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
     df_pdbchembl = group_df(df_pdbchembl)
-    print(
-        f"{cfg.name} Mean grouped EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}"
-    )
+    print(f"{cfg.name} Mean grouped EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
 
 
 if __name__ == "__main__":

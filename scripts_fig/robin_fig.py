@@ -54,9 +54,9 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
 pocket_names = [
     "2GDI_Y_TPP_100",
     "5BTP_A_AMZ_106",
-    #"2QWY_A_SAM_100",
+    # "2QWY_A_SAM_100",
     "2QWY_B_SAM_300",
-    #"3FU2_C_PRF_101",
+    # "3FU2_C_PRF_101",
     "3FU2_A_PRF_101",
 ]
 ligand_names = [
@@ -66,7 +66,7 @@ ligand_names = [
     "PreQ1",
 ]
 
-pocket_to_id = {p:l for p, l in zip(pocket_names, ligand_names)}
+pocket_to_id = {p: l for p, l in zip(pocket_names, ligand_names)}
 
 
 def get_dfs_docking(ligand_name):
@@ -92,7 +92,6 @@ def get_dfs_docking(ligand_name):
     print(ma, mi)
     # normalized_scores = (scores - np.nanmin(scores)) / (np.nanmax(scores) - np.nanmin(scores))
     normalized_scores = (scores - scores.min()) / (scores.max() - scores.min())
-
 
     # normalized_scores = scores
     mapping = {}
@@ -131,7 +130,7 @@ def get_dfs_docking(ligand_name):
           f"scores over 200 : {np.sum(scores > 200)} length : {len(scores)} ")
 
     merged = pd.concat([actives_df, inactives_df]).reset_index()
-    merged['smiles'] = all_smiles 
+    merged['smiles'] = all_smiles
     return merged
 
 
@@ -164,6 +163,7 @@ def get_dfs_migos(pocket_name, swap=False, swap_on='merged'):
         return both
 
     return merged
+
 
 def make_fig(score_to_use='dock_nat', swap=False, prefix='robin_fig'):
     # fig, axs = plt.subplots(1, 4, figsize=(18, 5))
@@ -206,7 +206,7 @@ def make_fig(score_to_use='dock_nat', swap=False, prefix='robin_fig'):
 
         colors = sns.color_palette("Paired", 4)
         colors = sns.color_palette(["#149950", "#00c358", "#037938", "#149921"])
-        
+
         colors = sns.color_palette(["#33ccff", "#00cccc", "#3366ff", "#9999ff"])
 
         default_frac = 0.01
@@ -218,7 +218,7 @@ def make_fig(score_to_use='dock_nat', swap=False, prefix='robin_fig'):
         #             palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
         merged = merged.sort_values(by='split')
         g = sns.kdeplot(data=merged, x=score_to_use, hue='split', ax=ax,
-                        #palette={'actives': colors[i], 'inactives': 'lightgrey'},
+                        # palette={'actives': colors[i], 'inactives': 'lightgrey'},
                         # fill=True,
                         # alpha=0.9,
                         linewidth=0,
@@ -235,7 +235,8 @@ def make_fig(score_to_use='dock_nat', swap=False, prefix='robin_fig'):
             ef, thresh = enrichment_factor(scores=scores, is_active=actives,
                                            lower_is_better=False, frac=frac)
             # ax.axvline(x=thresh, ymin=0, ymax=max(scores), color=linecolors[i])
-            rows.append({'pocket': pocket_to_id[pocket_name], 'ef': ef, 'thresh': f"{frac*100:.0f}", 'score': score_to_use})
+            rows.append(
+                {'pocket': pocket_to_id[pocket_name], 'ef': ef, 'thresh': f"{frac * 100:.0f}", 'score': score_to_use})
 
             if curve_fill:
                 xy_tail = [(x, y) for x, y in zip(xx, yy) if x > thresh]
@@ -287,7 +288,7 @@ def make_fig(score_to_use='dock_nat', swap=False, prefix='robin_fig'):
     # names = ['smiles', 'dock', 'is_native', 'native_fp', 'merged']
     plt.tight_layout()
     plt.savefig("figs/fig_3a_{prefix}.pdf", format="pdf")
-    #plt.show()
+    # plt.show()
     return pd.DataFrame(rows)
 
 
@@ -301,11 +302,10 @@ def make_table(df):
 
     pass
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
 
     dfs = []
     for score in ['dock_nat', 'is_native', 'dock', 'rDock', 'RNAmigos2++']:
         dfs.append(make_fig(score, prefix=f'repro_{score}'))
     make_table(pd.concat(dfs))
-

@@ -33,7 +33,7 @@ ROBIN_SYSTEMS = """2GDI	TPP TPP
 
 
 def get_nodelists_and_ligands(
-    robin_systems=ROBIN_SYSTEMS, pockets_path="data/json_pockets_expanded"
+        robin_systems=ROBIN_SYSTEMS, pockets_path="data/json_pockets_expanded"
 ):
     """
     This was useful to compare pockets appearing in a given ROBIN PDB.
@@ -75,12 +75,13 @@ def get_nodelists_and_ligands(
 
 
 def robin_inference(
-    ligand_name,
-    dgl_pocket_graph,
-    model=None,
-    out_path=None,
-    ligand_cache=None,
-    use_ligand_cache=False,
+        ligand_name,
+        dgl_pocket_graph,
+        model=None,
+        out_path=None,
+        ligand_cache=None,
+        use_ligand_cache=False,
+        debug=False
 ):
     actives_ligands_path = os.path.join(
         "data", "ligand_db", ligand_name, "robin", "actives.txt"
@@ -98,6 +99,9 @@ def robin_inference(
     is_active = [1 for _ in range(len(actives_smiles_list))] + [
         0 for _ in range(len(inactives_smiles_list))
     ]
+    if debug:
+        smiles_list = smiles_list[:10]
+        is_active = is_active[:10]
     final_df = inference(
         model=model,
         dgl_graph=dgl_pocket_graph,

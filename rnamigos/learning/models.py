@@ -424,7 +424,8 @@ def cfg_to_model(cfg, for_loading=False):
     """
     for_loading skips pretrained network subparts since it will be used for loading a fully pretrained model
     """
-    model_indim = cfg.model.encoder.in_dim + 640 if cfg.model.use_rnafm else cfg.model.encoder.in_dim
+    use_rnafm = "use_rnafm" in cfg.model and cfg.model.use_rnafm
+    model_indim = cfg.model.encoder.in_dim + 640 if use_rnafm else cfg.model.encoder.in_dim
     rna_encoder = Embedder(in_dim=model_indim,
                            hidden_dim=cfg.model.encoder.hidden_dim,
                            num_hidden_layers=cfg.model.encoder.num_layers,
