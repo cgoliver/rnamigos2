@@ -521,6 +521,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     if cfg.model.use_graphligs:
         graphlig_cfg = cfg.model.graphlig_encoder
         if graphlig_cfg.use_pretrained:
+            decoder_in_dim += 56
             if for_loading:
                 lig_encoder = LigandGraphEncoder(
                     features_dim=16,
@@ -531,10 +532,8 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
                     batch_norm=False,
                     cut_embeddings=True,
                 )
-                decoder_in_dim += 32
             else:
                 lig_encoder = LigandGraphEncoder.from_pretrained("pretrained/optimol")
-                decoder_in_dim += 56
         else:
             lig_encoder = LigandGraphEncoder(
                 features_dim=graphlig_cfg.features_dim,

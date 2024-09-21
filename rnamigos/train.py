@@ -275,6 +275,11 @@ def main(cfg: DictConfig):
         save_path, tune=cfg.train.tune, trial=study.best_trial
     )
 
+    dir_path_obj = Path(save_path)
+    new_dir_name = dir_path_obj.name + "_best"
+    new_dir_path = dir_path_obj.with_name(new_dir_name)
+    dir_path_obj.rename(new_dir_path)
+
     pdb_eval(cfg, best_model)
     robin_eval(cfg, best_model)
 
