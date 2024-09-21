@@ -531,7 +531,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
                     batch_norm=False,
                     cut_embeddings=True,
                 )
-                decoder_in_dim += 16
+                decoder_in_dim += 32
             else:
                 lig_encoder = LigandGraphEncoder.from_pretrained("pretrained/optimol")
                 decoder_in_dim += 56
