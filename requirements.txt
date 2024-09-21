@@ -8,6 +8,7 @@ seaborn
 scikit-learn
 tensorboard
 rdkit
+optuna
 
 rnaglib==2.0.4
 git+https://github.com/cgoliver/fr3d-python.git

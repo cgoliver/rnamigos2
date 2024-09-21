@@ -1,6 +1,8 @@
 # general
 seed: 42
 result_dir: outputs/
+tune: false
+n_trials: 1
 
 #loader
 shuffle: True
@@ -35,3 +37,4 @@ vs_every: 20
 vs_decoy_mode: 'chembl'
 do_rognan: True
 monitor_robin: False
+

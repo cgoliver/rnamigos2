@@ -21,10 +21,20 @@ from dgl.nn.pytorch.conv import RelGraphConv
 
 
 class RGCN(nn.Module):
-    """ RGCN encoder with num_hidden_layers + 2 RGCN layers, and sum pooling. """
+    """RGCN encoder with num_hidden_layers + 2 RGCN layers, and sum pooling."""
 
-    def __init__(self, features_dim, h_dim, num_rels, num_layers, num_bases=-1, gcn_dropout=0, batch_norm=False,
-                 self_loop=False, jumping_knowledge=True):
+    def __init__(
+        self,
+        features_dim,
+        h_dim,
+        num_rels,
+        num_layers,
+        num_bases=-1,
+        gcn_dropout=0,
+        batch_norm=False,
+        self_loop=False,
+        jumping_knowledge=True,
+    ):
         super(RGCN, self).__init__()
 
         self.features_dim, self.h_dim = features_dim, h_dim
@@ -39,49 +49,78 @@ class RGCN(nn.Module):
 
         self.batch_norm = batch_norm
         if self.batch_norm:
-            self.batch_norm_layers = nn.ModuleList([nn.BatchNorm1d(h_dim) for _ in range(num_layers)])
+            self.batch_norm_layers = nn.ModuleList(
+                [nn.BatchNorm1d(h_dim) for _ in range(num_layers)]
+            )
         self.pool = SumPooling()
 
     def build_model(self):
         self.layers = nn.ModuleList()
         # input to hidden
-        i2h = RelGraphConv(self.features_dim, self.h_dim, self.num_rels, self_loop=self.self_loop,
-                           activation=nn.ReLU(), dropout=self.p)
+        i2h = RelGraphConv(
+            self.features_dim,
+            self.h_dim,
+            self.num_rels,
+            self_loop=self.self_loop,
+            activation=nn.ReLU(),
+            dropout=self.p,
+        )
         self.layers.append(i2h)
         # hidden to hidden
         for _ in range(self.num_layers - 2):
-            h2h = RelGraphConv(self.h_dim, self.h_dim, self.num_rels,
-                               self_loop=self.self_loop, activation=nn.ReLU(), dropout=self.p)
+            h2h = RelGraphConv(
+                self.h_dim,
+                self.h_dim,
+                self.num_rels,
+                self_loop=self.self_loop,
+                activation=nn.ReLU(),
+                dropout=self.p,
+            )
             self.layers.append(h2h)
         # hidden to output
-        h2o = RelGraphConv(self.h_dim, self.h_dim, self.num_rels,
-                           self_loop=self.self_loop, activation=nn.ReLU(), dropout=self.p)
+        h2o = RelGraphConv(
+            self.h_dim,
+            self.h_dim,
+            self.num_rels,
+            self_loop=self.self_loop,
+            activation=nn.ReLU(),
+            dropout=self.p,
+        )
         self.layers.append(h2o)
 
     def forward(self, g):
         sequence = []
         for i, layer in enumerate(self.layers):
             # Node update
-            g.ndata['h'] = layer(g, g.ndata['h'], g.edata['edge_type'])
+            g.ndata["h"] = layer(g, g.ndata["h"], g.edata["edge_type"])
             # Jumping knowledge connexion
-            sequence.append(g.ndata['h'])
+            sequence.append(g.ndata["h"])
             if self.batch_norm:
-                g.ndata['h'] = self.batch_norm_layers[i](g.ndata['h'])
+                g.ndata["h"] = self.batch_norm_layers[i](g.ndata["h"])
         # Concatenation :
-        g.ndata['h'] = torch.cat(sequence, dim=1)  # Num_nodes * (h_dim*num_layers)
-        out = self.pool(g, g.ndata['h'])
+        g.ndata["h"] = torch.cat(sequence, dim=1)  # Num_nodes * (h_dim*num_layers)
+        out = self.pool(g, g.ndata["h"])
         return out
 
 
 class Decoder(nn.Module):
     """
-        NN which makes a prediction (fp or binding/non binding) from a pooled
-        graph embedding.
+    NN which makes a prediction (fp or binding/non binding) from a pooled
+    graph embedding.
 
-        Linear/ReLu layers with Sigmoid in output since fingerprints between 0 and 1.
+    Linear/ReLu layers with Sigmoid in output since fingerprints between 0 and 1.
     """
 
-    def __init__(self, in_dim, out_dim, hidden_dim, num_layers, dropout=0.2, batch_norm=True, activation=None):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        hidden_dim,
+        num_layers,
+        dropout=0.2,
+        batch_norm=True,
+        activation=None,
+    ):
         super(Decoder, self).__init__()
         # self.num_nodes = num_nodes
         self.in_dim = in_dim
@@ -91,9 +130,9 @@ class Decoder(nn.Module):
         self.batch_norm = batch_norm
         self.dropout = dropout
 
-        if activation == 'sigmoid':
+        if activation == "sigmoid":
             self.activation = nn.Sigmoid()
-        elif activation == 'softmax':
+        elif activation == "softmax":
             self.activation = nn.Softmax()
         else:
             self.activation = None
@@ -133,10 +172,18 @@ class Decoder(nn.Module):
 
 class LigandEncoder(nn.Module):
     """
-        Model for producing node embeddings.
+    Model for producing node embeddings.
     """
 
-    def __init__(self, in_dim, hidden_dim, num_hidden_layers, batch_norm=True, dropout=0.2, num_rels=19):
+    def __init__(
+        self,
+        in_dim,
+        hidden_dim,
+        num_hidden_layers,
+        batch_norm=True,
+        dropout=0.2,
+        num_rels=19,
+    ):
         super(LigandEncoder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
@@ -194,16 +241,17 @@ class LigandEncoder(nn.Module):
 
 
 class LigandGraphEncoder(nn.Module):
-    def __init__(self,
-                 l_size=56,
-                 gcn_hdim=32,
-                 gcn_layers=3,
-                 features_dim=22,
-                 num_rels=4,
-                 batch_norm=False,
-                 # cat_mu_v=True,
-                 cut_embeddings=False
-                 ):
+    def __init__(
+        self,
+        l_size=56,
+        gcn_hdim=32,
+        gcn_layers=3,
+        features_dim=22,
+        num_rels=4,
+        batch_norm=False,
+        # cat_mu_v=True,
+        cut_embeddings=False,
+    ):
         super(LigandGraphEncoder, self).__init__()
         self.features_dim = features_dim
         self.gcn_hdim = gcn_hdim
@@ -215,8 +263,14 @@ class LigandGraphEncoder(nn.Module):
         # Bottleneck
         self.l_size = l_size
         # layers:
-        self.encoder = RGCN(self.features_dim, self.gcn_hdim, self.num_rels, self.gcn_layers, num_bases=-1,
-                            batch_norm=batch_norm)
+        self.encoder = RGCN(
+            self.features_dim,
+            self.gcn_hdim,
+            self.num_rels,
+            self.gcn_layers,
+            num_bases=-1,
+            batch_norm=batch_norm,
+        )
 
         self.encoder_mean = nn.Linear(self.gcn_hdim * self.gcn_layers, self.l_size)
         self.encoder_logv = nn.Linear(self.gcn_hdim * self.gcn_layers, self.l_size)
@@ -228,25 +282,25 @@ class LigandGraphEncoder(nn.Module):
     @staticmethod
     def from_pretrained(trained_dir):
         # Loads trained model weights, with or without the affinity predictor
-        params = json.load(open(os.path.join(trained_dir, 'params.json'), 'r'))
-        weight_path = os.path.join(trained_dir, 'weights.pth')
+        params = json.load(open(os.path.join(trained_dir, "params.json"), "r"))
+        weight_path = os.path.join(trained_dir, "weights.pth")
         ligraph_encoder = LigandGraphEncoder(**params, cut_embeddings=True)
         whole_state_dict = torch.load(weight_path)
         filtered_state_dict = {}
-        for (k, v) in whole_state_dict.items():
-            if 'encoder' in k:
-                if k.startswith('encoder.layers'):
-                    filtered_state_dict[k.replace('weight', 'linear_r.W')] = v
+        for k, v in whole_state_dict.items():
+            if "encoder" in k:
+                if k.startswith("encoder.layers"):
+                    filtered_state_dict[k.replace("weight", "linear_r.W")] = v
                 else:
                     filtered_state_dict[k] = v
         ligraph_encoder.load_state_dict(filtered_state_dict)
         return ligraph_encoder
 
     def forward(self, g):
-        g.ndata['h'] = g.ndata['node_features']
+        g.ndata["h"] = g.ndata["node_features"]
         # Weird optimol pretrained_model
         if self.cut_embeddings:
-            g.ndata['h'] = g.ndata['h'][:, :-6]
+            g.ndata["h"] = g.ndata["h"][:, :-6]
         e_out = self.encoder(g)
         mu = self.encoder_mean(e_out)
         # if self.cat_mu_v:
@@ -257,11 +311,20 @@ class LigandGraphEncoder(nn.Module):
 
 class Embedder(nn.Module):
     """
-        Model for producing node embeddings.
+    Model for producing node embeddings.
     """
 
-    def __init__(self, in_dim, hidden_dim, num_hidden_layers, subset_pocket_nodes=True,
-                 batch_norm=True, num_rels=20, dropout=0.2, num_bases=-1):
+    def __init__(
+        self,
+        in_dim,
+        hidden_dim,
+        num_hidden_layers,
+        subset_pocket_nodes=True,
+        batch_norm=True,
+        num_rels=20,
+        dropout=0.2,
+        num_bases=-1,
+    ):
         super(Embedder, self).__init__()
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
@@ -302,21 +365,30 @@ class Embedder(nn.Module):
         return next(self.parameters()).device
 
     def build_hidden_layer(self, in_dim, out_dim):
-        return RelGraphConv(in_dim, out_dim, self.num_rels,
-                            regularizer='basis' if self.num_rels > 0 else None,
-                            num_bases=self.num_bases,
-                            activation=None)
+        return RelGraphConv(
+            in_dim,
+            out_dim,
+            self.num_rels,
+            regularizer="basis" if self.num_rels > 0 else None,
+            num_bases=self.num_bases,
+            activation=None,
+        )
 
     # No activation for the last layer
     def build_output_layer(self, in_dim, out_dim):
-        return RelGraphConv(in_dim, out_dim, self.num_rels, num_bases=self.num_bases,
-                            regularizer='basis' if self.num_rels > 0 else None,
-                            activation=None)
+        return RelGraphConv(
+            in_dim,
+            out_dim,
+            self.num_rels,
+            num_bases=self.num_bases,
+            regularizer="basis" if self.num_rels > 0 else None,
+            activation=None,
+        )
 
     def forward(self, g):
-        h = g.ndata['nt_features']
+        h = g.ndata["nt_features"]
         for i, layer in enumerate(self.layers):
-            h = layer(g, h, g.edata['edge_type'])
+            h = layer(g, h, g.edata["edge_type"])
             if self.batch_norm:
                 h = self.batch_norms[i](h)
 
@@ -325,7 +397,7 @@ class Embedder(nn.Module):
             else:
                 h = F.dropout(F.relu(h), self.dropout, training=self.training)
 
-        g.ndata['h'] = h
+        g.ndata["h"] = h
 
         graphs, embeddings = g, h
         if self.subset_pocket_nodes:
@@ -334,8 +406,8 @@ class Embedder(nn.Module):
             all_subgraphs = []
             all_embs = []
             for graph in graphs:
-                subgraph = dgl.node_subgraph(graph, graph.ndata['in_pocket'])
-                embeddings = subgraph.ndata.pop('h')
+                subgraph = dgl.node_subgraph(graph, graph.ndata["in_pocket"])
+                embeddings = subgraph.ndata.pop("h")
                 all_subgraphs.append(subgraph)
                 all_embs.append(embeddings)
             graphs = dgl.batch(all_subgraphs)
@@ -352,13 +424,7 @@ class Embedder(nn.Module):
 # Define full R-GCN model
 # ~~~~~~~~~~~~~~~~~~~~~~~
 class RNAmigosModel(nn.Module):
-    def __init__(self,
-                 encoder,
-                 decoder,
-                 lig_encoder=None,
-                 pool='att',
-                 pool_dim=32
-                 ):
+    def __init__(self, encoder, decoder, lig_encoder=None, pool="att", pool_dim=32):
         """
 
         :param dims: the embeddings dimensions
@@ -372,7 +438,7 @@ class RNAmigosModel(nn.Module):
         """
         super(RNAmigosModel, self).__init__()
 
-        if pool == 'att':
+        if pool == "att":
             pooling_gate_nn = nn.Linear(pool_dim, 1)
             self.pool = GlobalAttentionPooling(pooling_gate_nn)
         else:
@@ -384,7 +450,9 @@ class RNAmigosModel(nn.Module):
 
     @property
     def use_graphligs(self):
-        return self.lig_encoder is not None and isinstance(self.lig_encoder, LigandGraphEncoder)
+        return self.lig_encoder is not None and isinstance(
+            self.lig_encoder, LigandGraphEncoder
+        )
 
     def predict_ligands(self, g, ligands):
         with torch.no_grad():
@@ -414,82 +482,113 @@ class RNAmigosModel(nn.Module):
 
     def from_pretrained(self, model_path):
         state_dict = torch.load(model_path)
-        if 'model_state_dict' in state_dict:
-            state_dict = state_dict['model_state_dict']
+        if "model_state_dict" in state_dict:
+            state_dict = state_dict["model_state_dict"]
         self.load_state_dict(state_dict)
         return self
 
 
-def cfg_to_model(cfg, for_loading=False):
+def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     """
     for_loading skips pretrained network subparts since it will be used for loading a fully pretrained model
     """
     use_rnafm = "use_rnafm" in cfg.model and cfg.model.use_rnafm
-    model_indim = cfg.model.encoder.in_dim + 640 if use_rnafm else cfg.model.encoder.in_dim
-    rna_encoder = Embedder(in_dim=model_indim,
-                           hidden_dim=cfg.model.encoder.hidden_dim,
-                           num_hidden_layers=cfg.model.encoder.num_layers,
-                           batch_norm=cfg.model.batch_norm,
-                           dropout=cfg.model.dropout,
-                           num_bases=cfg.model.encoder.num_bases
-                           )
+    model_indim = (
+        cfg.model.encoder.in_dim + 640 if use_rnafm else cfg.model.encoder.in_dim
+    )
+
+    enc_hidden_dim = cfg.model.encoder.hidden_dim
+    dec_hidden_dim = cfg.model.decoder.hidden_dim
+    if tune:
+        enc_hidden_dim = trial.suggest_int("enc_hidden_dim", 8, 256, log=True)
+        dec_hidden_dim = trial.suggest_int("dec_hidden_dim", 8, 256, log=True)
+
+    rna_encoder = Embedder(
+        in_dim=model_indim,
+        hidden_dim=enc_hidden_dim,
+        num_hidden_layers=cfg.model.encoder.num_layers,
+        batch_norm=cfg.model.batch_norm,
+        dropout=cfg.model.dropout,
+        num_bases=cfg.model.encoder.num_bases,
+    )
     if cfg.model.use_pretrained and not for_loading:
         print(">>> Using pretrained weights")
         rna_encoder.from_pretrained(cfg.model.pretrained_path)
     rna_encoder.subset_pocket_nodes = True
 
+    decoder_in_dim = enc_hidden_dim
+
     if cfg.model.use_graphligs:
         graphlig_cfg = cfg.model.graphlig_encoder
         if graphlig_cfg.use_pretrained:
             if for_loading:
-                lig_encoder = LigandGraphEncoder(features_dim=16,
-                                                 l_size=56,
-                                                 num_rels=4,
-                                                 gcn_hdim=32,
-                                                 gcn_layers=3,
-                                                 batch_norm=False,
-                                                 cut_embeddings=True)
+                lig_encoder = LigandGraphEncoder(
+                    features_dim=16,
+                    l_size=56,
+                    num_rels=4,
+                    gcn_hdim=32,
+                    gcn_layers=3,
+                    batch_norm=False,
+                    cut_embeddings=True,
+                )
+                decoder_in_dim += 16
             else:
                 lig_encoder = LigandGraphEncoder.from_pretrained("pretrained/optimol")
+                decoder_in_dim += 56
         else:
-            lig_encoder = LigandGraphEncoder(features_dim=graphlig_cfg.features_dim,
-                                             l_size=graphlig_cfg.l_size,
-                                             gcn_hdim=graphlig_cfg.gcn_hdim,
-                                             gcn_layers=graphlig_cfg.gcn_layers,
-                                             batch_norm=cfg.model.batch_norm)
+            lig_encoder = LigandGraphEncoder(
+                features_dim=graphlig_cfg.features_dim,
+                l_size=graphlig_cfg.l_size,
+                gcn_hdim=graphlig_cfg.gcn_hdim,
+                gcn_layers=graphlig_cfg.gcn_layers,
+                batch_norm=cfg.model.batch_norm,
+            )
+            decoder_in_dim += graphlig_cfg.gcn_hdim
     else:
-        lig_encoder = LigandEncoder(in_dim=cfg.model.lig_encoder.in_dim,
-                                    hidden_dim=cfg.model.lig_encoder.hidden_dim,
-                                    num_hidden_layers=cfg.model.lig_encoder.num_layers,
-                                    batch_norm=cfg.model.batch_norm,
-                                    dropout=cfg.model.dropout)
+        lig_encoder = LigandEncoder(
+            in_dim=cfg.model.lig_encoder.in_dim,
+            hidden_dim=cfg.model.lig_encoder.hidden_dim,
+            num_hidden_layers=cfg.model.lig_encoder.num_layers,
+            batch_norm=cfg.model.batch_norm,
+            dropout=cfg.model.dropout,
+        )
+        decoder_in_dim += cfg.model.lig_encoder.hidden_dim
 
-    decoder = Decoder(in_dim=cfg.model.decoder.in_dim,
-                      out_dim=cfg.model.decoder.out_dim,
-                      hidden_dim=cfg.model.decoder.hidden_dim,
-                      num_layers=cfg.model.decoder.num_layers,
-                      activation=cfg.model.decoder.activation,
-                      batch_norm=cfg.model.batch_norm,
-                      dropout=cfg.model.dropout)
+    if cfg.train.target not in ["dock", "is_native"]:
+        decoder_in_dim = enc_hidden_dim
 
-    model = RNAmigosModel(encoder=rna_encoder,
-                          decoder=decoder,
-                          lig_encoder=lig_encoder if cfg.train.target in ['dock', 'is_native'] else None,
-                          pool=cfg.model.pool,
-                          pool_dim=cfg.model.encoder.hidden_dim
-                          )
+    decoder = Decoder(
+        in_dim=decoder_in_dim,
+        out_dim=cfg.model.decoder.out_dim,
+        hidden_dim=dec_hidden_dim,
+        num_layers=cfg.model.decoder.num_layers,
+        activation=cfg.model.decoder.activation,
+        batch_norm=cfg.model.batch_norm,
+        dropout=cfg.model.dropout,
+    )
+
+    model = RNAmigosModel(
+        encoder=rna_encoder,
+        decoder=decoder,
+        lig_encoder=lig_encoder if cfg.train.target in ["dock", "is_native"] else None,
+        pool=cfg.model.pool,
+        pool_dim=enc_hidden_dim,
+    )
+    print(model)
     return model
 
 
-def get_model_from_dirpath(saved_model_dir):
+def get_model_from_dirpath(saved_model_dir, tune=False, trial=None):
     # Create the right model with the right params
-    with open(Path(saved_model_dir, 'config.yaml'), 'r') as f:
+    with open(Path(saved_model_dir, "config.yaml"), "r") as f:
         params = safe_load(f)
     cfg = OmegaConf.create(params)
-    model = cfg_to_model(cfg, for_loading=True)
+    model = cfg_to_model(cfg, for_loading=True, tune=tune, trial=trial)
 
     # Load params and use eval()
-    state_dict = torch.load(Path(saved_model_dir, 'model.pth'), map_location='cpu')['model_state_dict']
+    state_dict = torch.load(Path(saved_model_dir, "model.pth"), map_location="cpu")[
+        "model_state_dict"
+    ]
     model.load_state_dict(state_dict)
     model.eval()
     return model
