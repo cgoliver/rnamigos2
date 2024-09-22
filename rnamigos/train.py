@@ -5,6 +5,7 @@ Examples of command lines to train a model are available in scripts_run/train.sh
 import os
 import sys
 import json
+import shutil
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -154,8 +155,8 @@ def objective(trial, cfg) -> float:
     weight_decay = cfg.train.learning_rate
 
     if cfg.train.tune:
-        lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
-        weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
+        lr = trial.suggest_float("train.learning_rate", 1e-5, 1e-1, log=True)
+        weight_decay = trial.suggest_float("train.weight_decay", 1e-5, 1e-2, log=True)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -224,7 +225,6 @@ def pdb_eval(cfg, model):
     base_name = pathlib.Path(cfg.name).stem
     df.to_csv(d / (base_name + ".csv"))
     df_raw.to_csv(d / (base_name + "_raw.csv"))
-    robin_ef_df.to_csv(d / (base_name + "_robin.csv"))
 
     df_chembl = df.loc[df["decoys"] == "chembl"]
     print(f"{cfg.name} Mean EF on chembl: {np.mean(df_chembl['score'].values)}")
@@ -275,10 +275,14 @@ def main(cfg: DictConfig):
         save_path, tune=cfg.train.tune, trial=study.best_trial
     )
 
-    dir_path_obj = Path(save_path)
-    new_dir_name = dir_path_obj.name + "_best"
-    new_dir_path = dir_path_obj.with_name(new_dir_name)
-    dir_path_obj.rename(new_dir_path)
+    src_path_obj = Path(save_path)
+    new_dir_name = src_path_obj.name + "_best"
+    dest_dir_path = src_path_obj.with_name(new_dir_name)
+
+    if dest_dir_path.exists():
+        shutil.rmtree(dest_dir_path)
+
+    shutil.copytree(src_path_obj, dest_dir_path)
 
     pdb_eval(cfg, best_model)
     robin_eval(cfg, best_model)

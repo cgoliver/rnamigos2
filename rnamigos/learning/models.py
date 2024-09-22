@@ -498,15 +498,22 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     )
 
     enc_hidden_dim = cfg.model.encoder.hidden_dim
+    enc_num_layers = cfg.model.encoder.num_layers
     dec_hidden_dim = cfg.model.decoder.hidden_dim
+    dec_num_layers = cfg.model.decoder.num_layers
+
     if tune:
-        enc_hidden_dim = trial.suggest_int("enc_hidden_dim", 8, 256, log=True)
-        dec_hidden_dim = trial.suggest_int("dec_hidden_dim", 8, 256, log=True)
+        dec_hidden_dim = trial.suggest_int("model.decoder.hidden_dim", 8, 256, log=True)
+        dec_num_layers = trial.suggest_int("model.decoder.num_layers", 2, 4)
+
+    if tune and not cfg.model.use_pretrained:
+        enc_hidden_dim = trial.suggest_int("model.encoder.hidden_dim", 8, 256, log=True)
+        enc_num_layers = trial.suggest_int("model.encoder.num_layers", 2, 4)
 
     rna_encoder = Embedder(
         in_dim=model_indim,
         hidden_dim=enc_hidden_dim,
-        num_hidden_layers=cfg.model.encoder.num_layers,
+        num_hidden_layers=enc_num_layers,
         batch_norm=cfg.model.batch_norm,
         dropout=cfg.model.dropout,
         num_bases=cfg.model.encoder.num_bases,
@@ -560,10 +567,14 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
         in_dim=decoder_in_dim,
         out_dim=cfg.model.decoder.out_dim,
         hidden_dim=dec_hidden_dim,
-        num_layers=cfg.model.decoder.num_layers,
+        num_layers=dec_num_layers,
         activation=cfg.model.decoder.activation,
         batch_norm=cfg.model.batch_norm,
-        dropout=cfg.model.dropout,
+        dropout=(
+            cfg.model.dropout
+            if not cfg.train.tune
+            else trial.suggest_float("model.decoder.dropout", 0, 1)
+        ),
     )
 
     model = RNAmigosModel(

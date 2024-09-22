@@ -216,7 +216,7 @@ def get_loader(cfg, dataset, systems, training=True, trial=None, tune=False):
         "batch_size": (
             cfg.train.batch_size
             if not tune
-            else trial.suggest_int("batch_size", 8, 64, log=True)
+            else trial.suggest_int("train.batch_size", 8, 64, log=True)
         ),
         "num_workers": cfg.train.num_workers,
     }
