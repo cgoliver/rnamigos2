@@ -31,6 +31,7 @@ clf_lam: 1.0
 reconstruction_lam: 1.0
 early_stop: 10
 target: dock # dock or native_fp or is_native
+weight_decay: 1e-5
 
 # Validation
 vs_every: 20

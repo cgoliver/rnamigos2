@@ -167,7 +167,10 @@ def objective(trial, cfg) -> float:
     save_path, save_name = mkdirs(name, prefix=cfg.train.target)
     writer = tensorboard.SummaryWriter(save_path)
     print(f"Saving result in {save_path}/{name}")
-    OmegaConf.save(cfg, pathlib.Path(save_path, "config.yaml"))
+    trial_params = [f"{k}={v}" for k, v in trial.params.items()]
+    trial_params = OmegaConf.from_dotlist(trial_params)
+    new_cfg = OmegaConf.merge(cfg, trial_params)
+    OmegaConf.save(new_cfg, pathlib.Path(save_path, "config.yaml"))
     # also dump the trial params
     with open(pathlib.Path(save_path) / "trial_params.json", "w") as j:
         json.dump(trial.params, j)
@@ -253,6 +256,7 @@ def robin_eval(cfg, model):
     d = pathlib.Path(cfg.result_dir, parents=True, exist_ok=True)
     base_name = pathlib.Path(cfg.name).stem
     final_df.to_csv(d / (base_name + "_robin.csv"))
+    print(f"ROBIN:", final_df)
     return final_df
 
 
@@ -260,32 +264,38 @@ def robin_eval(cfg, model):
 def main(cfg: DictConfig):
     # General config
     print(OmegaConf.to_yaml(cfg))
-    print("Done importing")
     study = optuna.create_study()
     study.optimize(lambda trial: objective(trial, cfg), n_trials=cfg.train.n_trials)
 
-    # load best model
-    name = f"{cfg.name}_{study.best_trial.number}"
-    save_path = os.path.join("results", "trained_models", cfg.train.target, name)
+    # load best model if tuned
+    if cfg.train.tune:
+        name = f"{cfg.name}_{study.best_trial.number}"
+        save_path = os.path.join("results", "trained_models", cfg.train.target, name)
+        trial_df = study.trials_dataframe()
+        trial_df.to_csv(Path(save_path) / "trials.csv")
 
-    print("best trial: ", study.best_trial.number)
-    print(study.best_trial)
+        model = get_model_from_dirpath(
+            save_path, tune=cfg.train.tune, trial=study.best_trial
+        )
 
-    best_model = get_model_from_dirpath(
-        save_path, tune=cfg.train.tune, trial=study.best_trial
-    )
+        src_path_obj = Path(save_path)
+        new_dir_name = src_path_obj.name + "_best"
+        dest_dir_path = src_path_obj.with_name(new_dir_name)
 
-    src_path_obj = Path(save_path)
-    new_dir_name = src_path_obj.name + "_best"
-    dest_dir_path = src_path_obj.with_name(new_dir_name)
+        if dest_dir_path.exists():
+            shutil.rmtree(dest_dir_path)
 
-    if dest_dir_path.exists():
-        shutil.rmtree(dest_dir_path)
+        shutil.copytree(src_path_obj, dest_dir_path)
 
-    shutil.copytree(src_path_obj, dest_dir_path)
+    # else load chosen model
+    else:
+        save_path = os.path.join(
+            "results", "trained_models", cfg.train.target, cfg.name
+        )
+        model = get_model_from_dirpath(save_path)
 
-    pdb_eval(cfg, best_model)
-    robin_eval(cfg, best_model)
+    pdb_eval(cfg, model)
+    robin_eval(cfg, model)
 
 
 if __name__ == "__main__":

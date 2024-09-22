@@ -503,11 +503,15 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     dec_num_layers = cfg.model.decoder.num_layers
 
     if tune:
-        dec_hidden_dim = trial.suggest_int("model.decoder.hidden_dim", 8, 256, log=True)
+        dec_hidden_dim = trial.suggest_categorical(
+            "model.decoder.hidden_dim", [32, 128, 256]
+        )
         dec_num_layers = trial.suggest_int("model.decoder.num_layers", 2, 4)
 
     if tune and not cfg.model.use_pretrained:
-        enc_hidden_dim = trial.suggest_int("model.encoder.hidden_dim", 8, 256, log=True)
+        enc_hidden_dim = trial.suggest_categorical(
+            "model.encoder.hidden_dim", [32, 128, 256]
+        )
         enc_num_layers = trial.suggest_int("model.encoder.num_layers", 2, 4)
 
     rna_encoder = Embedder(
