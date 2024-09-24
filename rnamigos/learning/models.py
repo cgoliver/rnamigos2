@@ -577,7 +577,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
         dropout=(
             cfg.model.dropout
             if not cfg.train.tune
-            else trial.suggest_float("model.decoder.dropout", 0, 1)
+            else trial.suggest_categorical("model.decoder.dropout", [0.2, 0.5])
         ),
     )
 
