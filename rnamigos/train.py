@@ -195,6 +195,9 @@ def objective(trial, cfg) -> float:
         cfg=cfg,
     )
 
+    with open(pathlib.Path(save_path) / f"trial_score.txt", "w") as t:
+        t.write(str(val_loss))
+
     return val_loss
 
 
