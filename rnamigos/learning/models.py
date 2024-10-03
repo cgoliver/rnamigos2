@@ -24,16 +24,16 @@ class RGCN(nn.Module):
     """RGCN encoder with num_hidden_layers + 2 RGCN layers, and sum pooling."""
 
     def __init__(
-        self,
-        features_dim,
-        h_dim,
-        num_rels,
-        num_layers,
-        num_bases=-1,
-        gcn_dropout=0,
-        batch_norm=False,
-        self_loop=False,
-        jumping_knowledge=True,
+            self,
+            features_dim,
+            h_dim,
+            num_rels,
+            num_layers,
+            num_bases=-1,
+            gcn_dropout=0,
+            batch_norm=False,
+            self_loop=False,
+            jumping_knowledge=True,
     ):
         super(RGCN, self).__init__()
 
@@ -112,14 +112,14 @@ class Decoder(nn.Module):
     """
 
     def __init__(
-        self,
-        in_dim,
-        out_dim,
-        hidden_dim,
-        num_layers,
-        dropout=0.2,
-        batch_norm=True,
-        activation=None,
+            self,
+            in_dim,
+            out_dim,
+            hidden_dim,
+            num_layers,
+            dropout=0.2,
+            batch_norm=True,
+            activation=None,
     ):
         super(Decoder, self).__init__()
         # self.num_nodes = num_nodes
@@ -176,13 +176,13 @@ class LigandEncoder(nn.Module):
     """
 
     def __init__(
-        self,
-        in_dim,
-        hidden_dim,
-        num_hidden_layers,
-        batch_norm=True,
-        dropout=0.2,
-        num_rels=19,
+            self,
+            in_dim,
+            hidden_dim,
+            num_hidden_layers,
+            batch_norm=True,
+            dropout=0.2,
+            num_rels=19,
     ):
         super(LigandEncoder, self).__init__()
         self.in_dim = in_dim
@@ -242,15 +242,15 @@ class LigandEncoder(nn.Module):
 
 class LigandGraphEncoder(nn.Module):
     def __init__(
-        self,
-        l_size=56,
-        gcn_hdim=32,
-        gcn_layers=3,
-        features_dim=22,
-        num_rels=4,
-        batch_norm=False,
-        # cat_mu_v=True,
-        cut_embeddings=False,
+            self,
+            l_size=56,
+            gcn_hdim=32,
+            gcn_layers=3,
+            features_dim=22,
+            num_rels=4,
+            batch_norm=False,
+            # cat_mu_v=True,
+            cut_embeddings=False,
     ):
         super(LigandGraphEncoder, self).__init__()
         self.features_dim = features_dim
@@ -315,15 +315,15 @@ class Embedder(nn.Module):
     """
 
     def __init__(
-        self,
-        in_dim,
-        hidden_dim,
-        num_hidden_layers,
-        subset_pocket_nodes=True,
-        batch_norm=True,
-        num_rels=20,
-        dropout=0.2,
-        num_bases=-1,
+            self,
+            in_dim,
+            hidden_dim,
+            num_hidden_layers,
+            subset_pocket_nodes=True,
+            batch_norm=True,
+            num_rels=20,
+            dropout=0.2,
+            num_bases=-1,
     ):
         super(Embedder, self).__init__()
         self.in_dim = in_dim
@@ -575,8 +575,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
         activation=cfg.model.decoder.activation,
         batch_norm=cfg.model.batch_norm,
         dropout=(
-            cfg.model.dropout
-            if not cfg.train.tune
+            cfg.model.dropout if not tune
             else trial.suggest_categorical("model.decoder.dropout", [0.2, 0.5])
         ),
     )
