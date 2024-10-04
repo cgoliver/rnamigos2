@@ -45,7 +45,8 @@ def one_robin(pocket_id, ligand_name, model=None, use_rna_fm=False, do_mixing=Fa
         model=model,
         use_ligand_cache=True,
         ligand_cache="data/ligands/robin_lig_graphs.p",
-        do_mixing=do_mixing
+        do_mixing=do_mixing,
+        debug=False
     )
     final_df["pocket_id"] = pocket_id
     rows = []
@@ -56,7 +57,7 @@ def one_robin(pocket_id, ligand_name, model=None, use_rna_fm=False, do_mixing=Fa
                                frac=frac,
                                )
         rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
-    return pd.DataFrame(rows), final_df
+    return pd.DataFrame(rows), pd.DataFrame(final_df)
 
 
 def get_all_preds(model, use_rna_fm):

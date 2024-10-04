@@ -587,7 +587,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
         pool=cfg.model.pool,
         pool_dim=enc_hidden_dim,
     )
-    print(model)
+    # print(model)
     return model
 
 
