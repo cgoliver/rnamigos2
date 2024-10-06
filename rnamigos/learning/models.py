@@ -492,7 +492,10 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     """
     for_loading skips pretrained network subparts since it will be used for loading a fully pretrained model
     """
-    use_rnafm = "use_rnafm" in cfg.model and cfg.model.use_rnafm
+    use_rnafm = False
+    if "use_rnafm" in cfg.model:
+        use_rnafm = cfg.model.use_rnafm
+
     model_indim = (
         cfg.model.encoder.in_dim + 640 if use_rnafm else cfg.model.encoder.in_dim
     )
@@ -576,7 +579,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
         batch_norm=cfg.model.batch_norm,
         dropout=(
             cfg.model.dropout
-            if not cfg.train.tune
+            if not tune
             else trial.suggest_categorical("model.decoder.dropout", [0.2, 0.5])
         ),
     )
@@ -592,7 +595,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     return model
 
 
-def get_model_from_dirpath(saved_model_dir, tune=False, trial=None):
+def get_model_from_dirpath(saved_model_dir, tune=False, trial=None, return_cfg=False):
     # Create the right model with the right params
     with open(Path(saved_model_dir, "config.yaml"), "r") as f:
         params = safe_load(f)
@@ -605,4 +608,6 @@ def get_model_from_dirpath(saved_model_dir, tune=False, trial=None):
     ]
     model.load_state_dict(state_dict)
     model.eval()
+    if return_cfg:
+        return model, cfg
     return model
