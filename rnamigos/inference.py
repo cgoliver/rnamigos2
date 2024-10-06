@@ -26,7 +26,6 @@ def inference(
     dump_all=False,
     ligand_cache=None,
     use_ligand_cache=False,
-    use_rnafm=False,
     do_mixing=True,
 ):
     """

@@ -34,17 +34,19 @@ ROBIN_POCKETS = {
 POCKET_PATH = "data/json_pockets_expanded"
 
 
-def one_robin(pocket_id, ligand_name, model, use_rna_fm):
+def one_robin(pocket_id, ligand_name, model=None, use_rna_fm=False, do_mixing=False):
     dgl_pocket_graph, _ = load_rna_graph(
         POCKET_PATH / Path(pocket_id).with_suffix(".json"),
         use_rnafm=use_rna_fm,
     )
     final_df = robin_inference(
-        ligand_name,
-        dgl_pocket_graph,
+        ligand_name=ligand_name,
+        dgl_pocket_graph=dgl_pocket_graph,
         model=model,
         use_ligand_cache=True,
         ligand_cache="data/ligands/robin_lig_graphs.p",
+        do_mixing=do_mixing,
+        debug=False
     )
     final_df["pocket_id"] = pocket_id
     rows = []
@@ -55,27 +57,32 @@ def one_robin(pocket_id, ligand_name, model, use_rna_fm):
                                frac=frac,
                                )
         rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows), pd.DataFrame(final_df)
 
 
 def get_all_preds(model, use_rna_fm):
     robin_dfs = [df for df in Parallel(n_jobs=4)(delayed(one_robin)(pocket_id, ligand_name, model, use_rna_fm)
                                                  for ligand_name, pocket_id in ROBIN_POCKETS.items())]
-    robin_ef_df = pd.concat(robin_dfs)
-    return robin_ef_df
+    robin_efs, robin_raw_dfs = list(map(list, zip(*robin_dfs)))
+    robin_ef_df = pd.concat(robin_efs)
+    robin_raw_df = pd.concat(robin_raw_dfs)
+    return robin_ef_df, robin_raw_df
 
 
-def get_all_csvs():
+def get_all_csvs(recompute=False):
     model_dir = "results/trained_models/"
+    os.makedirs(RES_DIR, exist_ok=True)
     for model, model_path in MODELS.items():
         out_csv = os.path.join(RES_DIR, f"{model}.csv")
-        if os.path.exists(out_csv):
+        out_csv_raw = os.path.join(RES_DIR, f"{model}_raw.csv")
+        if os.path.exists(out_csv) and not recompute:
             continue
         full_model_path = os.path.join(model_dir, model_path)
         rnafm = model_path.endswith('rnafm')
         model = get_model_from_dirpath(full_model_path)
-        df = get_all_preds(model, use_rna_fm=rnafm)
-        df.to_csv(out_csv, index=False)
+        df_ef, df_raw = get_all_preds(model, use_rna_fm=rnafm)
+        df_ef.to_csv(out_csv, index=False)
+        df_raw.to_csv(out_csv_raw, index=False)
 
 
 def plot_all():
@@ -95,7 +102,7 @@ def plot_all():
         'dock': '#9467bd',  # purple
         'dock_rnafm': '#8c564b'  # brown (distinct for rnafm)
     }
-    custom_palette=sns.color_palette("Paired")
+    custom_palette = sns.color_palette("Paired")
 
     # custom_palette = sns.color_palette(palette=custom_palette)
     # sns.set_palette(custom_palette)
@@ -126,5 +133,5 @@ if __name__ == "__main__":
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
     }
 
-    # get_all_csvs()
-    plot_all()
+    get_all_csvs(recompute=True)
+    # plot_all()

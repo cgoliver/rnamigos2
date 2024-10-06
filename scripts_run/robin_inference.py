@@ -81,7 +81,8 @@ def robin_inference(
         out_path=None,
         ligand_cache=None,
         use_ligand_cache=False,
-        debug=False
+        debug=False,
+        do_mixing=False
 ):
     actives_ligands_path = os.path.join(
         "data", "ligand_db", ligand_name, "robin", "actives.txt"
@@ -110,7 +111,7 @@ def robin_inference(
         out_path=out_path,
         ligand_cache=ligand_cache,
         use_ligand_cache=use_ligand_cache,
-        do_mixing=False,
+        do_mixing=do_mixing,
     )
     final_df["is_active"] = is_active
     return final_df
