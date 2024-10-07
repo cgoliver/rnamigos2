@@ -101,8 +101,8 @@ def robin_inference(
         0 for _ in range(len(inactives_smiles_list))
     ]
     if debug:
-        smiles_list = smiles_list[:10]
-        is_active = is_active[:10]
+        smiles_list = smiles_list[:100]
+        is_active = is_active[:100]
     final_df = inference(
         model=model,
         dgl_graph=dgl_pocket_graph,

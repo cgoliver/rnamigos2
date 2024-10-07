@@ -85,9 +85,55 @@ def get_all_csvs(recompute=False):
         df_raw.to_csv(out_csv_raw, index=False)
 
 
+def mix(df1, df2, outpath=None):
+    def normalize(scores):
+        out_scores = (scores - scores.min()) / (scores.max() - scores.min())
+        return out_scores
+
+    norm_score1 = normalize(df1["model"])
+    norm_score2 = normalize(df2["model"])
+    mixed_scores = 0.5 * (norm_score1 + norm_score2)
+    out_df = df1.copy()
+    out_df['mixed_score'] = mixed_scores
+    out_df = out_df.drop(columns=['model'])
+    if outpath is not None:
+        out_df.to_csv(outpath, index=False)
+    return out_df
+
+
+def mix_all():
+    for pair, outname in PAIRS.items():
+        path1 = os.path.join(RES_DIR, f"{pair[0]}_raw.csv")
+        path2 = os.path.join(RES_DIR, f"{pair[1]}_raw.csv")
+        df1 = pd.read_csv(path1)
+        df2 = pd.read_csv(path2)
+
+        robin_efs, robin_raw_dfs = [], []
+        for pocket_id in ROBIN_POCKETS.values():
+            rows = []
+            df1_lig = df1[df1["pocket_id"] == pocket_id]
+            df2_lig = df2[df2["pocket_id"] == pocket_id]
+            mixed_df_lig = mix(df1_lig, df2_lig)
+            robin_raw_dfs.append(mixed_df_lig)
+            for frac in (0.01, 0.02, 0.05):
+                ef = enrichment_factor(mixed_df_lig["mixed_score"],
+                                       mixed_df_lig["is_active"],
+                                       lower_is_better=False,
+                                       frac=frac)
+                robin_efs.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
+        robin_efs = pd.DataFrame(robin_efs)
+        robin_raw_dfs = pd.concat(robin_raw_dfs)
+        outpath = os.path.join(RES_DIR, f"{outname}.csv")
+        outpath_raw = os.path.join(RES_DIR, f"{outname}_raw.csv")
+        robin_efs.to_csv(outpath, index=False)
+        robin_raw_dfs.to_csv(outpath_raw, index=False)
+
+
 def plot_all():
     big_df = []
-    for model in MODELS:
+    models = MODELS
+    models = list(MODELS) + list(PAIRS.values())
+    for model in models:
         out_csv = os.path.join(RES_DIR, f"{model}.csv")
         df = pd.read_csv(out_csv)
         df['name'] = model
@@ -133,5 +179,19 @@ if __name__ == "__main__":
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
     }
 
-    get_all_csvs(recompute=True)
-    # plot_all()
+    PAIRS = {("native", "dock"): "vanilla",
+             ("native_rnafm", "dock_rnafm"): "vanilla_fm",
+             ("native_pre", "dock"): "pre",
+             ("native_pre_rnafm", "dock_rnafm"): "pre_fm"}
+
+    # pocket_id = "TPP"
+    # lig_name = "2GDI_Y_TPP_100"
+    # model_dir = "results/trained_models/"
+    # model_path = "is_native/native_nopre_new_pdbchembl"
+    # full_model_path = os.path.join(model_dir, model_path)
+    # model = get_model_from_dirpath(full_model_path)
+    # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
+
+    # get_all_csvs(recompute=True)
+    # mix_all()
+    plot_all()

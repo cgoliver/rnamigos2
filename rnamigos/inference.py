@@ -17,16 +17,16 @@ from rnamigos.learning.models import get_model_from_dirpath
 
 
 def inference(
-    dgl_graph,
-    smiles_list,
-    out_path="rnamigos_out.csv",
-    mixing_coeffs=(0.5, 0.0, 0.5),
-    model=None,
-    models_path=None,
-    dump_all=False,
-    ligand_cache=None,
-    use_ligand_cache=False,
-    do_mixing=True,
+        dgl_graph,
+        smiles_list,
+        out_path="rnamigos_out.csv",
+        mixing_coeffs=(0.5, 0.0, 0.5),
+        model=None,
+        models_path=None,
+        dump_all=False,
+        ligand_cache=None,
+        use_ligand_cache=False,
+        do_mixing=True,
 ):
     """
     Run inference from python objects
@@ -87,6 +87,8 @@ def inference(
             all_scores = -all_scores
         results[model_name] = all_scores
 
+    df = pd.DataFrame(results)
+    df['smiles'] = smiles_list
     if do_mixing:
         # Normalize each methods outputs and mix methods together : best mix = 0.44, 0.39, 0.17
         def normalize(scores):
@@ -97,38 +99,16 @@ def inference(
             model_name: normalize(result) for model_name, result in results.items()
         }
         mixed_scores = (
-            mixing_coeffs[0] * normalized_results["dock"]
-            + mixing_coeffs[1] * normalized_results["native_fp"]
-            + mixing_coeffs[2] * normalized_results["is_native"]
+                mixing_coeffs[0] * normalized_results["dock"]
+                + mixing_coeffs[1] * normalized_results["native_fp"]
+                + mixing_coeffs[2] * normalized_results["is_native"]
         )
-
-        rows = []
+        df['mixed_score'] = mixed_scores
         if not dump_all:
-            for smiles, score in zip(smiles_list, mixed_scores):
-                rows.append({"smiles": smiles, "score": score})
-        else:
-            for smiles, dock_score, native_score, fp_score, mixed_score in zip(
-                smiles_list,
-                results["dock"],
-                results["is_native"],
-                results["native_fp"],
-                mixed_scores,
-            ):
-                rows.append(
-                    {
-                        "smiles": smiles,
-                        "dock_score": dock_score,
-                        "native_score": native_score,
-                        "fp_score": fp_score,
-                        "mixed_score": mixed_score,
-                    }
-                )
-        result_df = pd.DataFrame(rows)
-    else:
-        result_df = results
+            df = df[["smiles", "mixed_score"]]
     if out_path is not None:
-        result_df.to_csv(out_path)
-    return result_df
+        df.to_csv(out_path)
+    return df
 
 
 def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False):
