@@ -30,6 +30,7 @@ ROBIN_POCKETS = {
     "SAM_ll": "2QWY_B_SAM_300",
     "PreQ1": "3FU2_A_PRF_101",
 }
+# SWAP_1 = {'PreQ1': '2GDI_Y_TPP_100', 'SAM_ll': '3FU2_A_PRF_101', 'TPP': '5BTP_A_AMZ_106', 'ZTP': '2QWY_B_SAM_300'}
 
 POCKET_PATH = "data/json_pockets_expanded"
 
@@ -61,11 +62,23 @@ def one_robin(pocket_id, ligand_name, model=None, use_rna_fm=False, do_mixing=Fa
 
 
 def get_all_preds(model, use_rna_fm):
+    robin_ligs = list(ROBIN_POCKETS.keys())
+    robin_pockets = list(ROBIN_POCKETS.values())
+
+    # Associate the ligands with the wrong pockets.
+    robin_lig_pocket_dict = {lig: robin_pockets[(i + SWAP) % len(robin_ligs)] for i, lig in enumerate(robin_ligs)}
+
     robin_dfs = [df for df in Parallel(n_jobs=4)(delayed(one_robin)(pocket_id, ligand_name, model, use_rna_fm)
-                                                 for ligand_name, pocket_id in ROBIN_POCKETS.items())]
+                                                 for ligand_name, pocket_id in robin_lig_pocket_dict.items())]
     robin_efs, robin_raw_dfs = list(map(list, zip(*robin_dfs)))
     robin_ef_df = pd.concat(robin_efs)
     robin_raw_df = pd.concat(robin_raw_dfs)
+
+    # The naming is based on the pocket. So to keep ligands swap consistent, we need to change that
+    old_to_new = {robin_pockets[i]: robin_pockets[(i + SWAP) % len(robin_ligs)] for i in range(len(robin_ligs))}
+    new_to_old = {v: k for k, v in old_to_new.items()}
+    robin_ef_df['pocket_id'] = robin_ef_df['pocket_id'].map(new_to_old)
+    robin_raw_df['pocket_id'] = robin_raw_df['pocket_id'].map(new_to_old)
     return robin_ef_df, robin_raw_df
 
 
@@ -162,28 +175,55 @@ def plot_all():
     plt.tight_layout()
     plt.show()
 
-    # axs = plt.subplots(2,2)
-    # for i, pockets in enumerate(ROBIN_POCKETS.values()):
-    #
-    # sns.lineplot(data=big_df, x="", y="passengers", hue="month")
+
+def plot_perturbed(model="pre_fm", group=True):
+    big_df = []
+    for swap in range(4):
+        res_dir = "outputs/robin/" if swap == 0 else f"outputs/robin_swap_{swap}"
+        out_csv = os.path.join(res_dir, f"{model}.csv")
+        df = pd.read_csv(out_csv)
+        df['name'] = f'{model}_swap{swap}'
+        big_df.append(df)
+    if group:
+        other_scores = [df['score'].values for df in big_df[1:]]
+        perturbed = big_df[1]
+        perturbed['name'] = "perturbed"
+        import numpy as np
+        perturbed['score'] = np.mean(other_scores, axis=0)
+        big_df = [big_df[0], perturbed]
+    big_df = pd.concat(big_df)
+
+    # custom_palette = sns.color_palette("Paired")
+    custom_palette = None
+    plt.rcParams['axes.grid'] = True
+    g = sns.FacetGrid(big_df, col="pocket_id", hue="name", col_wrap=2, height=4, palette=custom_palette, sharey=False)
+    g.map(sns.lineplot, "frac", "score").add_legend()
+
+    # Adjust the layout for better spacing
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
-    RES_DIR = "outputs/robin/"
+    SWAP = 0
+    RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     MODELS = {
-        "native": "is_native/native_nopre_new_pdbchembl",
-        "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
-        "native_pre": "is_native/native_pretrain_new_pdbchembl",
+        # "native": "is_native/native_nopre_new_pdbchembl",
+        # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
+        # "native_pre": "is_native/native_pretrain_new_pdbchembl",
         "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
-        "dock": "dock/dock_new_pdbchembl",
+        # "dock": "dock/dock_new_pdbchembl",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
     }
 
-    PAIRS = {("native", "dock"): "vanilla",
-             ("native_rnafm", "dock_rnafm"): "vanilla_fm",
-             ("native_pre", "dock"): "pre",
-             ("native_pre_rnafm", "dock_rnafm"): "pre_fm"}
+    PAIRS = {
+        # ("native", "dock"): "vanilla",
+        # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
+        # ("native_pre", "dock"): "pre",
+        ("native_pre_rnafm", "dock_rnafm"): "pre_fm"
+    }
 
+    # TEST ONE INFERENCE
     # pocket_id = "TPP"
     # lig_name = "2GDI_Y_TPP_100"
     # model_dir = "results/trained_models/"
@@ -192,6 +232,15 @@ if __name__ == "__main__":
     # model = get_model_from_dirpath(full_model_path)
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
-    # get_all_csvs(recompute=True)
+    # GET ALL CSVs for the models and plot them
+    # get_all_csvs(recompute=False)
     # mix_all()
-    plot_all()
+    # plot_all()
+
+    # COMPUTE PERTURBED VERSIONS
+    for i in range(1, 4):
+        SWAP = i
+        RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
+        # get_all_csvs(recompute=False)
+        # mix_all()
+    plot_perturbed(model="pre_fm", group=True)
