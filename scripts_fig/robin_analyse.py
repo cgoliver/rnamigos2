@@ -7,11 +7,13 @@ import sys
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
+from collections import defaultdict
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-import torch
 import seaborn as sns
+import torch
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,7 +32,6 @@ ROBIN_POCKETS = {
     "SAM_ll": "2QWY_B_SAM_300",
     "PreQ1": "3FU2_A_PRF_101",
 }
-# SWAP_1 = {'PreQ1': '2GDI_Y_TPP_100', 'SAM_ll': '3FU2_A_PRF_101', 'TPP': '5BTP_A_AMZ_106', 'ZTP': '2QWY_B_SAM_300'}
 
 POCKET_PATH = "data/json_pockets_expanded"
 
@@ -96,6 +97,52 @@ def get_all_csvs(recompute=False):
         df_ef, df_raw = get_all_preds(model, use_rna_fm=rnafm)
         df_ef.to_csv(out_csv, index=False)
         df_raw.to_csv(out_csv_raw, index=False)
+
+
+def get_dfs_docking():
+    """
+    Go from columns:
+    TARGET,_TITLE1,SMILE,TOTAL,INTER,INTRA,RESTR,VDW,TYPE
+
+    To columns:
+    raw: model,smiles,is_active,pocket_id
+    efs: pocket_id,score,frac
+    """
+
+    ref_raw_df = pd.read_csv("outputs/robin/dock_raw.csv")
+    docking_df = pd.read_csv("data/robin_docking_consolidated_v2.csv")
+    # For each pocket, get relevant mapping smiles : normalized score,
+    # then use it to create the appropriate raw, and clean csvs
+    all_raws, all_dfs = [], []
+    for ligand_name, pocket_id in ROBIN_POCKETS.items():
+        docking_df_lig = docking_df[docking_df["TARGET"] == ligand_name]
+        ref_raw_df_lig = ref_raw_df[ref_raw_df["pocket_id"] == pocket_id]
+        scores = -pd.to_numeric(docking_df_lig['INTER'], errors='coerce').values.squeeze()
+        scores[scores < 0] = 0
+        scores = np.nan_to_num(scores, nan=0)
+        normalized_scores = (scores - scores.min()) / (scores.max() - scores.min())
+        mapping = {}
+        for smiles, score in zip(docking_df_lig[["SMILE"]].values, normalized_scores):
+            mapping[smiles[0]] = score
+        mapping = defaultdict(int, mapping)
+        docking_scores = [mapping[smile] for smile in ref_raw_df_lig["smiles"].values]
+        ref_raw_df_lig['model'] = docking_scores
+
+        # Go from RAW to EF
+        rows = []
+        for frac in (0.01, 0.02, 0.05):
+            ef = enrichment_factor(ref_raw_df_lig["model"],
+                                   ref_raw_df_lig["is_active"],
+                                   lower_is_better=False,
+                                   frac=frac,
+                                   )
+            rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
+        all_raws.append(ref_raw_df_lig.copy())
+        all_dfs.append(pd.DataFrame(rows))
+    all_raws = pd.concat(all_raws)
+    all_dfs = pd.concat(all_dfs)
+    all_raws.to_csv('outputs/robin/rdock_raw.csv')
+    all_dfs.to_csv('outputs/robin/rdock.csv')
 
 
 def mix(df1, df2, outpath=None):
@@ -220,7 +267,8 @@ if __name__ == "__main__":
         # ("native", "dock"): "vanilla",
         # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
         # ("native_pre", "dock"): "pre",
-        ("native_pre_rnafm", "dock_rnafm"): "pre_fm"
+        ("native_pre_rnafm", "dock_rnafm"): "pre_fm",
+        ("native_pre_rnafm", "rdock"): "rnamigos++"
     }
 
     # TEST ONE INFERENCE
@@ -232,10 +280,14 @@ if __name__ == "__main__":
     # model = get_model_from_dirpath(full_model_path)
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
+
+
     # GET ALL CSVs for the models and plot them
     # get_all_csvs(recompute=False)
-    # mix_all()
-    # plot_all()
+    get_dfs_docking()
+    mix_all()
+    plot_all()
+
 
     # COMPUTE PERTURBED VERSIONS
     for i in range(1, 4):
@@ -243,4 +295,4 @@ if __name__ == "__main__":
         RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
         # get_all_csvs(recompute=False)
         # mix_all()
-    plot_perturbed(model="pre_fm", group=True)
+    # plot_perturbed(model="pre_fm", group=True)
