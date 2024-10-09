@@ -48,16 +48,17 @@ def one_robin(pocket_id, ligand_name, model=None, use_rna_fm=False, do_mixing=Fa
         use_ligand_cache=True,
         ligand_cache="data/ligands/robin_lig_graphs.p",
         do_mixing=do_mixing,
-        debug=False
+        debug=False,
     )
     final_df["pocket_id"] = pocket_id
     rows = []
     for frac in (0.01, 0.02, 0.05):
-        ef = enrichment_factor(final_df["model"],
-                               final_df["is_active"],
-                               lower_is_better=False,
-                               frac=frac,
-                               )
+        ef = enrichment_factor(
+            final_df["score"],
+            final_df["is_active"],
+            lower_is_better=False,
+            frac=frac,
+        )
         rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
     return pd.DataFrame(rows), pd.DataFrame(final_df)
 
@@ -67,19 +68,30 @@ def get_all_preds(model, use_rna_fm):
     robin_pockets = list(ROBIN_POCKETS.values())
 
     # Associate the ligands with the wrong pockets.
-    robin_lig_pocket_dict = {lig: robin_pockets[(i + SWAP) % len(robin_ligs)] for i, lig in enumerate(robin_ligs)}
+    robin_lig_pocket_dict = {
+        lig: robin_pockets[(i + SWAP) % len(robin_ligs)]
+        for i, lig in enumerate(robin_ligs)
+    }
 
-    robin_dfs = [df for df in Parallel(n_jobs=4)(delayed(one_robin)(pocket_id, ligand_name, model, use_rna_fm)
-                                                 for ligand_name, pocket_id in robin_lig_pocket_dict.items())]
+    robin_dfs = [
+        df
+        for df in Parallel(n_jobs=4)(
+            delayed(one_robin)(pocket_id, ligand_name, model, use_rna_fm)
+            for ligand_name, pocket_id in robin_lig_pocket_dict.items()
+        )
+    ]
     robin_efs, robin_raw_dfs = list(map(list, zip(*robin_dfs)))
     robin_ef_df = pd.concat(robin_efs)
     robin_raw_df = pd.concat(robin_raw_dfs)
 
     # The naming is based on the pocket. So to keep ligands swap consistent, we need to change that
-    old_to_new = {robin_pockets[i]: robin_pockets[(i + SWAP) % len(robin_ligs)] for i in range(len(robin_ligs))}
+    old_to_new = {
+        robin_pockets[i]: robin_pockets[(i + SWAP) % len(robin_ligs)]
+        for i in range(len(robin_ligs))
+    }
     new_to_old = {v: k for k, v in old_to_new.items()}
-    robin_ef_df['pocket_id'] = robin_ef_df['pocket_id'].map(new_to_old)
-    robin_raw_df['pocket_id'] = robin_raw_df['pocket_id'].map(new_to_old)
+    robin_ef_df["pocket_id"] = robin_ef_df["pocket_id"].map(new_to_old)
+    robin_raw_df["pocket_id"] = robin_raw_df["pocket_id"].map(new_to_old)
     return robin_ef_df, robin_raw_df
 
 
@@ -92,7 +104,7 @@ def get_all_csvs(recompute=False):
         if os.path.exists(out_csv) and not recompute:
             continue
         full_model_path = os.path.join(model_dir, model_path)
-        rnafm = model_path.endswith('rnafm')
+        rnafm = model_path.endswith("rnafm")
         model = get_model_from_dirpath(full_model_path)
         df_ef, df_raw = get_all_preds(model, use_rna_fm=rnafm)
         df_ef.to_csv(out_csv, index=False)
@@ -105,7 +117,7 @@ def get_dfs_docking():
     TARGET,_TITLE1,SMILE,TOTAL,INTER,INTRA,RESTR,VDW,TYPE
 
     To columns:
-    raw: model,smiles,is_active,pocket_id
+    raw: score,smiles,is_active,pocket_id
     efs: pocket_id,score,frac
     """
 
@@ -117,7 +129,9 @@ def get_dfs_docking():
     for ligand_name, pocket_id in ROBIN_POCKETS.items():
         docking_df_lig = docking_df[docking_df["TARGET"] == ligand_name]
         ref_raw_df_lig = ref_raw_df[ref_raw_df["pocket_id"] == pocket_id]
-        scores = -pd.to_numeric(docking_df_lig['INTER'], errors='coerce').values.squeeze()
+        scores = -pd.to_numeric(
+            docking_df_lig["INTER"], errors="coerce"
+        ).values.squeeze()
         scores[scores < 0] = 0
         scores = np.nan_to_num(scores, nan=0)
         normalized_scores = (scores - scores.min()) / (scores.max() - scores.min())
@@ -126,23 +140,24 @@ def get_dfs_docking():
             mapping[smiles[0]] = score
         mapping = defaultdict(int, mapping)
         docking_scores = [mapping[smile] for smile in ref_raw_df_lig["smiles"].values]
-        ref_raw_df_lig['model'] = docking_scores
+        ref_raw_df_lig["score"] = docking_scores
 
         # Go from RAW to EF
         rows = []
         for frac in (0.01, 0.02, 0.05):
-            ef = enrichment_factor(ref_raw_df_lig["model"],
-                                   ref_raw_df_lig["is_active"],
-                                   lower_is_better=False,
-                                   frac=frac,
-                                   )
+            ef = enrichment_factor(
+                ref_raw_df_lig["score"],
+                ref_raw_df_lig["is_active"],
+                lower_is_better=False,
+                frac=frac,
+            )
             rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
         all_raws.append(ref_raw_df_lig.copy())
         all_dfs.append(pd.DataFrame(rows))
     all_raws = pd.concat(all_raws)
     all_dfs = pd.concat(all_dfs)
-    all_raws.to_csv('outputs/robin/rdock_raw.csv')
-    all_dfs.to_csv('outputs/robin/rdock.csv')
+    all_raws.to_csv("outputs/robin/rdock_raw.csv")
+    all_dfs.to_csv("outputs/robin/rdock.csv")
 
 
 def mix(df1, df2, outpath=None):
@@ -150,12 +165,13 @@ def mix(df1, df2, outpath=None):
         out_scores = (scores - scores.min()) / (scores.max() - scores.min())
         return out_scores
 
-    norm_score1 = normalize(df1["model"])
-    norm_score2 = normalize(df2["model"])
+    norm_score1 = normalize(df1["score"])
+    norm_score2 = normalize(df2["score"])
     mixed_scores = 0.5 * (norm_score1 + norm_score2)
     out_df = df1.copy()
-    out_df['mixed_score'] = mixed_scores
-    out_df = out_df.drop(columns=['model'])
+    out_df["mixed_score"] = mixed_scores
+    out_df = out_df.drop(columns=["score"])
+    out_df = out_df.rename(columns={"mixed_score": "score"})
     if outpath is not None:
         out_df.to_csv(outpath, index=False)
     return out_df
@@ -176,10 +192,12 @@ def mix_all():
             mixed_df_lig = mix(df1_lig, df2_lig)
             robin_raw_dfs.append(mixed_df_lig)
             for frac in (0.01, 0.02, 0.05):
-                ef = enrichment_factor(mixed_df_lig["mixed_score"],
-                                       mixed_df_lig["is_active"],
-                                       lower_is_better=False,
-                                       frac=frac)
+                ef = enrichment_factor(
+                    mixed_df_lig["score"],
+                    mixed_df_lig["is_active"],
+                    lower_is_better=False,
+                    frac=frac,
+                )
                 robin_efs.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
         robin_efs = pd.DataFrame(robin_efs)
         robin_raw_dfs = pd.concat(robin_raw_dfs)
@@ -192,30 +210,39 @@ def mix_all():
 def plot_all():
     big_df = []
     models = MODELS
-    models = list(MODELS) + list(PAIRS.values())
+    models = list(MODELS) + list(PAIRS.values()) + ["rdock"]
     for model in models:
         out_csv = os.path.join(RES_DIR, f"{model}.csv")
         df = pd.read_csv(out_csv)
-        df['name'] = model
+        df["name"] = model
         big_df.append(df)
     big_df = pd.concat(big_df)
 
     custom_palette = {
-        'native': '#1f77b4',  # blue
-        'native_rnafm': '#ff7f0e',  # orange (distinct for rnafm)
-        'native_pre': '#2ca02c',  # green
-        'native_pre_rnafm': '#d62728',  # red (distinct for rnafm)
-        'dock': '#9467bd',  # purple
-        'dock_rnafm': '#8c564b'  # brown (distinct for rnafm)
+        "native": "#1f77b4",  # blue
+        "native_rnafm": "#ff7f0e",  # orange (distinct for rnafm)
+        "native_pre": "#2ca02c",  # green
+        "native_pre_rnafm": "#d62728",  # red (distinct for rnafm)
+        "dock": "#9467bd",  # purple
+        "dock_rnafm": "#8c564b",  # brown (distinct for rnafm)
+        "rdock": "black",
     }
     custom_palette = sns.color_palette("Paired")
 
     # custom_palette = sns.color_palette(palette=custom_palette)
     # sns.set_palette(custom_palette)
 
-    plt.rcParams['axes.grid'] = True
+    plt.rcParams["axes.grid"] = True
 
-    g = sns.FacetGrid(big_df, col="pocket_id", hue="name", col_wrap=2, height=4, palette=custom_palette, sharey=False)
+    g = sns.FacetGrid(
+        big_df,
+        col="pocket_id",
+        hue="name",
+        col_wrap=2,
+        height=4,
+        palette=custom_palette,
+        sharey=False,
+    )
     g.map(sns.lineplot, "frac", "score").add_legend()
 
     # Adjust the layout for better spacing
@@ -229,21 +256,30 @@ def plot_perturbed(model="pre_fm", group=True):
         res_dir = "outputs/robin/" if swap == 0 else f"outputs/robin_swap_{swap}"
         out_csv = os.path.join(res_dir, f"{model}.csv")
         df = pd.read_csv(out_csv)
-        df['name'] = f'{model}_swap{swap}'
+        df["name"] = f"{model}_swap{swap}"
         big_df.append(df)
     if group:
-        other_scores = [df['score'].values for df in big_df[1:]]
+        other_scores = [df["score"].values for df in big_df[1:]]
         perturbed = big_df[1]
-        perturbed['name'] = "perturbed"
+        perturbed["name"] = "perturbed"
         import numpy as np
-        perturbed['score'] = np.mean(other_scores, axis=0)
+
+        perturbed["score"] = np.mean(other_scores, axis=0)
         big_df = [big_df[0], perturbed]
     big_df = pd.concat(big_df)
 
     # custom_palette = sns.color_palette("Paired")
     custom_palette = None
-    plt.rcParams['axes.grid'] = True
-    g = sns.FacetGrid(big_df, col="pocket_id", hue="name", col_wrap=2, height=4, palette=custom_palette, sharey=False)
+    plt.rcParams["axes.grid"] = True
+    g = sns.FacetGrid(
+        big_df,
+        col="pocket_id",
+        hue="name",
+        col_wrap=2,
+        height=4,
+        palette=custom_palette,
+        sharey=False,
+    )
     g.map(sns.lineplot, "frac", "score").add_legend()
 
     # Adjust the layout for better spacing
@@ -259,7 +295,7 @@ if __name__ == "__main__":
         # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
         # "native_pre": "is_native/native_pretrain_new_pdbchembl",
         "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
-        # "dock": "dock/dock_new_pdbchembl",
+        "dock": "dock/dock_new_pdbchembl",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
     }
 
@@ -268,7 +304,7 @@ if __name__ == "__main__":
         # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
         # ("native_pre", "dock"): "pre",
         ("native_pre_rnafm", "dock_rnafm"): "pre_fm",
-        ("native_pre_rnafm", "rdock"): "rnamigos++"
+        ("pre_fm", "rdock"): "rnamigos++",
     }
 
     # TEST ONE INFERENCE
@@ -280,19 +316,16 @@ if __name__ == "__main__":
     # model = get_model_from_dirpath(full_model_path)
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
-
-
     # GET ALL CSVs for the models and plot them
-    # get_all_csvs(recompute=False)
+    get_all_csvs(recompute=False)
     get_dfs_docking()
     mix_all()
     plot_all()
-
 
     # COMPUTE PERTURBED VERSIONS
     for i in range(1, 4):
         SWAP = i
         RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
-        # get_all_csvs(recompute=False)
-        # mix_all()
-    # plot_perturbed(model="pre_fm", group=True)
+        get_all_csvs(recompute=False)
+        mix_all()
+    plot_perturbed(model="pre_fm", group=True)

@@ -17,16 +17,16 @@ from rnamigos.learning.models import get_model_from_dirpath
 
 
 def inference(
-        dgl_graph,
-        smiles_list,
-        out_path="rnamigos_out.csv",
-        mixing_coeffs=(0.5, 0.0, 0.5),
-        model=None,
-        models_path=None,
-        dump_all=False,
-        ligand_cache=None,
-        use_ligand_cache=False,
-        do_mixing=True,
+    dgl_graph,
+    smiles_list,
+    out_path="rnamigos_out.csv",
+    mixing_coeffs=(0.5, 0.0, 0.5),
+    model=None,
+    models_path=None,
+    dump_all=False,
+    ligand_cache=None,
+    use_ligand_cache=False,
+    do_mixing=True,
 ):
     """
     Run inference from python objects
@@ -49,7 +49,7 @@ def inference(
             for model_name, model_path in models_path.items()
         }
     else:
-        models = {"model": model}
+        models = {"score": model}
 
     # Get ready to loop through ligands
     dataset = InferenceDataset(
@@ -88,7 +88,7 @@ def inference(
         results[model_name] = all_scores
 
     df = pd.DataFrame(results)
-    df['smiles'] = smiles_list
+    df["smiles"] = smiles_list
     if do_mixing:
         # Normalize each methods outputs and mix methods together : best mix = 0.44, 0.39, 0.17
         def normalize(scores):
@@ -99,11 +99,11 @@ def inference(
             model_name: normalize(result) for model_name, result in results.items()
         }
         mixed_scores = (
-                mixing_coeffs[0] * normalized_results["dock"]
-                + mixing_coeffs[1] * normalized_results["native_fp"]
-                + mixing_coeffs[2] * normalized_results["is_native"]
+            mixing_coeffs[0] * normalized_results["dock"]
+            + mixing_coeffs[1] * normalized_results["native_fp"]
+            + mixing_coeffs[2] * normalized_results["is_native"]
         )
-        df['mixed_score'] = mixed_scores
+        df["mixed_score"] = mixed_scores
         if not dump_all:
             df = df[["smiles", "mixed_score"]]
     if out_path is not None:
