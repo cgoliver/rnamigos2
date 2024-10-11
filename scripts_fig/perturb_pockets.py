@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.learning.dataset import VirtualScreenDataset, get_systems
-from rnamigos.utils.virtual_screen import mean_active_rank, run_virtual_screen
+from rnamigos.utils.virtual_screen import mean_active_rank, run_virtual_screen, enrichment_factor
 from rnamigos.utils.graph_utils import load_rna_graph
 from scripts_run.robin_inference import robin_inference
 
@@ -237,20 +237,6 @@ def compute_overlaps(original_pockets, modified_pockets_path, dump_path=None):
     return resdict
 
 
-def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
-    # ddf = pd.DataFrame({'score': scores, 'is_active': is_active})
-    # sns.kdeplot(ddf, x='score', hue='is_active', common_norm=False)
-    # plt.show()
-
-    n_actives = np.sum(is_active)
-    n_screened = int(frac * len(scores))
-    is_active_sorted = [a for _, a in sorted(zip(scores, is_active), reverse=not lower_is_better)]
-    scores_sorted = [s for s, _ in sorted(zip(scores, is_active), reverse=not lower_is_better)]
-    n_actives_screened = np.sum(is_active_sorted[:n_screened])
-    ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
-    return ef, scores_sorted[n_screened]
-
-
 def compute_efs_model(model, dataloader, lower_is_better):
     """
     Given a model and a dataloader, make the inference on all pocket-ligand pairs and dump raw and aggregated csvs
@@ -274,8 +260,8 @@ def compute_efs_model(model, dataloader, lower_is_better):
     ef_rows = []
     for frac in (0.01, 0.02, 0.05):
         for pocket, group in raw_df.groupby('pocket_id'):
-            ef_frac, _ = enrichment_factor(group['raw_score'], group['is_active'], frac=frac,
-                                           lower_is_better=lower_is_better)
+            ef_frac = enrichment_factor(group['raw_score'], group['is_active'], frac=frac,
+                                        lower_is_better=lower_is_better)
             ef_rows.append({'score': ef_frac,
                             'pocket_id': pocket,
                             'frac': frac
@@ -393,7 +379,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
         ef_rows = []
         for frac in (0.01, 0.02, 0.05):
             for pocket, group in mixed_df_raw.groupby('pocket_id'):
-                ef_frac, _ = enrichment_factor(group['mixed'], group['is_active'], frac=frac, lower_is_better=False)
+                ef_frac = enrichment_factor(group['mixed'], group['is_active'], frac=frac, lower_is_better=False)
                 ef_rows.append({'score': ef_frac,
                                 'pocket_id': pocket,
                                 'frac': frac
@@ -421,10 +407,10 @@ def do_robin(ligand_name, pocket_path, use_rnafm=False):
     final_df['pocket_id'] = pocket_id
     ef_rows = []
     for frac in (0.01, 0.02, 0.05):
-        ef, _ = enrichment_factor(final_df['mixed_score'],
-                                  final_df['is_active'],
-                                  lower_is_better=False,
-                                  frac=frac)
+        ef = enrichment_factor(final_df['mixed_score'],
+                               final_df['is_active'],
+                               lower_is_better=False,
+                               frac=frac)
         ef_rows.append({'pocket_id': pocket_id, 'score': ef, 'frac': frac})
     ef_df = pd.DataFrame(ef_rows)
     return ef_df, final_df
@@ -720,9 +706,9 @@ def main_chembl():
     plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, label="Hard strategy")
 
     # Rognan like
-    # df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute,
-    #                                      use_cached_pockets=use_cached_pockets)
-    # plot_one(df_rognan, fractions=fractions, color='black', label='Rognan strategy')    # Plot rognan
+    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute,
+                                         use_cached_pockets=use_cached_pockets)
+    plot_one(df_rognan, fractions=fractions, color='black', label='Rognan strategy')    # Plot rognan
 
     # Now compute perturbed scores using the soft approach.
     # Vary unexpanding. You can't do BFS0, since this makes small graphs with no edges,
