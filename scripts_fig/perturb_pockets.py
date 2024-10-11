@@ -38,7 +38,8 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 import random
-from rnaglib.utils import graph_from_pdbid, graph_utils, graph_io
+from rnaglib.algorithms.graph_algos import bfs
+from rnaglib.utils import graph_from_pdbid, graph_io
 import seaborn as sns
 from sklearn import metrics
 import torch
@@ -58,7 +59,7 @@ torch.set_num_threads(1)
 
 
 def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
-    expanded_nodes = graph_utils.bfs(rglib_graph, nodelist, depth=bfs_depth, label='LW')
+    expanded_nodes = bfs(rglib_graph, nodelist, depth=bfs_depth, label='LW')
     new_pocket_graph = rglib_graph.subgraph(expanded_nodes)
     in_pocket = {node: node in nodelist for node in expanded_nodes}
     nt_codes = nx.get_node_attributes(new_pocket_graph, 'nt_code')
@@ -100,7 +101,7 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
 
         # Ensure all nodes are valid and expand with a small bfs
         in_pocket_filtered = in_pocket_nodes.intersection(set(rglib_graph.nodes()))
-        around_pocket = graph_utils.bfs(rglib_graph, in_pocket_filtered, depth=perturb_bfs_depth, label='LW')
+        around_pocket = bfs(rglib_graph, in_pocket_filtered, depth=perturb_bfs_depth, label='LW')
 
         # Now compute the perturbed pockets
         for fraction in fractions:
@@ -136,10 +137,10 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
                     noisy_nodelist = shuffled_in_pocket[:n_nodes_to_sample]
                 elif perturbation == 'hard':
                     # Sample a pocket around a random node of the perimeter
-                    smaller_bfs = graph_utils.bfs(rglib_graph,
-                                                  in_pocket_filtered,
-                                                  depth=perturb_bfs_depth - 1,
-                                                  label='LW')
+                    smaller_bfs = bfs(rglib_graph,
+                                      in_pocket_filtered,
+                                      depth=perturb_bfs_depth - 1,
+                                      label='LW')
                     perimeter = sorted(list(around_pocket.difference(smaller_bfs)))
                     if len(perimeter) == 0:
                         print(f"Buggy pocket: {pocket}, it spans the whole connected component and cannot be expanded")
@@ -152,10 +153,10 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
                     expander = 1
                     while len(perturbed_pocket) < n_nodes_to_sample and expander <= 10:
                         prev_perturbed_pocket = perturbed_pocket
-                        perturbed_pocket = graph_utils.bfs(rglib_graph,
-                                                           perturbed_pocket,
-                                                           depth=expander,
-                                                           label='LW')
+                        perturbed_pocket = bfs(rglib_graph,
+                                               perturbed_pocket,
+                                               depth=expander,
+                                               label='LW')
                         expander += 1
                     # When querying with very large fractions, sometimes we cannot return as many nodes as queried
                     # Note: nx.connected_component does not work for directed graphs...
@@ -178,10 +179,10 @@ def get_perturbed_pockets(unperturbed_path='data/json_pockets_expanded',
                     expander = 1
                     while len(perturbed_pocket) < n_nodes_to_sample and expander <= 10:
                         prev_perturbed_pocket = perturbed_pocket
-                        perturbed_pocket = graph_utils.bfs(rglib_graph,
-                                                           perturbed_pocket,
-                                                           depth=expander,
-                                                           label='LW')
+                        perturbed_pocket = bfs(rglib_graph,
+                                               perturbed_pocket,
+                                               depth=expander,
+                                               label='LW')
                         expander += 1
                     # When querying with very large fractions, sometimes we cannot return as many nodes as queried
                     # Note: nx.connected_component does not work for directed graphs...
@@ -281,7 +282,7 @@ def compute_efs_model(model, dataloader, lower_is_better):
                             })
 
     df_ef = pd.DataFrame(ef_rows)
-    print(df_ef)
+    # print(df_ef)
 
     for ef, score, pocket_id in zip(efs, scores, pocket_names):
         grouped = {
@@ -301,7 +302,7 @@ def compute_efs_model(model, dataloader, lower_is_better):
 def get_perf(pocket_path, base_name=None, out_dir=None):
     """
     Starting from a pocket path containing pockets, and using global variables to set things like pockets to use or
-    paths, dump the native/dock/mixed results of a virtual screening
+    paths, dump the native/dock/mixed results (raw, mar and efs) of a virtual screening
     """
     # Setup loader
     print(f"get_perf {pocket_path}")
@@ -316,17 +317,17 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
         test_systems = TEST_SYSTEMS[~TEST_SYSTEMS["PDB_ID_POCKET"].isin(missing_pockets)]
     else:
         test_systems = TEST_SYSTEMS
-    decoy_mode = 'robin' if ROBIN else 'chembl'
     ligand_cache = f'data/ligands/{"robin_" if ROBIN else ""}lig_graphs.p'
     dataset = VirtualScreenDataset(pocket_path,
                                    cache_graphs=False,
                                    ligands_path="data/ligand_db",
                                    systems=test_systems,
-                                   decoy_mode=decoy_mode,
+                                   decoy_mode=DECOYS,
                                    use_graphligs=True,
                                    group_ligands=False,
                                    reps_only=not ROBIN,
                                    ligand_cache=ligand_cache,
+                                   use_rnafm=True,
                                    use_ligand_cache=True)
     dataloader = GraphDataLoader(dataset=dataset, **LOADER_ARGS)
 
@@ -335,9 +336,9 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     if base_name is None:
         base_name = Path(pocket_path).name
 
-    dock_model_path = 'results/trained_models/dock/dock_42'
+    dock_model_path = 'results/trained_models/dock/dock_new_pdbchembl_rnafm'
     dock_model = get_model_from_dirpath(dock_model_path)
-    native_model_path = 'results/trained_models/is_native/native_42'
+    native_model_path = 'results/trained_models/is_native/native_pretrain_new_pdbchembl_rnafm'
     native_model = get_model_from_dirpath(native_model_path)
 
     # Get dock performance
@@ -515,8 +516,8 @@ def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=
                           metric='ef', ef_frac=0.02):
     dfs = []
     for i in range(1, 4):
-        out_path = f'figs/perturbations/perturbed{"_hard" if hard else ""}{"robin_" if ROBIN else ""}_{i}'
-        out_df = f'figs/perturbations/aggregated{"_hard" if hard else ""}{"robin_" if ROBIN else ""}_{i}.csv'
+        out_path = f'figs/perturbations/perturbed{"_hard" if hard else ""}{"_robin" if ROBIN else ""}_{i}'
+        out_df = f'figs/perturbations/aggregated{"_hard" if hard else ""}{"_robin" if ROBIN else ""}_{i}.csv'
         if not use_cached_pockets:
             get_perturbed_pockets(out_path=out_path,
                                   perturb_bfs_depth=i,
@@ -543,8 +544,8 @@ def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
                            compute_overlap=False,
                            metric='ef',
                            ef_frac=0.02):
-    out_path = f'figs/perturbations/perturbed_soft_robin_{final_bfs}'
-    out_df = f'figs/perturbations/aggregated_soft_robin_{final_bfs}.csv'
+    out_path = f'figs/perturbations/perturbed_soft{"_robin" if ROBIN else ""}_{final_bfs}'
+    out_df = f'figs/perturbations/aggregated_soft{"_robin" if ROBIN else ""}_{final_bfs}.csv'
     if not use_cached_pockets:
         get_perturbed_pockets(out_path=out_path,
                               perturb_bfs_depth=2,
@@ -566,8 +567,8 @@ def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
 def get_all_perturbed_rognan(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=10,
                              recompute=True, use_cached_pockets=False, final_bfs=4,
                              metric='ef', ef_frac=0.02):
-    out_path = f'figs/perturbations/perturbed_rognan_robin'
-    out_df = f'figs/perturbations/aggregated_rognan_robin.csv'
+    out_path = f'figs/perturbations/perturbed_rognan{"_robin" if ROBIN else ""}'
+    out_df = f'figs/perturbations/aggregated_rognan{"_robin" if ROBIN else ""}.csv'
     if not use_cached_pockets:
         get_perturbed_pockets(out_path=out_path,
                               perturb_bfs_depth=2,
@@ -669,7 +670,11 @@ def main_chembl():
     global ALL_POCKETS_GRAPHS
     global DF_UNPERTURBED
     global ROBIN
+    global DECOYS
     ROBIN = False
+    metric = 'mar'
+    # DECOYS = 'pdb'
+    DECOYS = 'pdb_chembl'
     TEST_SYSTEMS = get_systems(target="is_native",
                                rnamigos1_split=-2,
                                use_rnamigos1_train=False,
@@ -680,8 +685,8 @@ def main_chembl():
                           for pocket_id in ALL_POCKETS}
     # # Check that inference works, we should get 0.9848
     os.makedirs("figs/perturbations/unperturbed", exist_ok=True)
-    get_perf(pocket_path="data/json_pockets_expanded",
-             out_dir="figs/perturbations/unperturbed")
+    # get_perf(pocket_path="data/json_pockets_expanded",
+    #          out_dir="figs/perturbations/unperturbed")
     DF_UNPERTURBED = pd.read_csv("figs/perturbations/unperturbed/json_pockets_expanded_mixed.csv", index_col=False)
     DF_UNPERTURBED.rename(columns={'score': 'unpert_score'}, inplace=True)
     global GOOD_POCKETS
@@ -703,33 +708,33 @@ def main_chembl():
     #            out_df='figs/perturbations/perturbed_robin/aggregated_test.csv',
     #            compute_overlap=True)
 
+    use_cached_pockets = True
+    recompute = False
     # Now compute perturbed scores using the random BFS approach
-    # dfs_random = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True)
-    # plot_list(dfs=dfs_random, fractions=fractions, colors=colors, label="Random strategy")
+    dfs_random = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=use_cached_pockets)
+    plot_list(dfs=dfs_random, fractions=fractions, colors=colors, label="Random strategy")
 
     # Hard: sample on the border
-    # dfs_hard = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=True, hard=True)
-    # plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, label="Hard strategy")
+    dfs_hard = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=use_cached_pockets,
+                                     hard=True)
+    plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, label="Hard strategy")
 
-    use_cached_pockets = False
-    recompute = False
-    metric = 'ef'
     # Rognan like
-    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute,
-                                         use_cached_pockets=use_cached_pockets)
+    # df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute,
+    #                                      use_cached_pockets=use_cached_pockets)
     # plot_one(df_rognan, fractions=fractions, color='black', label='Rognan strategy')    # Plot rognan
 
     # Now compute perturbed scores using the soft approach.
     # Vary unexpanding. You can't do BFS0, since this makes small graphs with no edges,
     # resulting in empty graph when subgraphing
-    df_soft_4 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=4,
-                                       recompute=recompute, metric=metric)
     df_soft_1 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=1,
                                        recompute=recompute, metric=metric)
-    """
-    df_soft_2 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=2, recompute=recompute, metric=metric, robin=robin)
-    df_soft_3 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=3, recompute=recompute, metric=metric, robin=robin)
-    """
+    df_soft_2 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=2,
+                                       recompute=recompute, metric=metric)
+    df_soft_3 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=3,
+                                       recompute=recompute, metric=metric)
+    df_soft_4 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=4,
+                                       recompute=recompute, metric=metric)
     # dfs_soft = [
     #     df_soft_1,
     #     df_soft_2,
@@ -765,6 +770,8 @@ def main_robin():
     global DF_UNPERTURBED
     global ROBIN
     global ROBIN_POCKETS
+    global DECOYS
+    DECOYS = 'robin'
 
     ROBIN_POCKETS = {'TPP': '2GDI_Y_TPP_100',
                      'ZTP': '5BTP_A_AMZ_106',
@@ -806,7 +813,7 @@ if __name__ == '__main__':
                    'num_workers': 4,
                    'collate_fn': lambda x: x[0]
                    }
-    TEST_SYSTEMS, ALL_POCKETS, ALL_POCKETS_GRAPHS, DF_UNPERTURBED, ROBIN = [None, ] * 5
+    TEST_SYSTEMS, ALL_POCKETS, ALL_POCKETS_GRAPHS, DF_UNPERTURBED, ROBIN, DECOYS = [None, ] * 6
 
-    # main_chembl()
-    main_robin()
+    main_chembl()
+    # main_robin()
