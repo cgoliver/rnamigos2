@@ -27,6 +27,7 @@ def inference(
     ligand_cache=None,
     use_ligand_cache=False,
     do_mixing=True,
+    new_models=True,
 ):
     """
     Run inference from python objects
@@ -34,15 +35,31 @@ def inference(
     # Load models
     script_dir = os.path.dirname(__file__)
     if models_path is None:
-        models_path = {
-            "dock": os.path.join(script_dir, "../results/trained_models/dock/dock_42"),
-            "native_fp": os.path.join(
-                script_dir, "../results/trained_models/native_fp/fp_42"
-            ),
-            "is_native": os.path.join(
-                script_dir, "../results/trained_models/is_native/native_42"
-            ),
-        }
+        if new_models:
+            # NEW DEFAULT MODELS
+            models_path = {
+                # "native": "is_native/native_nopre_new_pdbchembl",
+                # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
+                # "native_pre": "is_native/native_pretrain_new_pdbchembl",
+                # "native_fp": os.path.join(
+                #    script_dir, "../results/trained_models/native_fp/fp_42"
+                # ),
+                "is_native": "results/trained_models/is_native/native_pretrain_new_pdbchembl_rnafm",
+                "dock": "results/trained_models/dock/dock_new_pdbchembl_rnafm",
+            }
+        else:
+            models_path = {
+                "dock": os.path.join(
+                    script_dir, "../results/trained_models/dock/dock_42"
+                ),
+                "native_fp": os.path.join(
+                    script_dir, "../results/trained_models/native_fp/fp_42"
+                ),
+                "is_native": os.path.join(
+                    script_dir, "../results/trained_models/is_native/native_42"
+                ),
+            }
+
     if model is None:
         models = {
             model_name: get_model_from_dirpath(model_path)
@@ -82,15 +99,23 @@ def inference(
     # Post-process raw scores to get a consistent 'higher is better' numpy array score
     for model_name, all_scores in results.items():
         all_scores = np.asarray(all_scores)
+        print(
+            f"RAW: {model_name} {models[model_name].target} {all_scores[:10]} min: {min(all_scores)} max: {max(all_scores)} "
+        )
         # Flip raw scores as lower is better for those models
-        if model_name in {"dock", "native_fp"}:
-            all_scores = -all_scores
+        if models[model_name].target in {"dock", "native_fp"}:
+            all_scores = -1 * all_scores
+        print(f"{model_name} {models[model_name].target} {all_scores[:10]}")
         results[model_name] = all_scores
 
     df = pd.DataFrame(results)
     df["smiles"] = smiles_list
     if do_mixing:
         # Normalize each methods outputs and mix methods together : best mix = 0.44, 0.39, 0.17
+        print(
+            "WARNING: DO NOT NORMALIZE IF RUNNING INFERENCE SEPARATELY ON DECOYS AND ACTIVES"
+        )
+
         def normalize(scores):
             out_scores = (scores - scores.min()) / (scores.max() - scores.min())
             return out_scores

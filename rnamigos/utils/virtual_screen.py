@@ -38,7 +38,7 @@ def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
     return auroc
 
 
-def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
+def enrichment_factor(scores, is_active, lower_is_better=False, frac=0.01):
     n_actives = np.sum(is_active)
     n_screened = int(frac * len(scores))
     is_active_sorted = [
@@ -99,6 +99,8 @@ def get_efs(model, dataloader, decoy_mode, cfg, verbose=False):
     rows, raw_rows = list(), list()
     lower_is_better = cfg.train.target in ["dock", "native_fp"]
     metric = enrichment_factor if decoy_mode == "robin" else mean_active_rank
+    print(f"DOING: {cfg.name}, LOWER IS BETTER: {lower_is_better}")
+    # metric = enrichment_factor
     efs, scores, status, pocket_names, all_smiles = run_virtual_screen(
         model,
         dataloader,
@@ -129,5 +131,5 @@ def get_efs(model, dataloader, decoy_mode, cfg, verbose=False):
             }
         )
     if verbose:
-        print(f"Mean EF for {decoy_mode}:", np.mean(efs))
+        print(f"Mean EF for {decoy_mode} {cfg.name}:", np.mean(efs))
     return rows, raw_rows

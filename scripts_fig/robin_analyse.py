@@ -9,6 +9,7 @@ from pathlib import Path
 
 from joblib import Parallel, delayed
 from collections import defaultdict
+from loguru import logger
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -18,9 +19,13 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos.utils.virtual_screen import enrichment_factor
+# from rnamigos.utils.virtual_screen import enrichment_factor
 from rnamigos.utils.graph_utils import load_rna_graph
+from rnamigos.learning.dataset import get_systems_from_cfg
+from rnamigos.learning.dataloader import get_loader, get_vs_loader
 from rnamigos.learning.models import get_model_from_dirpath
+from rnamigos.utils.virtual_screen import get_efs
+from scripts_fig.plot_utils import group_df
 from scripts_run.robin_inference import robin_inference
 
 torch.multiprocessing.set_sharing_strategy("file_system")
@@ -36,6 +41,26 @@ ROBIN_POCKETS = {
 POCKET_PATH = "data/json_pockets_expanded"
 
 
+def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
+    n_actives = np.sum(is_active)
+    n_screened = int(frac * len(scores))
+    is_active_sorted = [
+        a
+        for _, a in sorted(
+            zip(scores, is_active), key=lambda x: x[0], reverse=not lower_is_better
+        )
+    ]
+    scores_sorted = [
+        s
+        for s, _ in sorted(
+            zip(scores, is_active), key=lambda x: x[0], reverse=not lower_is_better
+        )
+    ]
+    n_actives_screened = np.sum(is_active_sorted[:n_screened])
+    ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
+    return ef, scores_sorted[n_screened]
+
+
 def one_robin(pocket_id, ligand_name, model=None, use_rna_fm=False, do_mixing=False):
     dgl_pocket_graph, _ = load_rna_graph(
         POCKET_PATH / Path(pocket_id).with_suffix(".json"),
@@ -45,15 +70,17 @@ def one_robin(pocket_id, ligand_name, model=None, use_rna_fm=False, do_mixing=Fa
         ligand_name=ligand_name,
         dgl_pocket_graph=dgl_pocket_graph,
         model=model,
-        use_ligand_cache=True,
+        use_ligand_cache=False,
         ligand_cache="data/ligands/robin_lig_graphs.p",
         do_mixing=do_mixing,
         debug=False,
     )
     final_df["pocket_id"] = pocket_id
     rows = []
+    # sns.kdeplot(final_df, x="score", hue="is_active", common_norm=False)
+    # plt.show()
     for frac in (0.01, 0.02, 0.05):
-        ef = enrichment_factor(
+        ef, _ = enrichment_factor(
             final_df["score"],
             final_df["is_active"],
             lower_is_better=False,
@@ -105,6 +132,7 @@ def get_all_csvs(recompute=False):
             continue
         full_model_path = os.path.join(model_dir, model_path)
         rnafm = model_path.endswith("rnafm")
+        rnafm = "rnafm" in model_path
         model = get_model_from_dirpath(full_model_path)
         df_ef, df_raw = get_all_preds(model, use_rna_fm=rnafm)
         df_ef.to_csv(out_csv, index=False)
@@ -145,7 +173,7 @@ def get_dfs_docking():
         # Go from RAW to EF
         rows = []
         for frac in (0.01, 0.02, 0.05):
-            ef = enrichment_factor(
+            ef, _ = enrichment_factor(
                 ref_raw_df_lig["score"],
                 ref_raw_df_lig["is_active"],
                 lower_is_better=False,
@@ -156,8 +184,8 @@ def get_dfs_docking():
         all_dfs.append(pd.DataFrame(rows))
     all_raws = pd.concat(all_raws)
     all_dfs = pd.concat(all_dfs)
-    all_raws.to_csv("outputs/robin/rdock_raw.csv")
-    all_dfs.to_csv("outputs/robin/rdock.csv")
+    all_raws.to_csv(f"{RES_DIR}/rdock_raw.csv")
+    all_dfs.to_csv(f"{RES_DIR}/rdock.csv")
 
 
 def mix(df1, df2, outpath=None):
@@ -192,7 +220,7 @@ def mix_all():
             mixed_df_lig = mix(df1_lig, df2_lig)
             robin_raw_dfs.append(mixed_df_lig)
             for frac in (0.01, 0.02, 0.05):
-                ef = enrichment_factor(
+                ef, _ = enrichment_factor(
                     mixed_df_lig["score"],
                     mixed_df_lig["is_active"],
                     lower_is_better=False,
@@ -287,15 +315,65 @@ def plot_perturbed(model="pre_fm", group=True):
     plt.show()
 
 
+def pdb_eval(cfg, model):
+    # Final VS validation on each decoy set
+    logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
+    logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")
+
+    test_systems = get_systems_from_cfg(cfg, return_test=True)
+    model = model.to("cpu")
+    rows, raw_rows = [], []
+    decoys = ["chembl", "pdb", "pdb_chembl", "decoy_finder"]
+    for decoy_mode in decoys:
+        dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg)
+        decoy_rows, decoys_raw_rows = get_efs(
+            model=model,
+            dataloader=dataloader,
+            decoy_mode=decoy_mode,
+            cfg=cfg,
+            verbose=True,
+        )
+        rows += decoy_rows
+        raw_rows += decoys_raw_rows
+
+    # Make it a df
+    df = pd.DataFrame(rows)
+    df_raw = pd.DataFrame(raw_rows)
+
+    # Dump csvs
+    d = Path(cfg.result_dir, parents=True, exist_ok=True)
+    base_name = Path(cfg.name).stem
+    # df.to_csv(d / (base_name + ".csv"))
+    # df_raw.to_csv(d / (base_name + "_raw.csv"))
+
+    df_chembl = df.loc[df["decoys"] == "chembl"]
+    print(f"{cfg.name} Mean MAR on chembl: {np.mean(df_chembl['score'].values)}")
+    df_chembl = group_df(df_chembl)
+    print(
+        f"{cfg.name} Mean grouped MAR on chembl: {np.mean(df_chembl['score'].values)}"
+    )
+
+    df_pdbchembl = df.loc[df["decoys"] == "pdb_chembl"]
+    print(f"{cfg.name} Mean MAR on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
+    df_pdbchembl = group_df(df_pdbchembl)
+    print(
+        f"{cfg.name} Mean grouped MAR on pdbchembl: {np.mean(df_pdbchembl['score'].values)}"
+    )
+    pass
+
+
 if __name__ == "__main__":
     SWAP = 0
-    RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
+    # RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
+    RES_DIR = "outputs/robin_bk/" if SWAP == 0 else f"outputs/robin_bk_swap_{SWAP}"
     MODELS = {
         # "native": "is_native/native_nopre_new_pdbchembl",
         # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
         # "native_pre": "is_native/native_pretrain_new_pdbchembl",
         "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
-        "dock": "dock/dock_new_pdbchembl",
+        # "is_native_old": "is_native/native_42",
+        # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
+        # "dock": "dock/dock_new_pdbchembl",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
     }
 
@@ -303,8 +381,9 @@ if __name__ == "__main__":
         # ("native", "dock"): "vanilla",
         # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
         # ("native_pre", "dock"): "pre",
-        ("native_pre_rnafm", "dock_rnafm"): "pre_fm",
-        ("pre_fm", "rdock"): "rnamigos++",
+        # ("native_pre_rnafm_tune", "dock_rnafm"): "pre_fm",
+        ("native_pre_rnafm", "dock_rnafm"): "native_dock_pre_fm",
+        ("native_dock_pre_fm", "rdock"): "rnamigos++",
     }
 
     # TEST ONE INFERENCE
@@ -316,16 +395,23 @@ if __name__ == "__main__":
     # model = get_model_from_dirpath(full_model_path)
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
+    """
+    model_dir = "results/trained_models/"
+    for model_name, model_path in MODELS.items():
+        p = os.path.join(model_dir, model_path)
+        model, cfg = get_model_from_dirpath(p, return_cfg=True)
+        pdb_eval(cfg, model)
+    """
+
     # GET ALL CSVs for the models and plot them
-    get_all_csvs(recompute=False)
+    get_all_csvs(recompute=True)
     get_dfs_docking()
     mix_all()
     plot_all()
-
     # COMPUTE PERTURBED VERSIONS
     for i in range(1, 4):
         SWAP = i
         RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
-        get_all_csvs(recompute=False)
+        get_all_csvs(recompute=True)
         mix_all()
-    plot_perturbed(model="pre_fm", group=True)
+    plot_perturbed(model="rnamigos++", group=True)
