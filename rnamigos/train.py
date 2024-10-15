@@ -50,8 +50,6 @@ ROBIN_POCKETS = {
 POCKET_PATH = "data/json_pockets_expanded"
 
 
-
-
 def get_loaders(cfg, tune=False, trial=None):
     # Systems are basically lists of all pocket/pair/labels to consider. We then split the train_val systems.
     train_val_systems = get_systems_from_cfg(cfg, return_test=False)
@@ -174,7 +172,6 @@ def objective(trial, cfg) -> float:
 
     with open(pathlib.Path(save_path) / f"trial_score.txt", "w") as t:
         t.write(str(val_loss))
-
     return val_loss
 
 
@@ -221,9 +218,6 @@ def pdb_eval(cfg, model):
         f"{cfg.name} Mean grouped EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}"
     )
     pass
-
-
-
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")

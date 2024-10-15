@@ -47,9 +47,12 @@ def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col
         pocket_df = add_mixed_score(pocket_df, score1, score2, out_col='temp_name')
 
         # Then compute aurocs and add to all results
-        fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'],
-                                                 pocket_df['temp_name'],
-                                                 drop_intermediate=True)
+        try:
+            fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'],
+                                                     pocket_df['temp_name'],
+                                                     drop_intermediate=True)
+        except ValueError:
+            a = 1
         enrich = metrics.auc(fpr, tpr)
         all_efs.append(enrich)
         all_pockets.append(p)
@@ -58,9 +61,12 @@ def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col
     # Merge df and add decoys value
     mixed_df_raw = pd.concat(all_dfs)
     mixed_df_raw = mixed_df_raw.rename(columns={'temp_name': outname_col})
+
+    if not 'DECOY' in globals():
+        DECOY = 'pdb_chembl'
+
     dumb_decoy = [DECOY for _ in range(len(mixed_df_raw))]
     mixed_df_raw.insert(len(mixed_df_raw.columns), "decoys", dumb_decoy)
-
     mixed_df = pd.DataFrame({"pocket_id": all_pockets,
                              'decoys': [DECOY for _ in all_pockets],
                              'score': all_efs})
@@ -82,6 +88,7 @@ def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mi
     score_2 = score_1 if score_2 is None else score_2
     df_1 = df_1[['pocket_id', 'smiles', 'is_active', score_1]]
     renamed_score = score_2 + '_copy_2'
+    df_2 = df_2.copy()
     df_2[renamed_score] = df_2[score_2]
     df_2 = df_2[['pocket_id', 'smiles', 'is_active', renamed_score]]
     df_to_use = df_1.merge(df_2, on=['pocket_id', 'smiles', 'is_active'], how='outer')
@@ -149,11 +156,11 @@ def compute_all_self_mix():
         out_path_raw_2 = f'outputs/big_df{"_grouped" if GROUPED else ""}_{SEEDS[to_compare[1]]}_raw.csv'
         big_df_raw_2 = pd.read_csv(out_path_raw_2)
         for score in ['native', 'dock']:
-            all_efs, _, _ =  mix_two_dfs(big_df_raw_1, big_df_raw_2, score)
+            all_efs, _, _ = mix_two_dfs(big_df_raw_1, big_df_raw_2, score)
             print(score, np.mean(all_efs))
 
 
-def get_ef_one(df, score, outname=None):
+def get_mar_one(df, score, outname=None):
     pockets = df['pocket_id'].unique()
     all_efs = []
     rows = []
@@ -176,7 +183,7 @@ def get_one_mixing_table(df, seed=42):
     # Do singletons
     for method in all_methods:
         outname = f'outputs/{method}_{seed}.csv'
-        result = get_ef_one(df, score=method, outname=outname)
+        result = get_mar_one(df, score=method, outname=outname)
         all_res[method] = result
     # Do pairs
     # for pair in itertools.combinations(all_methods, 2):
@@ -185,11 +192,11 @@ def get_one_mixing_table(df, seed=42):
     mean_ef = get_mix_score(df, score1="dock", score2="rdock")
     all_res['dock/rdock'] = mean_ef
 
-    result_mixed = get_ef_one(df, score='docknat', outname=f'outputs/docknat_{seed}.csv')
+    result_mixed = get_mar_one(df, score='docknat', outname=f'outputs/docknat_{seed}.csv')
     all_res['docknat'] = result_mixed
-    result_mixed = get_ef_one(df, score='rdocknat', outname=f'outputs/rdocknat_{seed}.csv')
+    result_mixed = get_mar_one(df, score='rdocknat', outname=f'outputs/rdocknat_{seed}.csv')
     all_res['rdocknat'] = result_mixed
-    result_mixed = get_ef_one(df, score='combined', outname=f'outputs/combined_{seed}.csv')
+    result_mixed = get_mar_one(df, score='combined', outname=f'outputs/combined_{seed}.csv')
     all_res['combined'] = result_mixed
 
     for k, v in all_res.items():

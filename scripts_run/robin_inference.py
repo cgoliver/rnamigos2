@@ -17,7 +17,7 @@ from rnamigos.utils.virtual_screen import enrichment_factor
 from rnamigos.utils.graph_utils import load_rna_graph
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.inference import inference_raw, get_models
-from scripts_fig.small_mixing import normalize
+from scripts_run.small_mixing import normalize, mix_two_dfs
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 torch.set_num_threads(1)
@@ -41,18 +41,15 @@ def robin_inference(
         use_ligand_cache=False,
         debug=False,
 ):
-    actives_ligands_path = os.path.join(
-        "data", "ligand_db", ligand_name, "robin", "actives.txt"
-    )
-    actives_smiles_list = [
-        s.lstrip().rstrip() for s in list(open(actives_ligands_path).readlines())
-    ]
-    inactives_ligands_path = os.path.join(
-        "data", "ligand_db", ligand_name, "robin", "decoys.txt"
-    )
-    inactives_smiles_list = [
-        s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())
-    ]
+    actives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
+    actives_smiles_set = set([s.lstrip().rstrip() for s in list(open(actives_ligands_path).readlines())])
+
+    inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
+    inactives_smiles_set = set([s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())])
+    inactives_smiles_set = inactives_smiles_set.difference(actives_smiles_set)
+
+    actives_smiles_list = list(actives_smiles_set)
+    inactives_smiles_list = list(inactives_smiles_set)
     smiles_list = actives_smiles_list + inactives_smiles_list
     is_active = [1 for _ in range(len(actives_smiles_list))] + [
         0 for _ in range(len(inactives_smiles_list))
@@ -143,22 +140,24 @@ def robin_eval(cfg, model):
     return ef05
 
 
-def get_all_csvs(recompute=False):
+def get_all_csvs(recompute=False, swap=0):
     model_dir = "results/trained_models/"
-    os.makedirs(RES_DIR, exist_ok=True)
+    res_dir = "outputs/robin/" if swap == 0 else f"outputs/robin_swap_{swap}"
+    os.makedirs(res_dir, exist_ok=True)
     for model, model_path in MODELS.items():
-        out_csv = os.path.join(RES_DIR, f"{model}.csv")
-        out_csv_raw = os.path.join(RES_DIR, f"{model}_raw.csv")
+        out_csv = os.path.join(res_dir, f"{model}.csv")
+        out_csv_raw = os.path.join(res_dir, f"{model}_raw.csv")
         if os.path.exists(out_csv) and not recompute:
             continue
         full_model_path = os.path.join(model_dir, model_path)
         model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
-        df_ef, df_raw = get_all_preds(model, use_rna_fm=cfg.model.use_rnafm)
+        use_rnafm = cfg.model.use_rnafm if "use_rnafm" in cfg.model else False
+        df_ef, df_raw = get_all_preds(model, use_rna_fm=use_rnafm, swap=swap)
         df_ef.to_csv(out_csv, index=False)
         df_raw.to_csv(out_csv_raw, index=False)
 
 
-def get_dfs_docking():
+def get_dfs_docking(swap=0):
     """
     Go from columns:
     TARGET,_TITLE1,SMILE,TOTAL,INTER,INTRA,RESTR,VDW,TYPE
@@ -168,6 +167,7 @@ def get_dfs_docking():
     efs: pocket_id,score,frac
     """
 
+    res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
     ref_raw_df = pd.read_csv("outputs/robin/dock_raw.csv")
     docking_df = pd.read_csv("data/robin_docking_consolidated_v2.csv")
     # For each pocket, get relevant mapping smiles : normalized score,
@@ -203,27 +203,15 @@ def get_dfs_docking():
         all_dfs.append(pd.DataFrame(rows))
     all_raws = pd.concat(all_raws)
     all_dfs = pd.concat(all_dfs)
-    all_raws.to_csv(f"{RES_DIR}/rdock_raw.csv")
-    all_dfs.to_csv(f"{RES_DIR}/rdock.csv")
+    all_raws.to_csv(f"{res_dir}/rdock_raw.csv")
+    all_dfs.to_csv(f"{res_dir}/rdock.csv")
 
 
-def mix(df1, df2, outpath=None):
-    norm_score1 = normalize(df1["score"])
-    norm_score2 = normalize(df2["score"])
-    mixed_scores = 0.5 * (norm_score1 + norm_score2)
-    out_df = df1.copy()
-    out_df["mixed_score"] = mixed_scores
-    out_df = out_df.drop(columns=["score"])
-    out_df = out_df.rename(columns={"mixed_score": "score"})
-    if outpath is not None:
-        out_df.to_csv(outpath, index=False)
-    return out_df
-
-
-def mix_all():
+def mix_all(swap=0):
+    res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
     for pair, outname in PAIRS.items():
-        path1 = os.path.join(RES_DIR, f"{pair[0]}_raw.csv")
-        path2 = os.path.join(RES_DIR, f"{pair[1]}_raw.csv")
+        path1 = os.path.join(res_dir, f"{pair[0]}_raw.csv")
+        path2 = os.path.join(res_dir, f"{pair[1]}_raw.csv")
         df1 = pd.read_csv(path1)
         df2 = pd.read_csv(path2)
 
@@ -231,8 +219,12 @@ def mix_all():
         for pocket_id in ROBIN_POCKETS.values():
             df1_lig = df1[df1["pocket_id"] == pocket_id]
             df2_lig = df2[df2["pocket_id"] == pocket_id]
-            mixed_df_lig = mix(df1_lig, df2_lig)
+
+            _, _, mixed_df_lig = mix_two_dfs(df1_lig, df2_lig, score_1='score')
+            mixed_df_lig = mixed_df_lig[['pocket_id', 'smiles', 'is_active', 'mixed']]
+            mixed_df_lig = mixed_df_lig.rename(columns={'mixed': 'score'})
             robin_raw_dfs.append(mixed_df_lig)
+
             for frac in (0.01, 0.02, 0.05):
                 ef = enrichment_factor(
                     mixed_df_lig["score"],
@@ -243,30 +235,28 @@ def mix_all():
                 robin_efs.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
         robin_efs = pd.DataFrame(robin_efs)
         robin_raw_dfs = pd.concat(robin_raw_dfs)
-        outpath = os.path.join(RES_DIR, f"{outname}.csv")
-        outpath_raw = os.path.join(RES_DIR, f"{outname}_raw.csv")
+        outpath = os.path.join(res_dir, f"{outname}.csv")
+        outpath_raw = os.path.join(res_dir, f"{outname}_raw.csv")
         robin_efs.to_csv(outpath, index=False)
         robin_raw_dfs.to_csv(outpath_raw, index=False)
 
 
 if __name__ == "__main__":
-    SWAP = 0
-    RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     MODELS = {
-        # "native": "is_native/native_nopre_new_pdbchembl",
-        # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
-        # "native_pre": "is_native/native_pretrain_new_pdbchembl",
+        "native": "is_native/native_nopre_new_pdbchembl",
+        "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
+        "native_pre": "is_native/native_pretrain_new_pdbchembl",
         "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
-        # "is_native_old": "is_native/native_42",
+        "is_native_old": "is_native/native_42",
         # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
-        # "dock": "dock/dock_new_pdbchembl",
+        "dock": "dock/dock_new_pdbchembl",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
     }
 
     PAIRS = {
-        # ("native", "dock"): "vanilla",
-        # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
-        # ("native_pre", "dock"): "pre",
+        ("native", "dock"): "vanilla",
+        ("native_rnafm", "dock_rnafm"): "vanilla_fm",
+        ("native_pre", "dock"): "pre",
         # ("native_pre_rnafm_tune", "dock_rnafm"): "pre_fm",
         ("native_pre_rnafm", "dock_rnafm"): "native_dock_pre_fm",
         ("native_dock_pre_fm", "rdock"): "rnamigos++",
@@ -282,6 +272,12 @@ if __name__ == "__main__":
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
     # GET ALL CSVs for the models and plot them
-    # get_all_csvs(recompute=False)
-    # get_dfs_docking()
+    recompute = False
+    get_all_csvs(recompute=recompute)
+    get_dfs_docking()
     mix_all()
+
+    # COMPUTE PERTURBED VERSIONS
+    # for swap in range(1, 4):
+    #     get_all_csvs(recompute=recompute, swap=swap)
+    #     mix_all(swap=swap)
