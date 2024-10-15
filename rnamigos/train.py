@@ -34,7 +34,7 @@ from rnamigos.utils.virtual_screen import get_efs, enrichment_factor
 from rnamigos.utils.graph_utils import load_rna_graph
 from rnamigos.learning.models import get_model_from_dirpath
 
-from scripts_run.robin_inference import robin_inference
+from scripts_run.robin_inference import robin_eval
 from scripts_fig.plot_utils import group_df
 
 torch.multiprocessing.set_sharing_strategy("file_system")
@@ -50,29 +50,6 @@ ROBIN_POCKETS = {
 POCKET_PATH = "data/json_pockets_expanded"
 
 
-def one_robin(pocket_id, ligand_name, model, use_rnafm):
-    dgl_pocket_graph, _ = load_rna_graph(
-        POCKET_PATH / Path(pocket_id).with_suffix(".json"),
-        use_rnafm=use_rnafm,
-    )
-    final_df = robin_inference(
-        ligand_name,
-        dgl_pocket_graph,
-        model=model,
-        use_ligand_cache=True,
-        ligand_cache="data/ligands/robin_lig_graphs.p",
-    )
-    final_df["pocket_id"] = pocket_id
-    rows = []
-    for frac in (0.01, 0.02, 0.05):
-        ef = enrichment_factor(
-            final_df["model"],
-            final_df["is_active"],
-            lower_is_better=False,
-            frac=frac,
-        )
-        rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
-    return pd.DataFrame(rows)
 
 
 def get_loaders(cfg, tune=False, trial=None):
@@ -246,21 +223,7 @@ def pdb_eval(cfg, model):
     pass
 
 
-def robin_eval(cfg, model):
-    # Final ROBIN validation
-    robin_dfs = [
-        df
-        for df in Parallel(n_jobs=4)(
-            delayed(one_robin)(pocket_id, ligand_name, model, cfg.model.use_rnafm)
-            for ligand_name, pocket_id in ROBIN_POCKETS.items()
-        )
-    ]
-    final_df = pd.concat(robin_dfs)
-    d = pathlib.Path(cfg.result_dir, parents=True, exist_ok=True)
-    base_name = pathlib.Path(cfg.name).stem
-    final_df.to_csv(d / (base_name + "_robin.csv"))
-    print(f"ROBIN:", final_df)
-    return final_df
+
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")
