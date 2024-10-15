@@ -14,7 +14,7 @@ if __name__ == "__main__":
 from rnamigos.learning.dataset import InferenceDataset
 from rnamigos.utils.graph_utils import get_dgl_graph
 from rnamigos.learning.models import get_model_from_dirpath
-from scripts_run.small_mixing import add_mixed_score
+from rnamigos.utils.mixing_utils import add_mixed_score
 
 
 def inference_raw(

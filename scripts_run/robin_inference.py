@@ -17,7 +17,7 @@ from rnamigos.utils.virtual_screen import enrichment_factor
 from rnamigos.utils.graph_utils import load_rna_graph
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.inference import inference_raw, get_models
-from scripts_run.small_mixing import normalize, mix_two_dfs
+from rnamigos.utils.mixing_utils import mix_two_dfs
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 torch.set_num_threads(1)
@@ -32,7 +32,7 @@ ROBIN_POCKETS = {
 POCKET_PATH = "data/json_pockets_expanded"
 
 
-def robin_inference(
+def robin_inference_raw(
         ligand_name,
         dgl_pocket_graph,
         models=None,
@@ -41,6 +41,10 @@ def robin_inference(
         use_ligand_cache=False,
         debug=False,
 ):
+    """
+    Given the graph pocket and ligand name, as well as models as expected by the inference script,
+    output the raw df
+    """
     actives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
     actives_smiles_set = set([s.lstrip().rstrip() for s in list(open(actives_ligands_path).readlines())])
 
@@ -76,7 +80,7 @@ def one_robin(ligand_name, pocket_id, models=None, use_rna_fm=False):
         POCKET_PATH / Path(pocket_id).with_suffix(".json"),
         use_rnafm=use_rna_fm,
     )
-    raw_df = robin_inference(
+    raw_df = robin_inference_raw(
         ligand_name=ligand_name,
         dgl_pocket_graph=dgl_pocket_graph,
         models=models,

@@ -4,19 +4,14 @@ Examples of command lines to train a model are available in scripts_run/train.sh
 
 import os
 import sys
-import json
-import shutil
 
 import hydra
+import json
 from omegaconf import DictConfig, OmegaConf
-from pathlib import Path
-from joblib import Parallel, delayed
-from loguru import logger
 import optuna
-
-import numpy as np
 import pathlib
-import pandas as pd
+from pathlib import Path
+import shutil
 import torch
 from torch.utils import tensorboard
 
@@ -26,29 +21,15 @@ if __name__ == "__main__":
 from rnamigos.learning.dataset import get_systems_from_cfg
 from rnamigos.learning.dataset import get_dataset, train_val_split
 from rnamigos.learning.dataloader import get_loader, get_vs_loader
-
 from rnamigos.learning import learn
-from rnamigos.learning.models import cfg_to_model
+from rnamigos.learning.models import get_model_from_dirpath, cfg_to_model
 from rnamigos.utils.learning_utils import mkdirs, setup_device, setup_seed
-from rnamigos.utils.virtual_screen import get_efs, enrichment_factor
-from rnamigos.utils.graph_utils import load_rna_graph
-from rnamigos.learning.models import get_model_from_dirpath
 
 from scripts_run.robin_inference import robin_eval
-from scripts_fig.plot_utils import group_df
+from scripts_run.chembl_inference import pdb_eval
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 torch.set_num_threads(1)
-
-ROBIN_POCKETS = {
-    "TPP": "2GDI_Y_TPP_100",
-    "ZTP": "5BTP_A_AMZ_106",
-    "SAM_ll": "2QWY_B_SAM_300",
-    "PreQ1": "3FU2_A_PRF_101",
-}
-
-POCKET_PATH = "data/json_pockets_expanded"
-
 
 def get_loaders(cfg, tune=False, trial=None):
     # Systems are basically lists of all pocket/pair/labels to consider. We then split the train_val systems.
@@ -173,51 +154,6 @@ def objective(trial, cfg) -> float:
     with open(pathlib.Path(save_path) / f"trial_score.txt", "w") as t:
         t.write(str(val_loss))
     return val_loss
-
-
-def pdb_eval(cfg, model):
-    # Final VS validation on each decoy set
-    logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
-    logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")
-
-    test_systems = get_systems_from_cfg(cfg, return_test=True)
-    model = model.to("cpu")
-    rows, raw_rows = [], []
-    decoys = ["chembl", "pdb", "pdb_chembl", "decoy_finder"]
-    for decoy_mode in decoys:
-        dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg)
-        decoy_rows, decoys_raw_rows = get_efs(
-            model=model,
-            dataloader=dataloader,
-            decoy_mode=decoy_mode,
-            cfg=cfg,
-            verbose=True,
-        )
-        rows += decoy_rows
-        raw_rows += decoys_raw_rows
-
-    # Make it a df
-    df = pd.DataFrame(rows)
-    df_raw = pd.DataFrame(raw_rows)
-
-    # Dump csvs
-    d = pathlib.Path(cfg.result_dir, parents=True, exist_ok=True)
-    base_name = pathlib.Path(cfg.name).stem
-    df.to_csv(d / (base_name + ".csv"))
-    df_raw.to_csv(d / (base_name + "_raw.csv"))
-
-    df_chembl = df.loc[df["decoys"] == "chembl"]
-    print(f"{cfg.name} Mean EF on chembl: {np.mean(df_chembl['score'].values)}")
-    df_chembl = group_df(df_chembl)
-    print(f"{cfg.name} Mean grouped EF on chembl: {np.mean(df_chembl['score'].values)}")
-
-    df_pdbchembl = df.loc[df["decoys"] == "pdb_chembl"]
-    print(f"{cfg.name} Mean EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
-    df_pdbchembl = group_df(df_pdbchembl)
-    print(
-        f"{cfg.name} Mean grouped EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}"
-    )
-    pass
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")

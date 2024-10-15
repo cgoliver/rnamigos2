@@ -99,7 +99,8 @@ def get_efs(model, dataloader, decoy_mode, cfg, verbose=False):
     rows, raw_rows = list(), list()
     lower_is_better = cfg.train.target in ["dock", "native_fp"]
     metric = enrichment_factor if decoy_mode == "robin" else mean_active_rank
-    print(f"DOING: {cfg.name}, LOWER IS BETTER: {lower_is_better}")
+    if verbose:
+        print(f"DOING: {cfg.name}, LOWER IS BETTER: {lower_is_better}")
     # metric = enrichment_factor
     efs, scores, status, pocket_names, all_smiles = run_virtual_screen(
         model,

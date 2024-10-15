@@ -1,103 +1,85 @@
 import os
 import sys
 
+from loguru import logger
 import numpy as np
 import pandas as pd
+import pathlib
 from sklearn import metrics
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
+from rnamigos.learning.dataset import get_systems_from_cfg
+from rnamigos.learning.dataloader import get_vs_loader
+from rnamigos.learning.models import get_model_from_dirpath
+from rnamigos.utils.mixing_utils import mix_two_scores, mix_two_dfs, get_mix_score
+from rnamigos.utils.virtual_screen import get_efs
 from scripts_fig.plot_utils import group_df
 
-"""
-The main two functions are:
-- mix two scores than can explore many combinations
-- compute_mix_csvs: creates the original big csv, adding docknat and mixed (potentially with simplex grid search)
-"""
+
+def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None):
+    # Final VS validation on each decoy set
+    if verbose:
+        logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
+        logger.info(f"Loading VS ligands from {cfg.data.ligand_db}")
+
+    test_systems = get_systems_from_cfg(cfg, return_test=True)
+    model = model.to("cpu")
+    ef_rows, raw_rows = [], []
+    if decoys is None:
+        decoys = ["chembl", "pdb", "pdb_chembl", "decoy_finder"]
+    elif isinstance(decoys, str):
+        decoys = [decoys]
+    for decoy_mode in decoys:
+        dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg, cache_graphs=False)
+        decoy_ef_rows, decoys_raw_rows = get_efs(
+            model=model,
+            dataloader=dataloader,
+            decoy_mode=decoy_mode,
+            cfg=cfg,
+            verbose=verbose,
+        )
+        ef_rows += decoy_ef_rows
+        raw_rows += decoys_raw_rows
+
+    # Make it a df
+    df_ef = pd.DataFrame(ef_rows)
+    df_raw = pd.DataFrame(raw_rows)
+    if dump:
+        d = pathlib.Path(cfg.result_dir, parents=True, exist_ok=True)
+        base_name = pathlib.Path(cfg.name).stem
+        out_csv = d / (base_name + ".csv")
+        out_csv_raw = d / (base_name + "_raw.csv")
+        df_ef.to_csv(out_csv, index=False)
+        df_raw.to_csv(out_csv_raw, index=False)
+
+        # Just printing the results
+        df_chembl = df_ef.loc[df_ef["decoys"] == "chembl"]
+        df_pdbchembl = df_ef.loc[df_ef["decoys"] == "pdb_chembl"]
+        df_chembl_grouped = group_df(df_chembl)
+        df_pdbchembl_grouped = group_df(df_pdbchembl)
+        logger.info(f"{cfg.name} Mean EF on chembl: {np.mean(df_chembl['score'].values)}")
+        logger.info(f"{cfg.name} Mean grouped EF on chembl: {np.mean(df_chembl_grouped['score'].values)}")
+        logger.info(f"{cfg.name} Mean EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
+        logger.info(f"{cfg.name} Mean grouped EF on pdbchembl: {np.mean(df_pdbchembl_grouped['score'].values)}")
+    return df_ef, df_raw
 
 
-# Normalize
-def normalize(scores):
-    out_scores = (scores - scores.min()) / (scores.max() - scores.min())
-    return out_scores
-
-
-def add_mixed_score(df, score1='dock', score2='native', out_col='mixed'):
-    scores_1 = df[score1]
-    scores_2 = df[score2]
-    normalized_scores_1 = normalize(scores_1)
-    normalized_scores_2 = normalize(scores_2)
-    df[out_col] = (0.5 * normalized_scores_1 + 0.5 * normalized_scores_2).values
-    return df
-
-
-def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col='mixed'):
-    """
-    Mix two scores, and return raw, efs and mean efs. Optionally dump the dataframes.
-    """
-    pockets = df['pocket_id'].unique()
-    all_efs = []
-    all_pockets = []
-    all_dfs = []
-    for pi, p in enumerate(pockets):
-        pocket_df = df.loc[df['pocket_id'] == p]
-        # Add temp_name in case one of the input is mixed. This could probably be removed
-        pocket_df = pocket_df.reset_index(drop=True)
-        pocket_df = add_mixed_score(pocket_df, score1, score2, out_col='temp_name')
-
-        # Then compute aurocs and add to all results
-        try:
-            fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'],
-                                                     pocket_df['temp_name'],
-                                                     drop_intermediate=True)
-        except ValueError:
-            a = 1
-        enrich = metrics.auc(fpr, tpr)
-        all_efs.append(enrich)
-        all_pockets.append(p)
-        all_dfs.append(pocket_df[['pocket_id', 'smiles', 'is_active', 'temp_name']])
-
-    # Merge df and add decoys value
-    mixed_df_raw = pd.concat(all_dfs)
-    mixed_df_raw = mixed_df_raw.rename(columns={'temp_name': outname_col})
-
-    if not 'DECOY' in globals():
-        DECOY = 'pdb_chembl'
-
-    dumb_decoy = [DECOY for _ in range(len(mixed_df_raw))]
-    mixed_df_raw.insert(len(mixed_df_raw.columns), "decoys", dumb_decoy)
-    mixed_df = pd.DataFrame({"pocket_id": all_pockets,
-                             'decoys': [DECOY for _ in all_pockets],
-                             'score': all_efs})
-    if outname is not None:
-        mixed_df_raw.to_csv(f"outputs/{outname}_raw.csv")
-        mixed_df.to_csv(f"outputs/{outname}.csv")
-    return all_efs, mixed_df, mixed_df_raw
-
-
-def get_mix_score(df, score1='dock', score2='native'):
-    all_efs, _, _ = mix_two_scores(df, score1=score1, score2=score2)
-    return np.mean(all_efs)
-
-
-def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mixed'):
-    """
-    Instead of mixing one df on two scores, we have two dfs with one score...
-    """
-    score_2 = score_1 if score_2 is None else score_2
-    df_1 = df_1[['pocket_id', 'smiles', 'is_active', score_1]]
-    renamed_score = score_2 + '_copy_2'
-    df_2 = df_2.copy()
-    df_2[renamed_score] = df_2[score_2]
-    df_2 = df_2[['pocket_id', 'smiles', 'is_active', renamed_score]]
-    df_to_use = df_1.merge(df_2, on=['pocket_id', 'smiles', 'is_active'], how='outer')
-    all_efs, mixed_df, mixed_df_raw = mix_two_scores(df_to_use,
-                                                     score_1,
-                                                     renamed_score,
-                                                     outname=outname,
-                                                     outname_col=outname_col)
-    return all_efs, mixed_df, mixed_df_raw
+def get_all_csvs(recompute=False, decoys=None):
+    model_dir = "results/trained_models/"
+    res_dir = "outputs/pockets"
+    os.makedirs(res_dir, exist_ok=True)
+    for model, model_path in MODELS.items():
+        out_csv = os.path.join(res_dir, f"{model}.csv")
+        out_csv_raw = os.path.join(res_dir, f"{model}_raw.csv")
+        if os.path.exists(out_csv) and not recompute:
+            continue
+        full_model_path = os.path.join(model_dir, model_path)
+        model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
+        df_ef, df_raw = pdb_eval(cfg, model, dump=False, verbose=True, decoys=decoys)
+        df_ef.to_csv(out_csv, index=False)
+        df_raw.to_csv(out_csv_raw, index=False)
 
 
 def compute_mix_csvs():
@@ -135,14 +117,6 @@ def compute_mix_csvs():
         return big_df_raw
 
     for seed in SEEDS:
-        RUNS = ["rdock",
-                "dock_new_pdbchembl_rnafm",
-                "native_pretrain_new_pdbchembl_rnafm",
-                ]
-        # RUNS = ['rdock',
-        #         f'dock_{seed}',
-        #         f'native_{seed}',
-        #         ]
         out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
         big_df_raw = merge_csvs(runs=RUNS, grouped=GROUPED, decoy=DECOY)
         big_df_raw.to_csv(out_path_raw)
@@ -220,11 +194,20 @@ if __name__ == "__main__":
     SEEDS = [0]
     # SEEDS = [0, 1, 42]
 
-    # FIRST LET'S PARSE INFERENCE CSVS AND MIX THEM
-    compute_mix_csvs()
+    MODELS = {
+        "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
+        "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
+    }
+    RUNS = list(MODELS.keys())
+    # GET INFERENCE CSVS FOR SEVERAL MODELS
+    recompute = True
+    get_all_csvs(recompute=recompute, decoys=DECOY)
+
+    # PARSE INFERENCE CSVS AND MIX THEM
+    # compute_mix_csvs()
 
     # To compare to ensembling the same method with different seeds
     # compute_all_self_mix()
 
     # Get table with all mixing
-    get_table_mixing()
+    # get_table_mixing()

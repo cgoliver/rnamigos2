@@ -52,7 +52,7 @@ from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.learning.dataset import VirtualScreenDataset, get_systems
 from rnamigos.utils.virtual_screen import mean_active_rank, run_virtual_screen, enrichment_factor
 from rnamigos.utils.graph_utils import load_rna_graph
-from scripts_run.robin_inference import robin_inference
+from scripts_run.robin_inference import robin_inference_raw
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
@@ -402,7 +402,7 @@ def do_robin(ligand_name, pocket_path, use_rnafm=False):
     dgl_pocket_graph, _ = load_rna_graph(pocket_path + '.json', use_rnafm=use_rnafm)
 
     # Compute scores and EFs
-    final_df = robin_inference(ligand_name, dgl_pocket_graph)
+    final_df = robin_inference_raw(ligand_name, dgl_pocket_graph)
     pocket_id = Path(pocket_path).stem
     final_df['pocket_id'] = pocket_id
     ef_rows = []

@@ -188,7 +188,7 @@ class DockingDataset(Dataset):
         undirected=False,
         use_rings=False,
         use_rnafm=False,
-        ligand_cache="../../data/ligands/lig_graphs.p",
+        ligand_cache="data/ligands/lig_graphs.p",
         use_ligand_cache=True,
     ):
         """
@@ -499,7 +499,7 @@ def get_dataset(cfg, systems, training=True):
 
 
 if __name__ == "__main__":
-    pockets_path = "../../data/json_pockets_load"
+    pockets_path = "data/json_pockets_load"
     test_systems = get_systems(target="dock", return_test=True)
     dataset = DockingDataset(
         pockets_path=pockets_path,

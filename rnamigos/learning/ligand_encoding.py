@@ -98,7 +98,7 @@ class MolGraphEncoder:
             self.charges_map = pickle.load(f)
 
         self.cache = cache
-        self.cache_path = os.path.join(cache_path)
+        self.cache_path = cache_path
         if cache:
             try:
                 self.cached_graphs = pickle.load(open(self.cache_path, 'rb'))

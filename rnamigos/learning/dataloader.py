@@ -70,7 +70,7 @@ class IsNativeSampler(Sampler):
             selected_positive_rows = []
             selected_neg_rows = []
             for i, (group_pos, group_neg) in enumerate(
-                zip(self.all_positives, self.all_negatives)
+                    zip(self.all_positives, self.all_negatives)
             ):
                 selected_positive_rows.append(group_pos[selected_pos[i]])
                 selected_neg_rows.append(group_neg[selected_neg[i]])
@@ -140,7 +140,7 @@ class RingCollater:
         # We need to reimplement because current one expects dicts
         block = np.zeros((len(node_rings), len(node_rings)))
         assert (
-            self.node_simfunc.compare(node_rings[0], node_rings[0]) > 0.99
+                self.node_simfunc.compare(node_rings[0], node_rings[0]) > 0.99
         ), "Identical rings giving non 1 similarity."
         sims = [
             self.node_simfunc.compare(n1, n2)
@@ -164,8 +164,8 @@ class RingCollater:
                 for ring in values:
                     flat_rings.extend(ring)
                 if (
-                    self.max_size_kernel is None
-                    or len(flat_rings) < self.max_size_kernel
+                        self.max_size_kernel is None
+                        or len(flat_rings) < self.max_size_kernel
                 ):
                     # Just take them all
                     node_ids = [1 for _ in flat_rings]
@@ -235,7 +235,7 @@ VS_LOADER_ARGS = {
 }
 
 
-def get_vs_loader(systems, decoy_mode, cfg, reps_only=False, rognan=False):
+def get_vs_loader(systems, decoy_mode, cfg, reps_only=False, rognan=False, cache_graphs=True):
     """
     Just a wrapper to factor boilerplate expansion of the cfg file.
     We keep decoy_mode exposed to use on a different decoy set than the one used in training
@@ -251,6 +251,7 @@ def get_vs_loader(systems, decoy_mode, cfg, reps_only=False, rognan=False):
         group_ligands=True,
         reps_only=reps_only,
         rognan=rognan,
+        cache_graphs=cache_graphs
     )
     dataloader = GraphDataLoader(dataset=vs_dataset, **VS_LOADER_ARGS)
     return dataloader
