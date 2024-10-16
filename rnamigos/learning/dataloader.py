@@ -209,8 +209,8 @@ def get_loader(cfg, dataset, systems, training=True, trial=None, tune=False):
                 cfg.train.simfunc, depth=cfg.train.simfunc_depth
             )
             max_size_kernel = cfg.train.max_kernel
-
     collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=max_size_kernel)
+
     loader_args = {
         "shuffle": sampler is None,
         "batch_size": (

@@ -17,11 +17,11 @@ RDLogger.DisableLog("rdApp.*")  # disable warnings
 
 
 def rnamigos_1_split(
-    systems,
-    rnamigos1_test_split=0,
-    return_test=False,
-    use_rnamigos1_train=False,
-    use_rnamigos1_ligands=False,
+        systems,
+        rnamigos1_test_split=0,
+        return_test=False,
+        use_rnamigos1_train=False,
+        use_rnamigos1_ligands=False,
 ):
     """
 
@@ -64,13 +64,13 @@ def rnamigos_1_split(
 
 
 def get_systems(
-    target="dock",
-    rnamigos1_split=-1,
-    return_test=False,
-    use_rnamigos1_train=False,
-    use_rnamigos1_ligands=False,
-    filter_robin=False,
-    group_pockets=False,
+        target="dock",
+        rnamigos1_split=-1,
+        return_test=False,
+        use_rnamigos1_train=False,
+        use_rnamigos1_ligands=False,
+        filter_robin=False,
+        group_pockets=False,
 ):
     """
     :param target: The systems to load
@@ -94,10 +94,7 @@ def get_systems(
     elif target == "is_native":
         interactions_csv = os.path.join(script_dir, "../../data/csvs/binary_data.csv")
     else:
-        raise ValueError(
-            "train.target should be in {dock, native_fp, is_native}, received : "
-            + target
-        )
+        raise ValueError(f"train.target should be in {{dock, native_fp, is_native}}, received : {target}")
     systems = pd.read_csv(interactions_csv, index_col=0)
     if rnamigos1_split == -2:
         splits_file = os.path.join(script_dir, "../../data/train_test_75.p")
@@ -173,23 +170,23 @@ def stretch_values(value):
 class DockingDataset(Dataset):
 
     def __init__(
-        self,
-        pockets_path,
-        systems,
-        target="dock",
-        use_normalized_score=False,
-        stretch_scores=False,
-        fp_type="MACCS",
-        use_graphligs=False,
-        shuffle=False,
-        seed=0,
-        debug=False,
-        cache_graphs=True,
-        undirected=False,
-        use_rings=False,
-        use_rnafm=False,
-        ligand_cache="data/ligands/lig_graphs.p",
-        use_ligand_cache=True,
+            self,
+            pockets_path,
+            systems,
+            target="dock",
+            use_normalized_score=False,
+            stretch_scores=False,
+            fp_type="MACCS",
+            use_graphligs=False,
+            shuffle=False,
+            seed=0,
+            debug=False,
+            cache_graphs=True,
+            undirected=False,
+            use_rings=False,
+            use_rnafm=False,
+            ligand_cache="data/ligands/lig_graphs.p",
+            use_ligand_cache=True,
     ):
         """
         Setup for data loader.
@@ -298,15 +295,15 @@ class DockingDataset(Dataset):
 
 class VirtualScreenDataset(DockingDataset):
     def __init__(
-        self,
-        pockets_path,
-        ligands_path,
-        systems,
-        decoy_mode="pdb",
-        rognan=False,
-        reps_only=False,
-        group_ligands=True,
-        **kwargs,
+            self,
+            pockets_path,
+            ligands_path,
+            systems,
+            decoy_mode="pdb",
+            rognan=False,
+            reps_only=False,
+            group_ligands=True,
+            **kwargs,
     ):
         super().__init__(pockets_path, systems=systems, shuffle=False, **kwargs)
         self.ligands_path = ligands_path
@@ -426,7 +423,7 @@ class VirtualScreenDataset(DockingDataset):
 
 class InferenceDataset(Dataset):
     def __init__(
-        self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True
+            self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True
     ):
         self.smiles_list = smiles_list
         self.ligand_graph_encoder = (

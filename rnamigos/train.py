@@ -142,6 +142,7 @@ def objective(trial, cfg) -> float:
         val_vs_loader=val_vs_loader,
         val_vs_loader_rognan=val_vs_loader_rognan,
         test_vs_loader=test_vs_loader,
+        monitor_robin=cfg.train.monitor_robin,
         save_path=save_name,
         writer=writer,
         num_epochs=cfg.train.num_epochs,

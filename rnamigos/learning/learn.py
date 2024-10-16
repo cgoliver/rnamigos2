@@ -1,12 +1,12 @@
 import sys
 
 import numpy as np
-import pandas as pd
 import time
 import torch
 
-from rnamigos.utils.virtual_screen import mean_active_rank, run_virtual_screen
+from rnamigos.utils.virtual_screen import run_virtual_screen
 from rnamigos.utils.learning_utils import send_graph_to_device
+from scripts_run.robin_inference import robin_eval
 
 
 def print_gradients(model):
@@ -58,30 +58,30 @@ def validate(model, val_loader, criterion, device):
 
 
 def train_dock(
-    model,
-    criterion,
-    optimizer,
-    train_loader,
-    val_loader,
-    val_vs_loader,
-    test_vs_loader,
-    save_path,
-    val_vs_loader_rognan=None,
-    writer=None,
-    device="cpu",
-    num_epochs=25,
-    wall_time=None,
-    early_stop_threshold=10,
-    monitor_robin=False,
-    pretrain_weight=0.1,
-    debug=False,
-    cfg=None,
+        model,
+        criterion,
+        optimizer,
+        train_loader,
+        val_loader,
+        val_vs_loader,
+        test_vs_loader,
+        save_path,
+        val_vs_loader_rognan=None,
+        writer=None,
+        device="cpu",
+        num_epochs=25,
+        wall_time=None,
+        early_stop_threshold=10,
+        monitor_robin=False,
+        pretrain_weight=0.1,
+        debug=False,
+        cfg=None,
 ):
     """
     Performs the entire training routine.
     :param model: (torch.nn.Module): the model to train
-    :param criterion: the criterion to use (eg CrossEntropy)
-    :param optimizer: the optimizer to use (eg SGD or Adam)
+    :param criterion: the criterion to use (e.g. CrossEntropy)
+    :param optimizer: the optimizer to use (e.g. SGD or Adam)
     :param device: the device on which to run
     :param train_loader: dataloader for training
     :param val_loader: dataloader for validation
@@ -96,17 +96,12 @@ def train_dock(
     best_loss = sys.maxsize
     batch_size = train_loader.batch_size
     vs_every = cfg.train.vs_every if cfg is not None else 10
-    # if we delay attributor, start with attributor OFF
-    # if <= -1, both always ON.
     num_batches = len(train_loader)
     for epoch in range(num_epochs):
         print("Epoch {}/{}".format(epoch + 1, num_epochs))
         print("-" * 10)
-
         # Training phase
         model.train()
-
-        # switch off embedding grads, turn on attributor
         running_loss = 0.0
         val_ef = 0
         for batch_idx, (batch) in enumerate(train_loader):
@@ -140,6 +135,7 @@ def train_dock(
                 K_predict = torch.mm(selected_embs, selected_embs.t())
                 pretrain_loss = torch.nn.MSELoss()(K_predict, node_sim_block)
                 loss += pretrain_weight * pretrain_loss
+
             # Backward
             loss.backward()
             optimizer.step()
@@ -151,17 +147,12 @@ def train_dock(
 
             if batch_idx % 200 == 0:
                 time_elapsed = time.time() - start_time
-                print(
-                    f"Train Epoch: {epoch + 1} [{(batch_idx + 1) * batch_size}/{num_batches * batch_size} "
-                    f"({100. * (batch_idx + 1) / num_batches:.0f}%)]"
-                    f"\tLoss: {batch_loss:.6f}  Time: {time_elapsed:.2f}"
-                )
+                print(f"Train Epoch: {epoch + 1} [{(batch_idx + 1) * batch_size}/{num_batches * batch_size} "
+                      f"({100. * (batch_idx + 1) / num_batches:.0f}%)]"
+                      f"\tLoss: {batch_loss:.6f}  Time: {time_elapsed:.2f}")
 
                 # tensorboard logging
-                writer.add_scalar(
-                    "Training batch loss", batch_loss, epoch * num_batches + batch_idx
-                )
-
+                writer.add_scalar("Training batch loss", batch_loss, epoch * num_batches + batch_idx)
             del loss
 
         # Log training metrics
@@ -176,22 +167,20 @@ def train_dock(
         # Run VS metrics
         if not epoch % vs_every:
             lower_is_better = cfg.train.target in ["dock", "native_fp"]
-            efs, *_ = run_virtual_screen(
-                model, val_vs_loader, lower_is_better=lower_is_better
-            )
+            efs, *_ = run_virtual_screen(model, val_vs_loader, lower_is_better=lower_is_better)
             val_ef = np.mean(efs)
             writer.add_scalar("Val EF", val_ef, epoch)
 
             if val_vs_loader_rognan is not None:
-                efs, *_ = run_virtual_screen(
-                    model, val_vs_loader_rognan, lower_is_better=lower_is_better
-                )
+                efs, *_ = run_virtual_screen(model, val_vs_loader_rognan, lower_is_better=lower_is_better)
                 writer.add_scalar("Val EF Rognan", np.mean(efs), epoch)
 
-            efs, *_ = run_virtual_screen(
-                model, test_vs_loader, lower_is_better=lower_is_better
-            )
+            efs, *_ = run_virtual_screen(model, test_vs_loader, lower_is_better=lower_is_better)
             writer.add_scalar("Test EF", np.mean(efs), epoch)
+
+            if monitor_robin:
+                robin_ef05 = robin_eval(cfg, model)
+                writer.add_scalar("Robin EF", robin_ef05, epoch)
 
         # Finally do checkpointing based on vs performance, we negate it since higher efs are better
         # loss_to_track = val_loss
@@ -202,15 +191,11 @@ def train_dock(
             best_loss = loss_to_track
             epochs_from_best = 0
             model.cpu()
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "loss": criterion,
-                },
-                save_path,
-            )
+            torch.save({"epoch": epoch,
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "loss": criterion, },
+                       save_path)
             model.to(device)
 
         # Early stopping
@@ -227,13 +212,6 @@ def train_dock(
             if time_elapsed * (1 + 1 / (epoch + 1)) > 0.95 * wall_time * 3600:
                 break
         del val_loss
-
-    # robin check
-    if monitor_robin:
-        robin_df = get_perf_robin(model, use_rnafm=self.use_rnafm)
-        for row in robin_df.itertuples():
-            writer.add_scalar(f"Robin EF {row.frac} {row.pocket_id}", row.score, 0)
-
     best_state_dict = torch.load(save_path)["model_state_dict"]
     model.load_state_dict(best_state_dict)
     model.eval()
