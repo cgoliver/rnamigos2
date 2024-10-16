@@ -38,5 +38,5 @@ weight_decay: 1e-5
 vs_every: 20
 vs_decoy_mode: 'pdb_chembl'
 do_rognan: True
-monitor_robin: False
+monitor_robin: True
 
