@@ -10,15 +10,15 @@ batch_size: 32
 num_workers: 0
 
 # dataset
-use_normalized_score: False # To use quantiles instead of scores
+use_normalized_score: True # To use quantiles instead of scores
 stretch_scores: False # To put more emphasis on better scores
-group_pockets: False
+group_pockets: True
 group_sample: False
 use_rnamigos1_train: False
 use_rnamigos1_ligands: False
 filter_robin: False
 native_filter_pdb: False
-rnamigos1_split: -1
+rnamigos1_split: -2
 simfunc: None
 simfunc_depth: 2
 max_kernel: 20
@@ -36,7 +36,7 @@ weight_decay: 1e-5
 
 # Validation
 vs_every: 20
-vs_decoy_mode: 'chembl'
+vs_decoy_mode: 'pdb_chembl'
 do_rognan: True
 monitor_robin: False
 
