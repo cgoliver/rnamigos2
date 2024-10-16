@@ -17,6 +17,7 @@ group_sample: False
 use_rnamigos1_train: False
 use_rnamigos1_ligands: False
 filter_robin: False
+native_filter_pdb: False
 rnamigos1_split: -1
 simfunc: None
 simfunc_depth: 2

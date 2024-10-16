@@ -70,6 +70,7 @@ def get_systems(
         use_rnamigos1_train=False,
         use_rnamigos1_ligands=False,
         filter_robin=False,
+        native_filter_pdb=False,
         group_pockets=False,
 ):
     """
@@ -86,6 +87,8 @@ def get_systems(
     """
     # Can't split twice
     assert rnamigos1_split in {-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+
+    # Get the right csv file and load it as a df
     script_dir = os.path.dirname(__file__)
     if target == "dock":
         interactions_csv = os.path.join(script_dir, "../../data/csvs/docking_data.csv")
@@ -96,11 +99,18 @@ def get_systems(
     else:
         raise ValueError(f"train.target should be in {{dock, native_fp, is_native}}, received : {target}")
     systems = pd.read_csv(interactions_csv, index_col=0)
+
+    # Potentially only train on PDB compounds for is_native
+    if target == "is_native" and native_filter_pdb:
+        systems = systems.loc[systems['LIGAND_SOURCE'] == 'PDB']
+
+    # Latest systems querying, based on RMscores redundancy
     if rnamigos1_split == -2:
         splits_file = os.path.join(script_dir, "../../data/train_test_75.p")
         train_names, test_names, train_names_grouped, test_names_grouped = pickle.load(
             open(splits_file, "rb")
         )
+        # If group_pockets, we only use centroid pockets and not all copies
         if group_pockets:
             train_names = list(train_names_grouped.keys())
             test_names = list(test_names_grouped.keys())
@@ -108,6 +118,8 @@ def get_systems(
             systems = systems[systems["PDB_ID_POCKET"].isin(test_names)]
         else:
             systems = systems[systems["PDB_ID_POCKET"].isin(train_names)]
+
+    # This is the split originally propsed by juan, solely based on PDB names
     elif rnamigos1_split == -1:
         split = "TEST" if return_test else "TRAIN"
         # systems_train = systems.loc[systems['SPLIT'] == 'TRAIN']
@@ -133,6 +145,7 @@ def get_systems(
                 to_avoid = {s for s in unique_train if s.startswith(robin_pdb_id)}
                 shortlist_to_avoid = shortlist_to_avoid.union(to_avoid)
             systems = systems[~systems["PDB_ID_POCKET"].isin(shortlist_to_avoid)]
+    # This follows the old RNAmigos1 split
     else:
         systems = rnamigos_1_split(
             systems,
@@ -153,6 +166,7 @@ def get_systems_from_cfg(cfg, return_test=False):
         use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
         group_pockets=group_pockets,
         filter_robin=cfg.train.filter_robin,
+        native_filter_pdb=cfg.train.native_filter_pdb,
         return_test=return_test,
     )
     return systems
