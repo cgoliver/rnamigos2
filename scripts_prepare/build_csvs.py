@@ -43,11 +43,11 @@ def flatten_values(systems):
     return new_systems
 
 
-systems_dock = systems[['PDB_ID_POCKET', 'LIGAND_SMILES', 'INTER', 'SPLIT']]
+systems_dock = systems[['PDB_ID_POCKET', 'LIGAND_SMILES', 'INTER', 'SPLIT']].copy()
 systems_dock_quantiles = flatten_values(systems_dock)
 systems_dock_quantiles.to_csv(interactions_csv_dock)
 
 # IS NATIVE Get PDB, SMILES, 0/1
-systems_binary = systems[['PDB_ID_POCKET', 'LIGAND_SMILES', 'IS_NATIVE', 'SPLIT']]
+systems_binary = systems[['PDB_ID_POCKET', 'LIGAND_SMILES', 'IS_NATIVE', 'SPLIT', 'LIGAND_SOURCE']].copy()
 systems_binary['IS_NATIVE'] = systems_binary['IS_NATIVE'].apply(lambda x: 1 if x == 'YES' else 0)
 systems_binary.to_csv(interactions_csv_binary)
