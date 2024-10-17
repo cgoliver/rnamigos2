@@ -85,12 +85,24 @@ test_groups.update(robin_groups)
 print("Number of groups", len(train_groups), len(test_groups))
 
 # Also dump the actual pdb ids as flat lists, including redundancy
-train_names_grouped = train_groups
-test_names_grouped = test_groups
 train_names = set(chain.from_iterable([[name for name in group] for group in train_groups.values()]))
 test_names = set(chain.from_iterable([[name for name in group] for group in test_groups.values()]))
 print("Number of examples", len(train_names), len(test_names))
-pickle.dump((train_names, test_names, train_names_grouped, test_names_grouped), open("data/train_test_75.p", 'wb'))
+pickle.dump((train_names, test_names, train_groups, test_groups), open("data/train_test_75.p", 'wb'))
+
+# Also propose a train/val split
+print('trainval')
+trainval_cut = int(0.8 * len(groups))
+train_groups_keys = list(groups.keys())[:trainval_cut]
+val_groups_keys = list(groups.keys())[trainval_cut:train_cut]
+train_groups = {key: groups[key] for key in train_groups_keys}
+val_groups = {key: groups[key] for key in val_groups_keys}
+print("Number of groups", len(train_groups), len(val_groups))
+# Also dump the actual pdb ids as flat lists, including redundancy
+train_names = set(chain.from_iterable([[name for name in group] for group in train_groups.values()]))
+val_names = set(chain.from_iterable([[name for name in group] for group in val_groups.values()]))
+print("Number of examples", len(train_names), len(val_names))
+pickle.dump((train_names, val_names, train_groups, val_groups), open("data/train_val_75.p", 'wb'))
 
 
 def assess_copies():
@@ -103,15 +115,6 @@ def assess_copies():
     2QWY	SAM  SAM_ll
     3FU2	PRF  PreQ1
     """
-
-    ROBIN_POCKETS = {
-        "TPP": "2GDI_Y_TPP_100",
-        "ZTP": "5BTP_A_AMZ_106",
-        "SAM_ll": "2QWY_B_SAM_300",
-        "PreQ1": "3FU2_A_PRF_101",
-    }
-
-    POCKET_PATH = "data/json_pockets_expanded"
 
     # GET REFERENCE POCKETS
     def group_reference_pockets(pockets_path="data/json_pockets_expanded"):
@@ -192,6 +195,6 @@ def assess_gain():
 
     max_test_new = compute_max_train_test(train_names, test_names)
     plt.hist(max_test_new, alpha=0.5, bins=20)
-    max_test_new = compute_max_train_test(train_names_grouped, test_names_grouped)
+    max_test_new = compute_max_train_test(train_groups, test_groups)
     plt.hist(max_test_new, alpha=0.5, bins=20)
     plt.show()

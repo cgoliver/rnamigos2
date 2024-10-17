@@ -148,7 +148,8 @@ def line_plot(df, mixed_model='combined'):
     elif mixed_model == 'rdocknat':
         mixed_means = [0.924] * 20
     else:
-        raise ValueError
+        mixed_means = [0.924] * 20
+        print('Unexpected model, dashed line is confused')
     ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
 
     for (means, stds), name, color in zip(model_res, names, palette):
@@ -245,10 +246,9 @@ if __name__ == "__main__":
         build_ef_df(out_csv=out_csv)
 
     df = pd.read_csv(out_csv, index_col=0)
-    # mixed_model = 'combined'
-    # mixed_model = 'combined_docknat'
-    # mixed_model = 'combined_nat'
-    mixed_model = 'rdocknat'
+    # mixed_model = 'rdocknat'
+    mixed_model = 'dock'
+    mixed_model = 'docknat'
     line_plot(df, mixed_model=mixed_model)
     # vax_plot(df, mixed_model=mixed_model)
     pass

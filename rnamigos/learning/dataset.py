@@ -470,20 +470,14 @@ def train_val_split(train_val_systems, frac=0.8, system_based=True):
     :return:
     """
     if system_based:
-        train_names = train_val_systems["PDB_ID_POCKET"].unique()
-        train_names = np.random.choice(
-            train_names, size=int(frac * len(train_names)), replace=False
-        )
-        train_systems = train_val_systems[
-            train_val_systems["PDB_ID_POCKET"].isin(train_names)
-        ]
-        validation_systems = train_val_systems[
-            ~train_val_systems["PDB_ID_POCKET"].isin(train_names)
-        ]
+        script_dir = os.path.dirname(__file__)
+        splits_file = os.path.join(script_dir, "../../data/train_val_75.p")
+        train_names, val_names, _, _ = pickle.load(open(splits_file, "rb"))
+        train_systems = train_val_systems[train_val_systems["PDB_ID_POCKET"].isin(train_names)]
+        validation_systems = train_val_systems[~train_val_systems["PDB_ID_POCKET"].isin(train_names)]
     else:
-        train_systems, validation_systems = np.split(
-            train_val_systems.sample(frac=1), [int(frac * len(train_val_systems))]
-        )
+        train_systems, validation_systems = np.split(train_val_systems.sample(frac=1),
+                                                     [int(frac * len(train_val_systems))])
     return train_systems, validation_systems
 
 

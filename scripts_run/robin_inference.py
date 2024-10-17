@@ -247,23 +247,24 @@ def mix_all(swap=0):
 
 if __name__ == "__main__":
     MODELS = {
-        "native": "is_native/native_nopre_new_pdbchembl",
-        "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
-        "native_pre": "is_native/native_pretrain_new_pdbchembl",
+        # "native": "is_native/native_nopre_new_pdbchembl",
+        # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
+        # "native_pre": "is_native/native_pretrain_new_pdbchembl",
         "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
-        "is_native_old": "is_native/native_42",
+        # "is_native_old": "is_native/native_42",
         # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
-        "dock": "dock/dock_new_pdbchembl",
+        # "dock": "dock/dock_new_pdbchembl",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
+        "dock_rnafm_2": "dock/dock_rnafm_2",
     }
 
     PAIRS = {
-        ("native", "dock"): "vanilla",
-        ("native_rnafm", "dock_rnafm"): "vanilla_fm",
-        ("native_pre", "dock"): "pre",
+        # ("native", "dock"): "vanilla",
+        # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
+        # ("native_pre", "dock"): "pre",
         # ("native_pre_rnafm_tune", "dock_rnafm"): "pre_fm",
-        ("native_pre_rnafm", "dock_rnafm"): "native_dock_pre_fm",
-        ("native_dock_pre_fm", "rdock"): "rnamigos++",
+        # ("native_pre_rnafm", "dock_rnafm"): "native_dock_pre_fm",
+        # ("native_dock_pre_fm", "rdock"): "rnamigos++",
     }
 
     # TEST ONE INFERENCE
