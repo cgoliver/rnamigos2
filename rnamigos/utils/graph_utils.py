@@ -36,7 +36,11 @@ def add_rnafm(pocket_nx, rna_path, cache_path="data/pocket_embeddings"):
     embs = np.load(Path("data/pocket_embeddings") / Path(Path(rna_path).stem + ".npz"))
     # Now if some nodes are still missing and complement those with the mean embedding
     nx.set_node_attributes(pocket_nx, embs, "rnafm")
-    existing_nodes, existing_embs = list(zip(*nx.get_node_attributes(pocket_nx, "rnafm").items()))
+    existing_rnafm_embs_dict = nx.get_node_attributes(pocket_nx, "rnafm")
+    if len(existing_rnafm_embs_dict) > 0:
+        existing_nodes, existing_embs = list(zip(*existing_rnafm_embs_dict.items()))
+    else:
+        existing_nodes, existing_embs = [], []
     missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
     n = len(pocket_nx.nodes())
     # If only a fraction is missing, just skip and compute mean embedding
