@@ -43,7 +43,12 @@ def group_df(df):
 
 
 def get_rmscores():
-    rm_scores = pd.read_csv("data/rmscores.csv", index_col=0)
+    # OPEN RMSCORE DATA
+    with open("data/rmscores/systems.txt", 'r') as f:
+        columns = [s.strip() for s in f.readlines()]
+    rm_scores = pd.read_csv("data/rmscores/rmscore_normalized_by_average_length_complete_dataset.csv", header=None)
+    rm_scores.columns = columns
+    rm_scores.index = columns
     return rm_scores
 
 

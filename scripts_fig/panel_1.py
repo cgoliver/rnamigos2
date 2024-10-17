@@ -32,11 +32,11 @@ def barcodes(grouped=True):
     # TEST SET
     name_runs = {
         # r"\texttt{fp}": "fp_42.csv",
-        r"\texttt{compat}": "native_42.csv",
-        r"\texttt{aff}": "dock_42.csv",
-        r"\texttt{rDock}": "rdock.csv",
+        "COMPAT": "native_42.csv",
+        "AFF": "dock_42.csv",
+        "rDock": "rdock.csv",
         # r"\texttt{mixed}": "mixed_grouped_42.csv",
-        r"\texttt{mixed}": "docknat_grouped_42.csv",
+        "MIXED": "docknat_42.csv",
     }
     rows = []
     prev_pockets = None
@@ -45,8 +45,9 @@ def barcodes(grouped=True):
         df = pd.read_csv(f"outputs/{csv_name}")
         if grouped:
             df = group_df(df)
-        row = df[df['decoys'] == 'chembl'].sort_values(by='pocket_id')
+        row = df[df['decoys'] == 'pdb_chembl'].sort_values(by='pocket_id')
         all_pockets = row['pocket_id'].values
+        print(csv_name)
         if prev_pockets is None:
             prev_pockets = all_pockets
         else:
@@ -54,16 +55,20 @@ def barcodes(grouped=True):
         rows.append(row['score'])
 
     # FIND SMOOTHER PERMUTED VERSION
-    order = get_smooth_order(prev_pockets)
-    for i in range(len(rows)):
-        new_row = rows[i].values[order]
-        rows[i] = new_row
+    smooth = True
+    # smooth = False
+    if smooth:
+        order = get_smooth_order(prev_pockets)
+        for i in range(len(rows)):
+            new_row = rows[i].values[order]
+            rows[i] = new_row
 
+    n_over = 35
     # sns.heatmap(rows, cmap='binary_r')
     # cmap = sns.color_palette("vlag_r", as_cmap=True)
     # cmap = sns.diverging_palette(0, 245, s=100, l=50, as_cmap=True)
     # cmap = custom_diverging_palette(0, 245, s_neg=100, l_neg=50, s_pos=90, l_pos=80, as_cmap=True)
-    red_pal = sns.light_palette('#CF403E', reverse=True, n_colors=128 - 10)
+    red_pal = sns.light_palette('#CF403E', reverse=True, n_colors=128 - n_over)
     # blue_pal = sns.light_palette('#5c67ff', n_colors=30)[:10] # too grey/violet
     # blue_pal = sns.light_palette('#9dabe1', n_colors=10) # a bit violet and also lot of color
     # blue_pal = sns.light_palette('#a5b0d9', n_colors=10) # close
@@ -71,7 +76,7 @@ def barcodes(grouped=True):
     # blue_pal = sns.light_palette('#ccd6ff', n_colors=10) # brighter less blue
     # blue_pal = sns.light_palette('#d6ecff', n_colors=10) # almost white
     # blue_pal = sns.light_palette('#ebf5ff', n_colors=10) # whiter
-    blue_pal = sns.light_palette('#fff', n_colors=10)  # white
+    blue_pal = sns.light_palette('#fff', n_colors=n_over)  # white
     # blue_pal = sns.color_palette("light:b", n_colors=10) # hardcode blue
     cmap = blend_palette(np.concatenate([red_pal, blue_pal]), 1, as_cmap=True)
 
@@ -162,4 +167,3 @@ if __name__ == "__main__":
     grouped = True
     barcodes(grouped=grouped)
     # barcodes_transposed(grouped=grouped)
-    pass
