@@ -27,7 +27,7 @@ def add_mixed_score(df, score1='dock', score2='native', out_col='mixed'):
     return df
 
 
-def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col='mixed'):
+def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col='mixed', add_decoy=True):
     """
     Mix two scores, and return raw, efs and mean efs. Optionally dump the dataframes.
     """
@@ -50,15 +50,16 @@ def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col
         all_pockets.append(p)
         all_dfs.append(pocket_df[['pocket_id', 'smiles', 'is_active', 'temp_name']])
 
-    # Merge df and add decoys value
-    mixed_df_raw = pd.concat(all_dfs)
-    mixed_df_raw = mixed_df_raw.rename(columns={'temp_name': outname_col})
-
     if not 'DECOY' in globals():
         DECOY = 'pdb_chembl'
 
-    dumb_decoy = [DECOY for _ in range(len(mixed_df_raw))]
-    mixed_df_raw.insert(len(mixed_df_raw.columns), "decoys", dumb_decoy)
+    # Merge raw df and add decoys value
+    mixed_df_raw = pd.concat(all_dfs)
+    mixed_df_raw = mixed_df_raw.rename(columns={'temp_name': outname_col})
+    if "decoys" not in mixed_df_raw.columns and add_decoy:
+        dumb_decoy = [DECOY for _ in range(len(mixed_df_raw))]
+        mixed_df_raw.insert(len(mixed_df_raw.columns), "decoys", dumb_decoy)
+
     mixed_df = pd.DataFrame({"pocket_id": all_pockets,
                              'decoys': [DECOY for _ in all_pockets],
                              'score': all_efs})

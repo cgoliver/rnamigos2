@@ -16,7 +16,7 @@ np.random.seed(42)
 # OPEN RMSCORE DATA
 with open("data/rmscores/systems.txt", 'r') as f:
     columns = [s.strip() for s in f.readlines()]
-df = pd.read_csv("data/rmscore_normalized_by_average_length_complete_dataset.csv", header=None)
+df = pd.read_csv("data/rmscores/rmscore_normalized_by_average_length_complete_dataset.csv", header=None)
 df.columns = columns
 raw_val = df.values
 indices = {name: idx for (idx, name) in enumerate(columns)}

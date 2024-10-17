@@ -115,6 +115,7 @@ rdock_big = big_df[big_df['name'] == 'rDock']['score'].values
 # res = stats.ttest_ind(mixed_big, rdock_big)
 res = stats.ttest_rel(mixed_big, rdock_big)
 res_wil = stats.wilcoxon(mixed_big, rdock_big)
+print(res, res_wil)
 
 means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 # For a detailed score per pocket

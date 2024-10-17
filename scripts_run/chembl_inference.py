@@ -83,11 +83,11 @@ def get_all_csvs(recompute=False, decoys=None):
 
 
 def compute_mix_csvs():
-    def merge_csvs(runs, grouped=True, decoy=DECOY):
+    def merge_csvs(to_mix, grouped=True, decoy=DECOY):
         """
         Aggregate rdock, native and dock results for a given decoy + add mixing strategies
         """
-        raw_dfs = [pd.read_csv(f"outputs/{r}_raw.csv") for r in runs]
+        raw_dfs = [pd.read_csv(f"outputs/{r}_raw.csv") for r in to_mix]
         raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
         raw_dfs = [df[['pocket_id', 'smiles', 'is_active', 'raw_score']] for df in raw_dfs]
         if grouped:
@@ -106,19 +106,26 @@ def compute_mix_csvs():
         big_df_raw = big_df_raw.merge(raw_dfs[0], on=['pocket_id', 'smiles', 'is_active'], how='inner')
         big_df_raw = big_df_raw[['pocket_id', 'smiles', 'is_active', 'rdock', 'dock', 'native']]
 
-        _, _, raw_df_docknat = mix_two_scores(big_df_raw, score1='dock', score2='native', outname_col='docknat')
+        _, _, raw_df_docknat = mix_two_scores(big_df_raw, score1='dock', score2='native', outname_col='docknat',
+                                              add_decoy=True)
         big_df_raw = big_df_raw.merge(raw_df_docknat, on=['pocket_id', 'smiles', 'is_active'], how='outer')
 
-        _, _, raw_df_rdocknat = mix_two_scores(big_df_raw, score1='rdock', score2='native', outname_col='rdocknat')
+        _, _, raw_df_rdocknat = mix_two_scores(big_df_raw, score1='rdock', score2='native', outname_col='rdocknat',
+                                               add_decoy=False)
         big_df_raw = big_df_raw.merge(raw_df_rdocknat, on=['pocket_id', 'smiles', 'is_active'], how='outer')
 
-        _, _, raw_df_combined = mix_two_scores(big_df_raw, score1='docknat', score2='rdock', outname_col='combined')
+        _, _, raw_df_combined = mix_two_scores(big_df_raw, score1='docknat', score2='rdock', outname_col='combined',
+                                               add_decoy=False)
         big_df_raw = big_df_raw.merge(raw_df_combined, on=['pocket_id', 'smiles', 'is_active'], how='outer')
+
+        _, _, raw_df_rdockdock = mix_two_scores(big_df_raw, score1='dock', score2='rdock', outname_col='rdockdock',
+                                                add_decoy=False)
+        big_df_raw = big_df_raw.merge(raw_df_rdockdock, on=['pocket_id', 'smiles', 'is_active'], how='outer')
         return big_df_raw
 
     for seed in SEEDS:
         out_path_raw = f'outputs/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
-        big_df_raw = merge_csvs(runs=RUNS, grouped=GROUPED, decoy=DECOY)
+        big_df_raw = merge_csvs(to_mix=TO_MIX, grouped=GROUPED, decoy=DECOY)
         big_df_raw.to_csv(out_path_raw)
 
 
@@ -191,20 +198,21 @@ if __name__ == "__main__":
     DECOY = 'pdb_chembl'
     # DECOY = 'chembl'
     GROUPED = True
-    SEEDS = [0]
+    SEEDS = [42]
     # SEEDS = [0, 1, 42]
 
     MODELS = {
-        "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
+        "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
     }
     RUNS = list(MODELS.keys())
     # GET INFERENCE CSVS FOR SEVERAL MODELS
-    recompute = True
+    recompute = False
     get_all_csvs(recompute=recompute, decoys=DECOY)
 
     # PARSE INFERENCE CSVS AND MIX THEM
-    # compute_mix_csvs()
+    TO_MIX = ['rdock'] + RUNS
+    compute_mix_csvs()
 
     # To compare to ensembling the same method with different seeds
     # compute_all_self_mix()

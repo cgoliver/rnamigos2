@@ -12,7 +12,9 @@ a = chembl_ligs.intersection(pdb_ligs)
 
 # THEN SPLIT PERF
 # out_df = "outputs/pockets/native_pre_rnafm_raw.csv"
-out_df = "outputs/pockets/dock_rnafm_raw.csv"
+# out_df = "outputs/pockets/dock_rnafm_raw.csv"
+out_df = "outputs/pockets/rdock_raw.csv"
+out_df = "outputs/native_rnafm_onpdb_raw.csv"
 out_df = pd.read_csv(out_df)
 out_df = out_df.loc[out_df['decoys'] == 'pdb_chembl']
 pdb_scores = out_df.loc[out_df['smiles'].isin(pdb_ligs)]['raw_score'].values
