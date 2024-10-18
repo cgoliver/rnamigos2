@@ -11,7 +11,7 @@ lig_encoder:
   num_layers: 3
 
 graphlig_encoder:
-  use_pretrained: False
+  use_pretrained: True
   features_dim: 22
   gcn_hdim: 32
   gcn_layers: 3
@@ -19,17 +19,17 @@ graphlig_encoder:
 #  cat_mu_v: False
 
 decoder:
-  in_dim: 64
+  in_dim: 120
   out_dim: 1 
   hidden_dim: 32
   num_layers: 3
   activation: sigmoid 
-  dropout: 0.3
+  dropout: 0.2
 
 pool: 'att'
 dropout: 0.2
 batch_norm: True
-use_pretrained: False
-pretrained_path: pretrained/R_1_16/model.pth
-use_graphligs: False
-use_rnafm: False
+use_pretrained: True
+pretrained_path: pretrained/hungarian_64_rnafm/model.pth
+use_graphligs: True
+use_rnafm: True

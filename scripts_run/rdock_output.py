@@ -20,7 +20,6 @@ from rnamigos.utils.virtual_screen import mean_active_rank
 from rnamigos.learning.dataset import get_systems
 
 
-
 class VirtualScreenDatasetDocking:
     def __init__(self,
                  systems,

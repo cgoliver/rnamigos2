@@ -39,8 +39,10 @@ name_runs = {
     # r"\texttt{dock2}": "dock_split_grouped2.csv",
     r"rDock": "rdock.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
-    r"MIXED": "docknat_grouped_42.csv",
-    r"MIXED+rDock": "docknat_rdock_grouped_42.csv",
+    r"MIXED": "docknat_42.csv",
+    r"MIXED+rDock": "rdocknat_42.csv",
+    # r"MIXED": ".csv",
+    # r"MIXED+rDock": "docknat_rdock_grouped_42.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
     # r"\texttt{mixed}": "mixed_grouped_42.csv",
     # r"\texttt{mixed\newline+ rDock}": "mixed_rdock_grouped_42.csv",
@@ -72,8 +74,8 @@ names = list(name_runs.keys())
 runs = list(name_runs.values())
 
 # decoy_mode = 'pdb'
-decoy_mode = 'chembl'
-# decoy_mode = 'pdb_chembl'
+# decoy_mode = 'chembl'
+decoy_mode = 'pdb_chembl'
 
 grouped = True
 
@@ -113,6 +115,7 @@ rdock_big = big_df[big_df['name'] == 'rDock']['score'].values
 # res = stats.ttest_ind(mixed_big, rdock_big)
 res = stats.ttest_rel(mixed_big, rdock_big)
 res_wil = stats.wilcoxon(mixed_big, rdock_big)
+print(res, res_wil)
 
 means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 # For a detailed score per pocket
@@ -133,13 +136,13 @@ print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_fo
 # sys.exit()
 
 
-plt.gca().set_yscale('custom')
-yticks = np.arange(0.6, 1)
-lower = 0.6
+# plt.gca().set_yscale('custom')
+# yticks = np.arange(0.6, 1)
+lower = 0.5
 yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
 # lower = 0.
 # yticks = [0.4, 0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
-plt.gca().set_yticks(yticks)
+# plt.gca().set_yticks(yticks)
 
 # ADD WHISKERS
 sns.boxplot(x="name",

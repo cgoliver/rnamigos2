@@ -14,43 +14,19 @@ if __name__ == "__main__":
 from rnamigos.learning.dataset import InferenceDataset
 from rnamigos.utils.graph_utils import get_dgl_graph
 from rnamigos.learning.models import get_model_from_dirpath
+from rnamigos.utils.mixing_utils import add_mixed_score
 
 
-def inference(
-    dgl_graph,
-    smiles_list,
-    out_path="rnamigos_out.csv",
-    mixing_coeffs=(0.5, 0.0, 0.5),
-    model=None,
-    models_path=None,
-    dump_all=False,
-    ligand_cache=None,
-    use_ligand_cache=False,
-    do_mixing=True,
+def inference_raw(
+        dgl_graph,
+        smiles_list,
+        models,
+        ligand_cache=None,
+        use_ligand_cache=False,
 ):
     """
     Run inference from python objects
     """
-    # Load models
-    script_dir = os.path.dirname(__file__)
-    if models_path is None:
-        models_path = {
-            "dock": os.path.join(script_dir, "../results/trained_models/dock/dock_42"),
-            "native_fp": os.path.join(
-                script_dir, "../results/trained_models/native_fp/fp_42"
-            ),
-            "is_native": os.path.join(
-                script_dir, "../results/trained_models/is_native/native_42"
-            ),
-        }
-    if model is None:
-        models = {
-            model_name: get_model_from_dirpath(model_path)
-            for model_name, model_path in models_path.items()
-        }
-    else:
-        models = {"model": model}
-
     # Get ready to loop through ligands
     dataset = InferenceDataset(
         smiles_list,
@@ -70,7 +46,7 @@ def inference(
     t0 = time.time()
     for i, (ligands_graph, ligands_vector) in enumerate(dataloader):
         for model_name, model in models.items():
-            if model_name == "native_fp":
+            if model.target == "native_fp":
                 scores = model.predict_ligands(dgl_graph, ligands_vector)
             else:
                 scores = model.predict_ligands(dgl_graph, ligands_graph)
@@ -79,73 +55,73 @@ def inference(
         if not i % 10 and i > 0:
             print(f"Done {i * batch_size}/{len(dataset)} in {time.time() - t0}")
 
+    results = {model_name: np.asarray(all_scores) for model_name, all_scores in results.items()}
+
     # Post-process raw scores to get a consistent 'higher is better' numpy array score
     for model_name, all_scores in results.items():
-        all_scores = np.asarray(all_scores)
-        # Flip raw scores as lower is better for those models
-        if model_name in {"dock", "native_fp"}:
-            all_scores = -all_scores
+        # Flip raw scores as for those models, lower is better
+        if models[model_name].target in {"dock", "native_fp"}:
+            all_scores = -1 * all_scores
+        # print(f"{model_name} {models[model_name].target} {all_scores[:10]}")
         results[model_name] = all_scores
+    results = pd.DataFrame(results)
+    results["smiles"] = smiles_list
+    return results
 
-    if do_mixing:
-        # Normalize each methods outputs and mix methods together : best mix = 0.44, 0.39, 0.17
-        def normalize(scores):
-            out_scores = (scores - scores.min()) / (scores.max() - scores.min())
-            return out_scores
 
-        normalized_results = {
-            model_name: normalize(result) for model_name, result in results.items()
+def get_models(models_path=None, model=None):
+    # Load models
+    script_dir = os.path.dirname(__file__)
+    if model is not None:
+        return {"score": model}
+
+    if models_path is None:
+        models_path = {
+            "is_native": "results/trained_models/is_native/native_pretrain_new_pdbchembl_rnafm",
+            "dock": "results/trained_models/dock/dock_new_pdbchembl_rnafm",
         }
-        mixed_scores = (
-            mixing_coeffs[0] * normalized_results["dock"]
-            + mixing_coeffs[1] * normalized_results["native_fp"]
-            + mixing_coeffs[2] * normalized_results["is_native"]
-        )
-
-        rows = []
-        if not dump_all:
-            for smiles, score in zip(smiles_list, mixed_scores):
-                rows.append({"smiles": smiles, "score": score})
-        else:
-            for smiles, dock_score, native_score, fp_score, mixed_score in zip(
-                smiles_list,
-                results["dock"],
-                results["is_native"],
-                results["native_fp"],
-                mixed_scores,
-            ):
-                rows.append(
-                    {
-                        "smiles": smiles,
-                        "dock_score": dock_score,
-                        "native_score": native_score,
-                        "fp_score": fp_score,
-                        "mixed_score": mixed_score,
-                    }
-                )
-        result_df = pd.DataFrame(rows)
-    else:
-        result_df = results
-    if out_path is not None:
-        result_df.to_csv(out_path)
-    return result_df
+        models_path = {model_name: os.path.join(script_dir, "..", model_path)
+                       for model_name, model_path in models_path.items()}
+    models = {model_name: get_model_from_dirpath(model_path)
+                  for model_name, model_path in models_path.items()}
+    return models
 
 
-def do_inference(cif_path, residue_list, ligands_path, out_path, dump_all=False):
+def do_inference(cif_path,
+                 residue_list,
+                 ligands_path,
+                 out_path,
+                 model=None,
+                 models_path=None,
+                 ligand_cache=None,
+                 use_ligand_cache=False,
+                 do_mixing=True,
+                 dump_all=False):
     """
     Run inference from files
     """
-    # Get dgl graph with node expansion BFS
+    # Get dgl graph with node expansion BFS, load smiles and models
     dgl_graph = get_dgl_graph(cif_path, residue_list)
     print("Successfully built the graph")
     smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
-    print("Successfully parsed ligands, ready for inference")
-    inference(
+    models = get_models(models_path=models_path, model=model)
+
+    # Get raw results df
+    results_df = inference_raw(
         dgl_graph=dgl_graph,
         smiles_list=smiles_list,
-        out_path=out_path,
-        dump_all=dump_all,
-    )
+        models=models,
+        ligand_cache=ligand_cache,
+        use_ligand_cache=use_ligand_cache)
+
+    if do_mixing:
+        names = list(models.keys())
+        results_df = add_mixed_score(df=results_df, score1=names[0], score2=names[1])
+        if not dump_all:
+            results_df = results_df[['smiles', 'mixed']]
+    if out_path is not None:
+        results_df.to_csv(out_path)
+    return results_df
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="inference")

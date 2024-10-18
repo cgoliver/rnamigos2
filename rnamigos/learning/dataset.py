@@ -17,11 +17,11 @@ RDLogger.DisableLog("rdApp.*")  # disable warnings
 
 
 def rnamigos_1_split(
-    systems,
-    rnamigos1_test_split=0,
-    return_test=False,
-    use_rnamigos1_train=False,
-    use_rnamigos1_ligands=False,
+        systems,
+        rnamigos1_test_split=0,
+        return_test=False,
+        use_rnamigos1_train=False,
+        use_rnamigos1_ligands=False,
 ):
     """
 
@@ -64,13 +64,14 @@ def rnamigos_1_split(
 
 
 def get_systems(
-    target="dock",
-    rnamigos1_split=-1,
-    return_test=False,
-    use_rnamigos1_train=False,
-    use_rnamigos1_ligands=False,
-    filter_robin=False,
-    group_pockets=False,
+        target="dock",
+        rnamigos1_split=-1,
+        return_test=False,
+        use_rnamigos1_train=False,
+        use_rnamigos1_ligands=False,
+        filter_robin=False,
+        native_filter_pdb=False,
+        group_pockets=False,
 ):
     """
     :param target: The systems to load
@@ -86,6 +87,8 @@ def get_systems(
     """
     # Can't split twice
     assert rnamigos1_split in {-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+
+    # Get the right csv file and load it as a df
     script_dir = os.path.dirname(__file__)
     if target == "dock":
         interactions_csv = os.path.join(script_dir, "../../data/csvs/docking_data.csv")
@@ -94,16 +97,20 @@ def get_systems(
     elif target == "is_native":
         interactions_csv = os.path.join(script_dir, "../../data/csvs/binary_data.csv")
     else:
-        raise ValueError(
-            "train.target should be in {dock, native_fp, is_native}, received : "
-            + target
-        )
+        raise ValueError(f"train.target should be in {{dock, native_fp, is_native}}, received : {target}")
     systems = pd.read_csv(interactions_csv, index_col=0)
+
+    # Potentially only train on PDB compounds for is_native
+    if target == "is_native" and native_filter_pdb:
+        systems = systems.loc[systems['LIGAND_SOURCE'] == 'PDB']
+
+    # Latest systems querying, based on RMscores redundancy
     if rnamigos1_split == -2:
         splits_file = os.path.join(script_dir, "../../data/train_test_75.p")
         train_names, test_names, train_names_grouped, test_names_grouped = pickle.load(
             open(splits_file, "rb")
         )
+        # If group_pockets, we only use centroid pockets and not all copies
         if group_pockets:
             train_names = list(train_names_grouped.keys())
             test_names = list(test_names_grouped.keys())
@@ -111,6 +118,8 @@ def get_systems(
             systems = systems[systems["PDB_ID_POCKET"].isin(test_names)]
         else:
             systems = systems[systems["PDB_ID_POCKET"].isin(train_names)]
+
+    # This is the split originally propsed by juan, solely based on PDB names
     elif rnamigos1_split == -1:
         split = "TEST" if return_test else "TRAIN"
         # systems_train = systems.loc[systems['SPLIT'] == 'TRAIN']
@@ -136,6 +145,7 @@ def get_systems(
                 to_avoid = {s for s in unique_train if s.startswith(robin_pdb_id)}
                 shortlist_to_avoid = shortlist_to_avoid.union(to_avoid)
             systems = systems[~systems["PDB_ID_POCKET"].isin(shortlist_to_avoid)]
+    # This follows the old RNAmigos1 split
     else:
         systems = rnamigos_1_split(
             systems,
@@ -156,6 +166,7 @@ def get_systems_from_cfg(cfg, return_test=False):
         use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
         group_pockets=group_pockets,
         filter_robin=cfg.train.filter_robin,
+        native_filter_pdb=cfg.train.native_filter_pdb,
         return_test=return_test,
     )
     return systems
@@ -173,23 +184,23 @@ def stretch_values(value):
 class DockingDataset(Dataset):
 
     def __init__(
-        self,
-        pockets_path,
-        systems,
-        target="dock",
-        use_normalized_score=False,
-        stretch_scores=False,
-        fp_type="MACCS",
-        use_graphligs=False,
-        shuffle=False,
-        seed=0,
-        debug=False,
-        cache_graphs=True,
-        undirected=False,
-        use_rings=False,
-        use_rnafm=False,
-        ligand_cache="../../data/ligands/lig_graphs.p",
-        use_ligand_cache=True,
+            self,
+            pockets_path,
+            systems,
+            target="dock",
+            use_normalized_score=False,
+            stretch_scores=False,
+            fp_type="MACCS",
+            use_graphligs=False,
+            shuffle=False,
+            seed=0,
+            debug=False,
+            cache_graphs=True,
+            undirected=False,
+            use_rings=False,
+            use_rnafm=False,
+            ligand_cache="data/ligands/lig_graphs.p",
+            use_ligand_cache=True,
     ):
         """
         Setup for data loader.
@@ -278,7 +289,6 @@ class DockingDataset(Dataset):
             target = ligand_fp
         elif self.target == "dock":
             if not self.use_normalized_score:
-                # !!! replace back to INTER
                 target = row["INTER"] / 40
             else:
                 target = row["normalized_values"]
@@ -298,15 +308,15 @@ class DockingDataset(Dataset):
 
 class VirtualScreenDataset(DockingDataset):
     def __init__(
-        self,
-        pockets_path,
-        ligands_path,
-        systems,
-        decoy_mode="pdb",
-        rognan=False,
-        reps_only=False,
-        group_ligands=True,
-        **kwargs,
+            self,
+            pockets_path,
+            ligands_path,
+            systems,
+            decoy_mode="pdb",
+            rognan=False,
+            reps_only=False,
+            group_ligands=True,
+            **kwargs,
     ):
         super().__init__(pockets_path, systems=systems, shuffle=False, **kwargs)
         self.ligands_path = ligands_path
@@ -426,7 +436,7 @@ class VirtualScreenDataset(DockingDataset):
 
 class InferenceDataset(Dataset):
     def __init__(
-        self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True
+            self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True
     ):
         self.smiles_list = smiles_list
         self.ligand_graph_encoder = (
@@ -460,20 +470,14 @@ def train_val_split(train_val_systems, frac=0.8, system_based=True):
     :return:
     """
     if system_based:
-        train_names = train_val_systems["PDB_ID_POCKET"].unique()
-        train_names = np.random.choice(
-            train_names, size=int(frac * len(train_names)), replace=False
-        )
-        train_systems = train_val_systems[
-            train_val_systems["PDB_ID_POCKET"].isin(train_names)
-        ]
-        validation_systems = train_val_systems[
-            ~train_val_systems["PDB_ID_POCKET"].isin(train_names)
-        ]
+        script_dir = os.path.dirname(__file__)
+        splits_file = os.path.join(script_dir, "../../data/train_val_75.p")
+        train_names, val_names, _, _ = pickle.load(open(splits_file, "rb"))
+        train_systems = train_val_systems[train_val_systems["PDB_ID_POCKET"].isin(train_names)]
+        validation_systems = train_val_systems[~train_val_systems["PDB_ID_POCKET"].isin(train_names)]
     else:
-        train_systems, validation_systems = np.split(
-            train_val_systems.sample(frac=1), [int(frac * len(train_val_systems))]
-        )
+        train_systems, validation_systems = np.split(train_val_systems.sample(frac=1),
+                                                     [int(frac * len(train_val_systems))])
     return train_systems, validation_systems
 
 
@@ -499,7 +503,7 @@ def get_dataset(cfg, systems, training=True):
 
 
 if __name__ == "__main__":
-    pockets_path = "../../data/json_pockets_load"
+    pockets_path = "data/json_pockets_load"
     test_systems = get_systems(target="dock", return_test=True)
     dataset = DockingDataset(
         pockets_path=pockets_path,
