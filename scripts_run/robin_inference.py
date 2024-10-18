@@ -90,7 +90,7 @@ def one_robin(ligand_name, pocket_id, models=None, use_rna_fm=False):
     )
     raw_df["pocket_id"] = pocket_id
     ef_rows = []
-    for frac in (0.01, 0.02, 0.05):
+    for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
         ef = enrichment_factor(
             raw_df["score"],
             raw_df["is_active"],
@@ -100,16 +100,21 @@ def one_robin(ligand_name, pocket_id, models=None, use_rna_fm=False):
     return pd.DataFrame(ef_rows), pd.DataFrame(raw_df)
 
 
-def get_all_preds(model, use_rna_fm, swap=0):
+def get_swapped_pocketlig(swap=0):
     robin_ligs = list(ROBIN_POCKETS.keys())
     robin_pockets = list(ROBIN_POCKETS.values())
 
     # Associate the ligands with the wrong pockets.
-    robin_lig_pocket_dict = {
-        lig: robin_pockets[(i + swap) % len(robin_ligs)]
-        for i, lig in enumerate(robin_ligs)
-    }
+    robin_lig_pocket_dict = {lig: robin_pockets[(i + swap) % len(robin_ligs)]
+                             for i, lig in enumerate(robin_ligs)}
+    old_to_new = {robin_pockets[i]: robin_pockets[(i + swap) % len(robin_ligs)]
+                  for i in range(len(robin_ligs))}
+    new_to_old = {v: k for k, v in old_to_new.items()}
+    return robin_lig_pocket_dict, new_to_old
 
+
+def get_all_preds(model, use_rna_fm, swap=0):
+    robin_lig_pocket_dict, new_to_old = get_swapped_pocketlig(swap=swap)
     robin_dfs = [
         df
         for df in Parallel(n_jobs=4)(
@@ -122,11 +127,6 @@ def get_all_preds(model, use_rna_fm, swap=0):
     robin_raw_df = pd.concat(robin_raw_dfs)
 
     # The naming is based on the pocket. So to keep ligands swap consistent, we need to change that
-    old_to_new = {
-        robin_pockets[i]: robin_pockets[(i + swap) % len(robin_ligs)]
-        for i in range(len(robin_ligs))
-    }
-    new_to_old = {v: k for k, v in old_to_new.items()}
     robin_ef_df["pocket_id"] = robin_ef_df["pocket_id"].map(new_to_old)
     robin_raw_df["pocket_id"] = robin_raw_df["pocket_id"].map(new_to_old)
     return robin_ef_df, robin_raw_df
@@ -177,9 +177,9 @@ def get_dfs_docking(swap=0):
     # For each pocket, get relevant mapping smiles : normalized score,
     # then use it to create the appropriate raw, and clean csvs
     all_raws, all_dfs = [], []
-    for ligand_name, pocket_id in ROBIN_POCKETS.items():
+    robin_lig_pocket_dict, new_to_old = get_swapped_pocketlig(swap=swap)
+    for ligand_name, pocket_id in robin_lig_pocket_dict.items():
         docking_df_lig = docking_df[docking_df["TARGET"] == ligand_name]
-        ref_raw_df_lig = ref_raw_df[ref_raw_df["pocket_id"] == pocket_id].copy()
         scores = -pd.to_numeric(
             docking_df_lig["INTER"], errors="coerce"
         ).values.squeeze()
@@ -190,12 +190,13 @@ def get_dfs_docking(swap=0):
         for smiles, score in zip(docking_df_lig[["SMILE"]].values, normalized_scores):
             mapping[smiles[0]] = score
         mapping = defaultdict(int, mapping)
+        ref_raw_df_lig = ref_raw_df[ref_raw_df["pocket_id"] == pocket_id].copy()
         docking_scores = [mapping[smile] for smile in ref_raw_df_lig["smiles"].values]
         ref_raw_df_lig["score"] = docking_scores
 
         # Go from RAW to EF
         rows = []
-        for frac in (0.01, 0.02, 0.05):
+        for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
             ef = enrichment_factor(
                 ref_raw_df_lig["score"],
                 ref_raw_df_lig["is_active"],
@@ -234,7 +235,7 @@ def mix_all(recompute=False, swap=0):
             mixed_df_lig = mixed_df_lig.rename(columns={'mixed': 'score'})
             robin_raw_dfs.append(mixed_df_lig)
 
-            for frac in (0.01, 0.02, 0.05):
+            for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
                 ef = enrichment_factor(
                     mixed_df_lig["score"],
                     mixed_df_lig["is_active"],
@@ -248,11 +249,13 @@ def mix_all(recompute=False, swap=0):
         robin_raw_dfs.to_csv(outpath_raw, index=False)
 
 
-def get_merged_df(out_csv="outputs/robin/big_df_raw.csv", recompute=False):
+def get_merged_df(swap=0, recompute=False):
     """
-    Aggregate rdock, native and dock results for a given decoy + add mixing strategies
+    Aggregate several scores in one big_df (like for pockets)
+    This is useful for plotting scripts, such as time_ef.py
     """
-
+    res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
+    out_csv = os.path.join(res_dir, "big_df_raw.csv")
     if not recompute and os.path.exists(out_csv):
         return
     to_mix = [
@@ -268,7 +271,7 @@ def get_merged_df(out_csv="outputs/robin/big_df_raw.csv", recompute=False):
     ]
     big_df = None
     for name in to_mix:
-        df = pd.read_csv(f"outputs/robin/{name}_raw.csv")
+        df = pd.read_csv(os.path.join(res_dir, f"{name}_raw.csv"))
         df = df[['pocket_id', 'smiles', 'is_active', 'score']]
         df = df.rename(columns={"score": name})
         if big_df is None:
@@ -278,21 +281,30 @@ def get_merged_df(out_csv="outputs/robin/big_df_raw.csv", recompute=False):
     big_df.to_csv(out_csv)
 
 
-def print_results(in_csv="outputs/robin/big_df_raw.csv"):
+def print_results(swap=0):
+    res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
     to_print = [
         # "dock",
         # "native",
         # "vanilla",
         "rdock",
         "dock_rnafm",
+        "native_pre_rnafm",
         "native_validation",
+        "native_validation_dout",
+        "rnamigos",
         "updated_rnamigos",
+        "rnamigos_dout",
         "updated_rdocknat",
+        "rdocknat_dout",
         "updated_combined",
+        "combined_dout",
+        "dock_rdock",
     ]
-    df = pd.read_csv(in_csv)
     for method in to_print:
-        mar = get_mar_one(df, method)
+        in_csv = os.path.join(res_dir, f"{method}_raw.csv")
+        df = pd.read_csv(in_csv)
+        mar = get_mar_one(df, "score")
         print(method, mar)
 
 
@@ -301,8 +313,9 @@ if __name__ == "__main__":
         # "native": "is_native/native_nopre_new_pdbchembl",
         # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
         # "native_pre": "is_native/native_pretrain_new_pdbchembl",
-        # "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
+        "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
         "native_validation": "is_native/native_rnafm_dout3_4",
+        "native_validation_dout": "is_native/native_rnafm_dout5_4",
         # "is_native_old": "is_native/native_42",
         # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
         # "dock": "dock/dock_new_pdbchembl",
@@ -317,12 +330,18 @@ if __name__ == "__main__":
         # ("native_pre", "dock"): "pre",
         # ("native_pre_rnafm_tune", "dock_rnafm"): "pre_fm",
         # ("native_pre_rnafm", "dock_rnafm"): "native_pre_dock_fm",
+        ("rdock", "dock_rnafm"): "dock_rdock",
+        ("native_pre_rnafm", "dock_rnafm"): "rnamigos",
         ("native_validation", "dock_rnafm"): "updated_rnamigos",
+        ("native_validation_dout", "dock_rnafm"): "rnamigos_dout",
         # Which one is migos++ ?
         ("updated_rnamigos", "rdock"): "updated_combined",
         ("native_validation", "rdock"): "updated_rdocknat",
+        ("rnamigos_dout", "rdock"): "combined_dout",
+        ("native_validation_dout", "rdock"): "rdocknat_dout",
     }
 
+    SWAP = 0
     # TEST ONE INFERENCE
     # pocket_id = "TPP"
     # lig_name = "2GDI_Y_TPP_100"
@@ -333,11 +352,11 @@ if __name__ == "__main__":
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
     # GET ALL CSVs for the models and plot them
-    get_all_csvs(recompute=False)
-    get_dfs_docking()
-    mix_all(recompute=True)
-    get_merged_df(recompute=True)
-    print_results()
+    get_all_csvs(recompute=False, swap=SWAP)
+    get_dfs_docking(swap=SWAP)
+    mix_all(recompute=True, swap=SWAP)
+    get_merged_df(recompute=True, swap=SWAP)
+    print_results(swap=SWAP)
 
     # COMPUTE PERTURBED VERSIONS
     # for swap in range(1, 4):

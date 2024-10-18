@@ -25,12 +25,19 @@ def plot_all():
         # "dock",
         # "native",
         # "vanilla",
-        "rdock",
-        "dock_rnafm",
+        # "rdock",
+        # "dock_rnafm",
+        "native_pre_rnafm",
         "native_validation",
-        "updated_rnamigos",
-        "updated_rdocknat",
-        "updated_combined",
+        "native_validation_dout",
+        # "rnamigos",
+        # "updated_rnamigos",
+        # "rnamigos_dout",
+        # "updated_rdocknat",
+        # "rdocknat_dout",
+        # "updated_combined",
+        # "combined_dout",
+        # "dock_rdock",
     ]
     for model in models:
         out_csv = os.path.join(RES_DIR, f"{model}.csv")
@@ -158,7 +165,7 @@ if __name__ == "__main__":
         # ("native_dock_pre_fm", "rdock"): "rnamigos++",
     }
 
-    # plot_all()
+    plot_all()
     # PLOT PERTURBED VERSIONS
     # plot_perturbed(model="rnamigos++", group=True)
 
@@ -167,4 +174,4 @@ if __name__ == "__main__":
     # score_to_use = 'native_validation'
     # score_to_use = 'updated_rnamigos'
     score_to_use = 'updated_combined'
-    plot_distributions(score_to_use=score_to_use)
+    # plot_distributions(score_to_use=score_to_use)
