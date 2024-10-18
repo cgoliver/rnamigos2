@@ -172,7 +172,7 @@ def get_dfs_docking(swap=0):
     """
 
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    ref_raw_df = pd.read_csv("outputs/robin/dock_raw.csv")
+    ref_raw_df = pd.read_csv("outputs/robin/dock_rnafm_raw.csv")
     docking_df = pd.read_csv("data/robin_docking_consolidated_v2.csv")
     # For each pocket, get relevant mapping smiles : normalized score,
     # then use it to create the appropriate raw, and clean csvs
@@ -256,13 +256,13 @@ def get_merged_df(out_csv="outputs/robin/big_df_raw.csv", recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
     to_mix = [
-        "dock",
-        "native",
-        "vanilla",
+        # "dock",
+        # "native",
+        # "vanilla",
         "rdock",
-        "dock_rnafm_3",
+        "dock_rnafm",
         "native_validation",
-        "updated_docknat",
+        "updated_rnamigos",
         "updated_rdocknat",
         "updated_combined",
     ]
@@ -280,13 +280,13 @@ def get_merged_df(out_csv="outputs/robin/big_df_raw.csv", recompute=False):
 
 def print_results(in_csv="outputs/robin/big_df_raw.csv"):
     to_print = [
-        "dock",
-        "native",
-        "vanilla",
+        # "dock",
+        # "native",
+        # "vanilla",
         "rdock",
-        "dock_rnafm_3",
+        "dock_rnafm",
         "native_validation",
-        "updated_docknat",
+        "updated_rnamigos",
         "updated_rdocknat",
         "updated_combined",
     ]
@@ -302,13 +302,13 @@ if __name__ == "__main__":
         # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
         # "native_pre": "is_native/native_pretrain_new_pdbchembl",
         # "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
-        # "native_validation": "is_native/native_rnafm_dout3_4",
+        "native_validation": "is_native/native_rnafm_dout3_4",
         # "is_native_old": "is_native/native_42",
         # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
         # "dock": "dock/dock_new_pdbchembl",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
-        "dock_rnafm_2": "dock/dock_rnafm_2",
-        "dock_rnafm_3": "dock/dock_rnafm_3",
+        # "dock_rnafm_2": "dock/dock_rnafm_2",
+        # "dock_rnafm_3": "dock/dock_rnafm_3",
     }
 
     PAIRS = {
@@ -333,8 +333,7 @@ if __name__ == "__main__":
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
     # GET ALL CSVs for the models and plot them
-    recompute = False
-    get_all_csvs(recompute=recompute)
+    get_all_csvs(recompute=False)
     get_dfs_docking()
     mix_all(recompute=True)
     get_merged_df(recompute=True)

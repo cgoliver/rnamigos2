@@ -110,7 +110,7 @@ def build_ef_df_robin(out_csv='fig_script/time_ef_robin.csv', recompute=False):
                 ef_df_rows.append(res)
 
         # Presort
-        for sort_col in ['dock_rnafm_3', 'native_validation', 'updated_docknat']:
+        for sort_col in ['dock_rnafm_3', 'native_validation', 'updated_rnamigos']:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
                 ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
@@ -121,7 +121,7 @@ def build_ef_df_robin(out_csv='fig_script/time_ef_robin.csv', recompute=False):
                        'seed': 0}
                 ef_df_rows.append(res)
 
-        pocket_df = pocket_df.sort_values(by='updated_docknat', ascending=False)
+        pocket_df = pocket_df.sort_values(by='updated_rnamigos', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
             ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_rdocknat')
             res = {'sort_up_to': i,
@@ -131,7 +131,7 @@ def build_ef_df_robin(out_csv='fig_script/time_ef_robin.csv', recompute=False):
                    'seed': 0}
             ef_df_rows.append(res)
 
-        pocket_df = pocket_df.sort_values(by='updated_docknat', ascending=False)
+        pocket_df = pocket_df.sort_values(by='updated_rnamigos', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
             ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_combined')
             res = {'sort_up_to': i,
@@ -329,8 +329,8 @@ if __name__ == "__main__":
     df = pd.read_csv(out_csv_robin, index_col=0)
     # mixed_model = 'dock_rnafm_3'
     # mixed_model = 'native_validation'
-    # mixed_model = 'updated_docknat'
-    mixed_model = 'updated_rdocknat'
-    # mixed_model = 'updated_combined'
+    # mixed_model = 'updated_rnamigos'
+    # mixed_model = 'updated_rdocknat'
+    mixed_model = 'updated_combined'
     line_plot(df, mixed_model=mixed_model, robin=True)
     # vax_plot(df, mixed_model=mixed_model)
