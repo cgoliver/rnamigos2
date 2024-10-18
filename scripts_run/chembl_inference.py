@@ -14,7 +14,7 @@ from rnamigos.learning.dataset import get_systems_from_cfg
 from rnamigos.learning.dataloader import get_vs_loader
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.utils.mixing_utils import mix_two_scores, mix_two_dfs, get_mix_score
-from rnamigos.utils.virtual_screen import get_efs
+from rnamigos.utils.virtual_screen import get_efs, get_mar_one
 from scripts_fig.plot_utils import group_df
 
 
@@ -139,23 +139,6 @@ def compute_all_self_mix():
         for score in ['native', 'dock']:
             all_efs, _, _ = mix_two_dfs(big_df_raw_1, big_df_raw_2, score)
             print(score, np.mean(all_efs))
-
-
-def get_mar_one(df, score, outname=None):
-    pockets = df['pocket_id'].unique()
-    all_efs = []
-    rows = []
-    for pi, p in enumerate(pockets):
-        pocket_df = df.loc[df['pocket_id'] == p]
-        fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df[score], drop_intermediate=True)
-        enrich = metrics.auc(fpr, tpr)
-        all_efs.append(enrich)
-        rows.append({'pocket_id': p, "score": enrich, "decoys": DECOY, "metric": "MAR"})
-    if outname is not None:
-        df = pd.DataFrame(rows)
-        df.to_csv(outname)
-    pocket_ef = np.mean(all_efs)
-    return pocket_ef
 
 
 def get_one_mixing_table(df, seed=42):

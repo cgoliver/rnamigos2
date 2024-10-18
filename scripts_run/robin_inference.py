@@ -13,7 +13,7 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos.utils.virtual_screen import enrichment_factor
+from rnamigos.utils.virtual_screen import enrichment_factor, get_mar_one
 from rnamigos.utils.graph_utils import load_rna_graph
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.inference import inference_raw, get_models
@@ -211,9 +211,14 @@ def get_dfs_docking(swap=0):
     all_dfs.to_csv(f"{res_dir}/rdock.csv")
 
 
-def mix_all(swap=0):
+def mix_all(recompute=False, swap=0):
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
     for pair, outname in PAIRS.items():
+        outpath = os.path.join(res_dir, f"{outname}.csv")
+        outpath_raw = os.path.join(res_dir, f"{outname}_raw.csv")
+        if not recompute and os.path.exists(outpath) and os.path.exists(outpath_raw):
+            continue
+
         path1 = os.path.join(res_dir, f"{pair[0]}_raw.csv")
         path2 = os.path.join(res_dir, f"{pair[1]}_raw.csv")
         df1 = pd.read_csv(path1)
@@ -239,10 +244,56 @@ def mix_all(swap=0):
                 robin_efs.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
         robin_efs = pd.DataFrame(robin_efs)
         robin_raw_dfs = pd.concat(robin_raw_dfs)
-        outpath = os.path.join(res_dir, f"{outname}.csv")
-        outpath_raw = os.path.join(res_dir, f"{outname}_raw.csv")
         robin_efs.to_csv(outpath, index=False)
         robin_raw_dfs.to_csv(outpath_raw, index=False)
+
+
+def get_merged_df(out_csv="outputs/robin/big_df_raw.csv", recompute=False):
+    """
+    Aggregate rdock, native and dock results for a given decoy + add mixing strategies
+    """
+
+    if not recompute and os.path.exists(out_csv):
+        return
+    to_mix = [
+        "dock",
+        "native",
+        "vanilla",
+        "rdock",
+        "dock_rnafm_3",
+        "native_validation",
+        "updated_docknat",
+        "updated_rdocknat",
+        "updated_combined",
+    ]
+    big_df = None
+    for name in to_mix:
+        df = pd.read_csv(f"outputs/robin/{name}_raw.csv")
+        df = df[['pocket_id', 'smiles', 'is_active', 'score']]
+        df = df.rename(columns={"score": name})
+        if big_df is None:
+            big_df = df
+        else:
+            big_df = big_df.merge(df, on=['pocket_id', 'smiles', 'is_active'], how='inner')
+    big_df.to_csv(out_csv)
+
+
+def print_results(in_csv="outputs/robin/big_df_raw.csv"):
+    to_print = [
+        "dock",
+        "native",
+        "vanilla",
+        "rdock",
+        "dock_rnafm_3",
+        "native_validation",
+        "updated_docknat",
+        "updated_rdocknat",
+        "updated_combined",
+    ]
+    df = pd.read_csv(in_csv)
+    for method in to_print:
+        mar = get_mar_one(df, method)
+        print(method, mar)
 
 
 if __name__ == "__main__":
@@ -250,12 +301,14 @@ if __name__ == "__main__":
         # "native": "is_native/native_nopre_new_pdbchembl",
         # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
         # "native_pre": "is_native/native_pretrain_new_pdbchembl",
-        "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
+        # "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
+        # "native_validation": "is_native/native_rnafm_dout3_4",
         # "is_native_old": "is_native/native_42",
         # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
         # "dock": "dock/dock_new_pdbchembl",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
         "dock_rnafm_2": "dock/dock_rnafm_2",
+        "dock_rnafm_3": "dock/dock_rnafm_3",
     }
 
     PAIRS = {
@@ -263,8 +316,11 @@ if __name__ == "__main__":
         # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
         # ("native_pre", "dock"): "pre",
         # ("native_pre_rnafm_tune", "dock_rnafm"): "pre_fm",
-        # ("native_pre_rnafm", "dock_rnafm"): "native_dock_pre_fm",
-        # ("native_dock_pre_fm", "rdock"): "rnamigos++",
+        # ("native_pre_rnafm", "dock_rnafm"): "native_pre_dock_fm",
+        ("native_validation", "dock_rnafm"): "updated_rnamigos",
+        # Which one is migos++ ?
+        ("updated_rnamigos", "rdock"): "updated_combined",
+        ("native_validation", "rdock"): "updated_rdocknat",
     }
 
     # TEST ONE INFERENCE
@@ -280,7 +336,9 @@ if __name__ == "__main__":
     recompute = False
     get_all_csvs(recompute=recompute)
     get_dfs_docking()
-    mix_all()
+    mix_all(recompute=True)
+    get_merged_df(recompute=True)
+    print_results()
 
     # COMPUTE PERTURBED VERSIONS
     # for swap in range(1, 4):

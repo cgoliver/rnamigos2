@@ -134,3 +134,31 @@ def get_efs(model, dataloader, decoy_mode, cfg, verbose=False):
     if verbose:
         print(f"Mean EF for {decoy_mode} {cfg.name}:", np.mean(efs))
     return rows, raw_rows
+
+
+def get_mar_one(df, score, outname=None):
+    """
+    df_raw => MAR
+    :param df:
+    :param score:
+    :param outname:
+    :return:
+    """
+    pockets = df['pocket_id'].unique()
+    all_efs = []
+    rows = []
+
+    for pi, p in enumerate(pockets):
+        pocket_df = df.loc[df['pocket_id'] == p]
+        fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df[score], drop_intermediate=True)
+        enrich = metrics.auc(fpr, tpr)
+        all_efs.append(enrich)
+        res_dict = {'pocket_id': p, "score": enrich, "metric": "MAR"}
+        if 'DECOY' in globals():
+            res_dict["decoys"] = DECOY
+        rows.append(res_dict)
+    if outname is not None:
+        df = pd.DataFrame(rows)
+        df.to_csv(outname)
+    pocket_ef = np.mean(all_efs)
+    return pocket_ef

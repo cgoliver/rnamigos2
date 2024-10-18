@@ -18,6 +18,7 @@ def plot_all():
     big_df = []
     models = MODELS
     models = list(MODELS) + list(PAIRS.values()) + ["rdock"]
+    models = list(MODELS) + list(PAIRS.values())
     for model in models:
         out_csv = os.path.join(RES_DIR, f"{model}.csv")
         df = pd.read_csv(out_csv)
@@ -35,6 +36,7 @@ def plot_all():
         "rdock": "black",
     }
     custom_palette = sns.color_palette("Paired")
+    custom_palette = sns.color_palette()
 
     # custom_palette = sns.color_palette(palette=custom_palette)
     # sns.set_palette(custom_palette)
@@ -98,15 +100,18 @@ if __name__ == "__main__":
     SWAP = 0
     RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     MODELS = {
-        # "native": "is_native/native_nopre_new_pdbchembl",
-        # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
+        "native": "is_native/native_nopre_new_pdbchembl",
+        "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
         # "native_pre": "is_native/native_pretrain_new_pdbchembl",
-        # "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
         # "is_native_old": "is_native/native_42",
         # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
         # "dock": "dock/dock_new_pdbchembl",
-        "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
-        "dock_rnafm_2": "dock/dock_new_pdbchembl_rnafm",
+        # "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
+        # "dock_rnafm_2": "dock/dock_new_pdbchembl_rnafm",
+        # "dock_rnafm_3": "dock/dock_rnafm_3",
+        "native_pre_rnafm":'native_pre_rnafm',
+        "native_validation":'bla',
+        # "updated native":'bla',
     }
 
     PAIRS = {

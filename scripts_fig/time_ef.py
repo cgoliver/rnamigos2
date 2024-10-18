@@ -23,7 +23,9 @@ def partial_virtual_screen(df, sort_up_to=0, score_column='rdock'):
     return enrich
 
 
-def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
+def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True, recompute=False):
+    if not recompute and os.path.exists(out_csv):
+        return
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_42_raw.csv')
     big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
 
@@ -79,6 +81,71 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
     return df
 
 
+def build_ef_df_robin(out_csv='fig_script/time_ef_robin.csv', recompute=False):
+    if not recompute and os.path.exists(out_csv):
+        return
+    big_df_raw = pd.read_csv(f'outputs/robin/big_df_raw.csv')
+    big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
+
+    # Now iterate
+    pockets = big_df_raw['pocket_id'].unique()
+    ef_df_rows = []
+    nsteps = 20
+    nshuffles = 10
+    for pi, pocket in enumerate(pockets):
+        print(f'Doing pocket {pi + 1}/{len(pockets)}')
+        pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
+
+        # RDOCK alone
+        for n in range(nshuffles):
+            # Shuffle
+            pocket_df = pocket_df.sample(frac=1, random_state=n)
+            for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                res = {'sort_up_to': i,
+                       'pocket': pocket,
+                       'ef': ef,
+                       'model': 'rdock',
+                       'seed': n}
+                ef_df_rows.append(res)
+
+        # Presort
+        for sort_col in ['dock_rnafm_3', 'native_validation', 'updated_docknat']:
+            pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
+            for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                res = {'sort_up_to': i,
+                       'pocket': pocket,
+                       'ef': ef,
+                       'model': sort_col,
+                       'seed': 0}
+                ef_df_rows.append(res)
+
+        pocket_df = pocket_df.sort_values(by='updated_docknat', ascending=False)
+        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+            ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_rdocknat')
+            res = {'sort_up_to': i,
+                   'pocket': pocket,
+                   'ef': ef,
+                   'model': "updated_rdocknat",
+                   'seed': 0}
+            ef_df_rows.append(res)
+
+        pocket_df = pocket_df.sort_values(by='updated_docknat', ascending=False)
+        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+            ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_combined')
+            res = {'sort_up_to': i,
+                   'pocket': pocket,
+                   'ef': ef,
+                   'model': "updated_combined",
+                   'seed': 0}
+            ef_df_rows.append(res)
+
+    df = pd.DataFrame(ef_df_rows)
+    df.to_csv(out_csv)
+    return df
+
+
 def get_means_stds(df, model):
     model_df = df[df['model'] == model]
 
@@ -109,9 +176,9 @@ def plot_mean_std(ax, times, means, stds, label, color):
     ax.fill_between(times, means_low, means_high, alpha=0.2, color=color)
 
 
-def line_plot(df, mixed_model='combined'):
+def line_plot(df, mixed_model='combined', robin=False):
     # Get results
-    names = [r'\texttt{rDock}', r'\texttt{RNAmigos++}']
+    names = [r'\texttt{rDock}', f'{mixed_model}']
     palette = [PALETTE_DICT['rdock'], PALETTE_DICT['mixed+rdock']]
     model_res = []
     # assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
@@ -150,7 +217,8 @@ def line_plot(df, mixed_model='combined'):
     else:
         mixed_means = [0.924] * 20
         print('Unexpected model, dashed line is confused')
-    ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
+    if not robin:
+        ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
 
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
@@ -166,7 +234,8 @@ def line_plot(df, mixed_model='combined'):
     # This shows how fast we go from mixed to mixed+rdock performance
     # yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
     # plt.gca().set_yticks(yticks)
-    plt.ylim(0.4, 1)
+    if not robin:
+        plt.ylim(0.4, 1)
 
     plt.ylabel(r"AuROC")
     plt.xlabel(r"Time Limit (hours)")
@@ -238,17 +307,30 @@ def vax_plot(df, mixed_model='combined'):
 
 
 if __name__ == "__main__":
-    # Build the time df for making the figures, this can be commented then
+    # Build the time df for making the figures
     out_csv = 'scripts_fig/time_ef.csv'
     recompute = False
     # recompute = True
-    if recompute or not os.path.exists(out_csv):
-        build_ef_df(out_csv=out_csv)
+    build_ef_df(out_csv=out_csv, recompute=recompute)
 
+    out_csv_robin = 'scripts_fig/time_ef_robin.csv'
+    recompute = False
+    # recompute = True
+    build_ef_df_robin(out_csv=out_csv_robin, recompute=recompute)
+
+    # Then make plots
     df = pd.read_csv(out_csv, index_col=0)
     # mixed_model = 'rdocknat'
-    mixed_model = 'dock'
     mixed_model = 'docknat'
-    line_plot(df, mixed_model=mixed_model)
+    mixed_model = 'dock'
+    # line_plot(df, mixed_model=mixed_model)
     # vax_plot(df, mixed_model=mixed_model)
-    pass
+
+    df = pd.read_csv(out_csv_robin, index_col=0)
+    # mixed_model = 'dock_rnafm_3'
+    # mixed_model = 'native_validation'
+    # mixed_model = 'updated_docknat'
+    mixed_model = 'updated_rdocknat'
+    # mixed_model = 'updated_combined'
+    line_plot(df, mixed_model=mixed_model, robin=True)
+    # vax_plot(df, mixed_model=mixed_model)
