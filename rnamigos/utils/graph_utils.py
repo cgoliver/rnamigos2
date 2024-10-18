@@ -36,24 +36,31 @@ def add_rnafm(pocket_nx, rna_path, cache_path="data/pocket_embeddings"):
     embs = np.load(Path("data/pocket_embeddings") / Path(Path(rna_path).stem + ".npz"))
     # Now if some nodes are still missing and complement those with the mean embedding
     nx.set_node_attributes(pocket_nx, embs, "rnafm")
-    existing_nodes, existing_embs = list(zip(*nx.get_node_attributes(pocket_nx, "rnafm").items()))
+    existing_rnafm_embs_dict = nx.get_node_attributes(pocket_nx, "rnafm")
+    if len(existing_rnafm_embs_dict) > 0:
+        existing_nodes, existing_embs = list(zip(*existing_rnafm_embs_dict.items()))
+    else:
+        existing_nodes, existing_embs = [], []
     missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
     n = len(pocket_nx.nodes())
-    # If only a fraction is missing, just skip, otherwise recompute
+    # If only a fraction is missing, just skip and compute mean embedding
     if n * 0.15 > len(missing_nodes) > 0:
         if isinstance(existing_embs[0], np.ndarray):
             existing_embs = [torch.from_numpy(x) for x in existing_embs]
         mean_emb = torch.mean(torch.stack(existing_embs), dim=0)
         missing_embs = {node: mean_emb for node in missing_nodes}
         nx.set_node_attributes(pocket_nx, name="rnafm", values=missing_embs)
-    else:
+
+    # Otherwise load the whole graphs embeddings. This step is useful for pocket perturbation.
+    elif len(missing_nodes) >= n * 0.15:
         pdb_id = Path(rna_path).stem.split("_")[0]
         large_embs = np.load(f"data/pocket_chain_embeddings/{pdb_id}.npz")
         nx.set_node_attributes(pocket_nx, large_embs, "rnafm")
+
+        # Just triple check
         existing_nodes, existing_embs = list(zip(*nx.get_node_attributes(pocket_nx, "rnafm").items()))
         missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
         if len(missing_nodes) > 0:
-            a = 1
             raise Exception
 
     rnafm_embs = nx.get_node_attributes(pocket_nx, name="rnafm")
@@ -89,7 +96,7 @@ def load_rna_graph(rna_path,
     }
     nx.set_edge_attributes(pocket_graph, name="edge_type", values=one_hot)
 
-    # Needed for graph creation with fred, the key changed from nt_code to nt
+    # Needed for graph creation with fr3d, the key changed from nt_code to nt
     _, ndata = list(pocket_graph.nodes(data=True))[0]
     if "nt" in ndata.keys():
         nx.set_node_attributes(
@@ -106,21 +113,15 @@ def load_rna_graph(rna_path,
     nx.set_node_attributes(pocket_graph, name="nt_features", values=one_hot_nucs)
 
     # Add 1/0 flag to indicate which nodes are actually in the pocket (as opposed to ones used for expansion)
-    pocket_nodes = {
-        node: label
-        for node, label in (nx.get_node_attributes(pocket_graph, "in_pocket")).items()
-    }
+    pocket_nodes = {node: label for node, label in (nx.get_node_attributes(pocket_graph, "in_pocket")).items()}
     # By default, or if some nodes were missing, set them to True
-    pocket_nodes = {
-        node: True if node not in pocket_nodes else pocket_nodes[node]
-        for node in pocket_graph.nodes()
-    }
+    pocket_nodes = {node: True if node not in pocket_nodes else pocket_nodes[node] for node in pocket_graph.nodes()}
     nx.set_node_attributes(pocket_graph, name="in_pocket", values=pocket_nodes)
 
     # Optionally add rna_fm embs
     if use_rnafm:
         add_rnafm(pocket_graph, rna_path)
-    a = list(pocket_graph.nodes(data=True))
+    # a = list(pocket_graph.nodes(data=True))
     # b = pocket_graph_dgl.ndata['rnafm']
 
     pocket_graph_dgl = dgl.from_networkx(

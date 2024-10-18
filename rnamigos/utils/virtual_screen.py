@@ -51,7 +51,7 @@ def enrichment_factor(scores, is_active, lower_is_better=False, frac=0.01):
     return (n_actives_screened / n_screened) / (n_actives / len(scores))
 
 
-def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
+def run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=False):
     """run_virtual_screen.
 
     :param model: trained affinity prediction model
@@ -67,7 +67,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
     failed_set = set()
     failed = 0
     for i, (pocket_name, pocket_graph, ligands, is_active, smiles) in enumerate(
-        dataloader
+            dataloader
     ):
         if pocket_graph is None:
             failed_set.add(pocket_graph)
@@ -78,13 +78,13 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, **kwargs):
         if not i % 20:
             logger.info(f"Done {i}/{len(dataloader)}")
         if (isinstance(ligands, torch.Tensor) and len(ligands) < 10) or (
-            isinstance(ligands, DGLGraph) and ligands.batch_size < 10
+                isinstance(ligands, DGLGraph) and ligands.batch_size < 10
         ):
             logger.warning(f"Skipping pocket{i}, not enough decoys")
             continue
         scores = model.predict_ligands(pocket_graph, ligands)[:, 0].numpy()
         is_active = is_active.numpy()
-        efs.append(metric(scores, is_active, **kwargs))
+        efs.append(metric(scores, is_active, lower_is_better=lower_is_better))
         all_scores.append(list(scores))
         status.append(list(is_active))
         pocket_names.append(pocket_name)
@@ -99,7 +99,8 @@ def get_efs(model, dataloader, decoy_mode, cfg, verbose=False):
     rows, raw_rows = list(), list()
     lower_is_better = cfg.train.target in ["dock", "native_fp"]
     metric = enrichment_factor if decoy_mode == "robin" else mean_active_rank
-    print(f"DOING: {cfg.name}, LOWER IS BETTER: {lower_is_better}")
+    if verbose:
+        print(f"DOING: {cfg.name}, LOWER IS BETTER: {lower_is_better}")
     # metric = enrichment_factor
     efs, scores, status, pocket_names, all_smiles = run_virtual_screen(
         model,
@@ -108,7 +109,7 @@ def get_efs(model, dataloader, decoy_mode, cfg, verbose=False):
         lower_is_better=lower_is_better,
     )
     for pocket_id, score_list, status_list, smiles_list in zip(
-        pocket_names, scores, status, all_smiles
+            pocket_names, scores, status, all_smiles
     ):
         for score, status, smiles in zip(score_list, status_list, smiles_list):
             raw_rows.append(
@@ -133,3 +134,31 @@ def get_efs(model, dataloader, decoy_mode, cfg, verbose=False):
     if verbose:
         print(f"Mean EF for {decoy_mode} {cfg.name}:", np.mean(efs))
     return rows, raw_rows
+
+
+def get_mar_one(df, score, outname=None):
+    """
+    df_raw => MAR
+    :param df:
+    :param score:
+    :param outname:
+    :return:
+    """
+    pockets = df['pocket_id'].unique()
+    all_efs = []
+    rows = []
+
+    for pi, p in enumerate(pockets):
+        pocket_df = df.loc[df['pocket_id'] == p]
+        fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'], pocket_df[score], drop_intermediate=True)
+        enrich = metrics.auc(fpr, tpr)
+        all_efs.append(enrich)
+        res_dict = {'pocket_id': p, "score": enrich, "metric": "MAR"}
+        if 'DECOY' in globals():
+            res_dict["decoys"] = DECOY
+        rows.append(res_dict)
+    if outname is not None:
+        df = pd.DataFrame(rows)
+        df.to_csv(outname)
+    pocket_ef = np.mean(all_efs)
+    return pocket_ef

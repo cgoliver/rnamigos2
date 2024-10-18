@@ -10,32 +10,24 @@ import random
 from plot_utils import PALETTE_DICT, CustomScale, group_df
 
 
-def virtual_screen(df, sort_up_to=0, score_column='rdock'):
+def partial_virtual_screen(df, sort_up_to=0, score_column='rdock'):
     df = df.reset_index(drop=True)
     sort_up_to = int(sort_up_to)
-    df[:sort_up_to] = df[:sort_up_to].sort_values(score_column, ascending=False).values
-    fpr, tpr, thresholds = metrics.roc_curve(df['is_active'], 1 - np.linspace(0, 1, num=len(df)),
+    if sort_up_to > 0:
+        # Get the first values, sort them and reassign them back to the original DataFrame
+        df[:sort_up_to] = df[:sort_up_to].sort_values(score_column, ascending=False).values
+    fpr, tpr, thresholds = metrics.roc_curve(df['is_active'],
+                                             1 - np.linspace(0, 1, num=len(df)),
                                              drop_intermediate=True)
     enrich = metrics.auc(fpr, tpr)
     return enrich
 
 
-def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
+def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True, recompute=False):
+    if not recompute and os.path.exists(out_csv):
+        return
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_42_raw.csv')
     big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
-
-    # Combined and combined_docknat are not present in big_df_raw
-    combined_mixed = pd.read_csv(f'outputs/mixed_rdock{"_grouped" if grouped else ""}_42_raw.csv')
-    combined_mixed = combined_mixed[['pocket_id', 'smiles', 'is_active', 'combined']]
-    big_df_raw = big_df_raw.merge(combined_mixed, on=['pocket_id', 'smiles', 'is_active'], how='outer')
-
-    combined_docknat = pd.read_csv(f'outputs/docknat_rdock{"_grouped" if grouped else ""}_42_raw.csv')
-    combined_docknat = combined_docknat[['pocket_id', 'smiles', 'is_active', 'combined_docknat']]
-    big_df_raw = big_df_raw.merge(combined_docknat, on=['pocket_id', 'smiles', 'is_active'], how='outer')
-
-    combined_nat = pd.read_csv(f'outputs/nat_rdock{"_grouped" if grouped else ""}_42_raw.csv')
-    combined_nat = combined_nat[['pocket_id', 'smiles', 'is_active', 'combined_nat']]
-    big_df_raw = big_df_raw.merge(combined_nat, on=['pocket_id', 'smiles', 'is_active'], how='outer')
 
     # Now iterate
     pockets = big_df_raw['pocket_id'].unique()
@@ -47,14 +39,14 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
         #     continue
         if not pi % 20:
             print(f"Doing pocket {pi}/{len(pockets)}")
+        pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
 
         # RDOCK alone
-        pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
         for n in range(nshuffles):
             # Shuffle
             pocket_df = pocket_df.sample(frac=1, random_state=n)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                ef = virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
                 res = {'sort_up_to': i,
                        'pocket': pocket,
                        'ef': ef,
@@ -63,10 +55,10 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
                 ef_df_rows.append(res)
 
         # Presort
-        for sort_col in ['dock', 'fp', 'native', 'mixed', 'docknat']:
+        for sort_col in ['dock', 'native', 'docknat']:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                ef = virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
                 res = {'sort_up_to': i,
                        'pocket': pocket,
                        'ef': ef,
@@ -74,38 +66,81 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True):
                        'seed': 0}
                 ef_df_rows.append(res)
 
-        # mixed+combined
-        pocket_df = pocket_df.sort_values(by='mixed', ascending=False)
+        # docknat+rdocknat
+        pocket_df = pocket_df.sort_values(by='docknat', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            ef = virtual_screen(pocket_df, sort_up_to, score_column='combined')
+            s = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdocknat')
+            res = {'sort_up_to': i,
+                   'pocket': pocket,
+                   'ef': s,
+                   'model': "rdocknat",
+                   'seed': 0}
+            ef_df_rows.append(res)
+    df = pd.DataFrame(ef_df_rows)
+    df.to_csv(out_csv)
+    return df
+
+
+def build_ef_df_robin(out_csv='fig_script/time_ef_robin.csv', recompute=False):
+    if not recompute and os.path.exists(out_csv):
+        return
+    big_df_raw = pd.read_csv(f'outputs/robin/big_df_raw.csv')
+    big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
+
+    # Now iterate
+    pockets = big_df_raw['pocket_id'].unique()
+    ef_df_rows = []
+    nsteps = 20
+    nshuffles = 10
+    for pi, pocket in enumerate(pockets):
+        print(f'Doing pocket {pi + 1}/{len(pockets)}')
+        pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
+
+        # RDOCK alone
+        for n in range(nshuffles):
+            # Shuffle
+            pocket_df = pocket_df.sample(frac=1, random_state=n)
+            for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                res = {'sort_up_to': i,
+                       'pocket': pocket,
+                       'ef': ef,
+                       'model': 'rdock',
+                       'seed': n}
+                ef_df_rows.append(res)
+
+        # Presort
+        for sort_col in ['dock_rnafm_3', 'native_validation', 'updated_rnamigos']:
+            pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
+            for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                res = {'sort_up_to': i,
+                       'pocket': pocket,
+                       'ef': ef,
+                       'model': sort_col,
+                       'seed': 0}
+                ef_df_rows.append(res)
+
+        pocket_df = pocket_df.sort_values(by='updated_rnamigos', ascending=False)
+        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+            ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_rdocknat')
             res = {'sort_up_to': i,
                    'pocket': pocket,
                    'ef': ef,
-                   'model': "combined",
+                   'model': "updated_rdocknat",
                    'seed': 0}
             ef_df_rows.append(res)
 
-        # docknat+combined_docknat
-        pocket_df = pocket_df.sort_values(by='docknat', ascending=False)
+        pocket_df = pocket_df.sort_values(by='updated_rnamigos', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            s = virtual_screen(pocket_df, sort_up_to, score_column='combined_docknat')
+            ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_combined')
             res = {'sort_up_to': i,
                    'pocket': pocket,
-                   'ef': s,
-                   'model': "combined_docknat",
+                   'ef': ef,
+                   'model': "updated_combined",
                    'seed': 0}
             ef_df_rows.append(res)
 
-        # docknat+combined_nat
-        pocket_df = pocket_df.sort_values(by='docknat', ascending=False)
-        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            s = virtual_screen(pocket_df, sort_up_to, score_column='combined_nat')
-            res = {'sort_up_to': i,
-                   'pocket': pocket,
-                   'ef': s,
-                   'model': "combined_nat",
-                   'seed': 0}
-            ef_df_rows.append(res)
     df = pd.DataFrame(ef_df_rows)
     df.to_csv(out_csv)
     return df
@@ -125,8 +160,9 @@ def get_means_stds(df, model):
     #     all_stds.append(std)
 
     model_df_gb = model_df.groupby(['sort_up_to'], as_index=False)
-    model_df_means = model_df_gb.mean()[['ef']].values.squeeze()
-    model_df_stds = model_df_gb.std()[['ef']].values.squeeze()
+    model_df_gb = model_df.groupby(['sort_up_to'])
+    model_df_means = model_df_gb[['ef']].mean().values.squeeze()
+    model_df_stds = model_df_gb[['ef']].std().values.squeeze()
     n_pockets = len(model_df['pocket'].unique())
     model_df_stds = model_df_stds / np.sqrt(n_pockets)
     # model_df_stds = np.square(model_df_gb.std()[['ef']].values.squeeze())
@@ -140,12 +176,12 @@ def plot_mean_std(ax, times, means, stds, label, color):
     ax.fill_between(times, means_low, means_high, alpha=0.2, color=color)
 
 
-def line_plot(df, mixed_model='combined'):
+def line_plot(df, mixed_model='combined', robin=False):
     # Get results
-    names = [r'\texttt{rDock}', r'\texttt{RNAmigos++}']
+    names = [r'\texttt{rDock}', f'{mixed_model}']
     palette = [PALETTE_DICT['rdock'], PALETTE_DICT['mixed+rdock']]
     model_res = []
-    assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
+    # assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
     all_models = ['rdock', mixed_model]
 
     for model in all_models:
@@ -158,19 +194,31 @@ def line_plot(df, mixed_model='combined'):
     plt.rc('grid', color='grey', alpha=0.2)
     plt.grid(True)
     ax = plt.gca()
-    ax.set_yscale('custom')
+    # ax.set_yscale('custom')
 
     times = np.linspace(0, 8.3, 20)
+    # # Add sole mixed performance
+    # CHEMBL results
+    # if mixed_model == 'combined':
+    #     mixed_means = [0.9898] * 20
+    # elif mixed_model == 'combined_docknat':
+    #     mixed_means = [0.9848] * 20
+    # elif mixed_model == 'combined_nat':
+    #     mixed_means = [0.9848] * 20
+    # else:
+    #     raise ValueError
+
+    # PDB CHEMBL results
     # Add sole mixed performance
     if mixed_model == 'combined':
-        mixed_means = [0.9898] * 20
-    elif mixed_model == 'combined_docknat':
         mixed_means = [0.9848] * 20
-    elif mixed_model == 'combined_nat':
-        mixed_means = [0.9848] * 20
+    elif mixed_model == 'rdocknat':
+        mixed_means = [0.924] * 20
     else:
-        raise ValueError
-    ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
+        mixed_means = [0.924] * 20
+        print('Unexpected model, dashed line is confused')
+    if not robin:
+        ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
 
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
@@ -184,9 +232,10 @@ def line_plot(df, mixed_model='combined'):
 
     # Possible plot: Set y_lim to 0.99 and CustomScale to: offset=0.03, sup_lim=1
     # This shows how fast we go from mixed to mixed+rdock performance
-    yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
-    plt.gca().set_yticks(yticks)
-    plt.ylim(0.4, 1)
+    # yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
+    # plt.gca().set_yticks(yticks)
+    if not robin:
+        plt.ylim(0.4, 1)
 
     plt.ylabel(r"AuROC")
     plt.xlabel(r"Time Limit (hours)")
@@ -258,14 +307,30 @@ def vax_plot(df, mixed_model='combined'):
 
 
 if __name__ == "__main__":
-    # Build the time df for making the figures, this can be commented then
+    # Build the time df for making the figures
     out_csv = 'scripts_fig/time_ef.csv'
-    # build_ef_df(out_csv=out_csv)
+    recompute = False
+    # recompute = True
+    build_ef_df(out_csv=out_csv, recompute=recompute)
 
+    out_csv_robin = 'scripts_fig/time_ef_robin.csv'
+    recompute = False
+    # recompute = True
+    build_ef_df_robin(out_csv=out_csv_robin, recompute=recompute)
+
+    # Then make plots
     df = pd.read_csv(out_csv, index_col=0)
-    # mixed_model = 'combined'
-    # mixed_model = 'combined_docknat'
-    mixed_model = 'combined_nat'
-    line_plot(df, mixed_model=mixed_model)
+    # mixed_model = 'rdocknat'
+    mixed_model = 'docknat'
+    mixed_model = 'dock'
+    # line_plot(df, mixed_model=mixed_model)
     # vax_plot(df, mixed_model=mixed_model)
-    pass
+
+    df = pd.read_csv(out_csv_robin, index_col=0)
+    # mixed_model = 'dock_rnafm_3'
+    # mixed_model = 'native_validation'
+    # mixed_model = 'updated_rnamigos'
+    # mixed_model = 'updated_rdocknat'
+    mixed_model = 'updated_combined'
+    line_plot(df, mixed_model=mixed_model, robin=True)
+    # vax_plot(df, mixed_model=mixed_model)

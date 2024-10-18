@@ -52,7 +52,7 @@ from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.learning.dataset import VirtualScreenDataset, get_systems
 from rnamigos.utils.virtual_screen import mean_active_rank, run_virtual_screen, enrichment_factor
 from rnamigos.utils.graph_utils import load_rna_graph
-from scripts_run.robin_inference import robin_inference
+from scripts_run.robin_inference import robin_inference_raw
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
@@ -402,7 +402,7 @@ def do_robin(ligand_name, pocket_path, use_rnafm=False):
     dgl_pocket_graph, _ = load_rna_graph(pocket_path + '.json', use_rnafm=use_rnafm)
 
     # Compute scores and EFs
-    final_df = robin_inference(ligand_name, dgl_pocket_graph)
+    final_df = robin_inference_raw(ligand_name, dgl_pocket_graph)
     pocket_id = Path(pocket_path).stem
     final_df['pocket_id'] = pocket_id
     ef_rows = []
@@ -608,7 +608,7 @@ def get_low_high(df, fractions, to_plot='score', filter_good=True, error_bar=Tru
         df[to_plot] = 100 * df[to_plot]
     means = df.groupby('thresh')[to_plot].mean().values
     if error_bar:
-        stds = df.groupby('thresh').agg({'score': lambda x: x.std() / np.sqrt(len(x))}).values.flatten()
+        stds = df.groupby('thresh').agg({to_plot: lambda x: x.std() / np.sqrt(len(x))}).values.flatten()
     else:
         stds = df.groupby('thresh')[to_plot].std().values
     means_low = means - stds
@@ -616,7 +616,7 @@ def get_low_high(df, fractions, to_plot='score', filter_good=True, error_bar=Tru
     return means, means_low, means_high
 
 
-def plot_one(df, fractions, filter_good=True, plot_delta=True, color='blue', label='default_label', metric='ef'):
+def plot_one(df, fractions, filter_good=False, plot_delta=False, color='blue', label='default_label', metric='ef'):
     if plot_delta:
         df = add_delta(df)
         to_plot = 'delta'
@@ -659,6 +659,7 @@ def main_chembl():
     global DECOYS
     ROBIN = False
     metric = 'mar'
+    # metric = 'ef'
     # DECOYS = 'pdb'
     DECOYS = 'pdb_chembl'
     TEST_SYSTEMS = get_systems(target="is_native",
@@ -673,7 +674,8 @@ def main_chembl():
     os.makedirs("figs/perturbations/unperturbed", exist_ok=True)
     # get_perf(pocket_path="data/json_pockets_expanded",
     #          out_dir="figs/perturbations/unperturbed")
-    DF_UNPERTURBED = pd.read_csv("figs/perturbations/unperturbed/json_pockets_expanded_mixed.csv", index_col=False)
+    unpert_df = f"figs/perturbations/unperturbed/json_pockets_expanded_mixed{'_ef' if metric == 'ef' else ''}.csv"
+    DF_UNPERTURBED = pd.read_csv(unpert_df, index_col=False)
     DF_UNPERTURBED.rename(columns={'score': 'unpert_score'}, inplace=True)
     global GOOD_POCKETS
     GOOD_POCKETS = DF_UNPERTURBED[DF_UNPERTURBED['unpert_score'] >= 0.98]['pocket_id'].unique()
@@ -692,23 +694,29 @@ def main_chembl():
     # # Get a first result
     # df = get_efs(all_perturbed_pockets_path='figs/perturbations/perturbed_robin',
     #            out_df='figs/perturbations/perturbed_robin/aggregated_test.csv',
-    #            compute_overlap=True)
+    #            compute_overlap=True,
+    #            metric=metric)
 
     use_cached_pockets = True
     recompute = False
     # Now compute perturbed scores using the random BFS approach
-    dfs_random = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=use_cached_pockets)
-    plot_list(dfs=dfs_random, fractions=fractions, colors=colors, label="Random strategy")
+    dfs_random = get_all_perturbed_bfs(fractions=fractions,
+                                       recompute=recompute,
+                                       use_cached_pockets=use_cached_pockets,
+                                       metric=metric)
 
     # Hard: sample on the border
-    dfs_hard = get_all_perturbed_bfs(fractions=fractions, recompute=False, use_cached_pockets=use_cached_pockets,
-                                     hard=True)
-    plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, label="Hard strategy")
+    dfs_hard = get_all_perturbed_bfs(fractions=fractions,
+                                     recompute=recompute,
+                                     use_cached_pockets=use_cached_pockets,
+                                     hard=True,
+                                     metric=metric)
 
     # Rognan like
-    df_rognan = get_all_perturbed_rognan(fractions=fractions, recompute=recompute,
+    df_rognan = get_all_perturbed_rognan(fractions=fractions,
+                                         recompute=recompute,
+                                         metric=metric,
                                          use_cached_pockets=use_cached_pockets)
-    plot_one(df_rognan, fractions=fractions, color='black', label='Rognan strategy')    # Plot rognan
 
     # Now compute perturbed scores using the soft approach.
     # Vary unexpanding. You can't do BFS0, since this makes small graphs with no edges,
@@ -721,15 +729,22 @@ def main_chembl():
                                        recompute=recompute, metric=metric)
     df_soft_4 = get_all_perturbed_soft(fractions=fractions, use_cached_pockets=use_cached_pockets, final_bfs=4,
                                        recompute=recompute, metric=metric)
-    # dfs_soft = [
-    #     df_soft_1,
-    #     df_soft_2,
-    #     df_soft_3,
-    #     df_soft_4
-    # ]
-    plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple',
-             label='soft 1')  # Plot soft perturbed
-    # plot_list(dfs=dfs_soft, colors=colors, label="Soft strategy")
+    dfs_soft = [
+        df_soft_1,
+        df_soft_2,
+        df_soft_3,
+        df_soft_4
+    ]
+
+    # PLOT
+    # plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple',metric=metric,
+    #          label='soft 1')  # Plot soft perturbed
+    plot_list(dfs=dfs_random, fractions=fractions, colors=colors, metric=metric, label="Random strategy")
+    end_plot()
+    plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, metric=metric, label="Hard strategy")
+    end_plot()
+    plot_one(df_rognan, fractions=fractions, color='black', metric=metric, label='Rognan strategy')    # Plot rognan
+    plot_list(dfs=dfs_soft, fractions=fractions, colors=colors, metric=metric, label="Soft strategy")
     end_plot()
 
     # Compute plots with overlap
