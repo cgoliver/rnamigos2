@@ -12,7 +12,8 @@ paths = {
     "RNAmigos2": "outputs/docknat_grouped_0_raw.csv",
     "RLDOCK": "outputs/rldock_docking_consolidate_all_terms.csv",
     "rDock": "outputs/rdock_raw.csv",
-    "dock6": "outputs/dock6_results.csv",
+    "dock6_old": "outputs/dock6_results.csv",
+    "dock6_all": "outputs/dock6_results_13_10_2024.csv",
     "AnnapuRNA": "outputs/annapurna_results_consolidate.csv",
     "AutoDock-Vina": "outputs/vina_docking_consolidate.csv",
 }
@@ -24,7 +25,8 @@ score_to_use = {
     "AnnapuRNA": "score_RNA-Ligand",
     "AutoDock-Vina": "score",
     "rDock": "raw_score",
-    "dock6": "GRID_SCORE",
+    "dock6_old": "GRID_SCORE",
+    "dock6_all": "GRID_SCORE",
 }
 
 names_train, names_test, grouped_train, grouped_test = pickle.load(
