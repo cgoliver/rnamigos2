@@ -79,6 +79,7 @@ def get_all_csvs(recompute=False):
             continue
         full_model_path = os.path.join(model_dir, model_path)
         rnafm = model_path.endswith('rnafm')
+        rnafm = 'rnafm' in model_path
         model = get_model_from_dirpath(full_model_path)
         df_ef, df_raw = get_all_preds(model, use_rna_fm=rnafm)
         df_ef.to_csv(out_csv, index=False)
@@ -125,9 +126,9 @@ def plot_all():
 if __name__ == "__main__":
     RES_DIR = "outputs/robin/"
     MODELS = {
-        "native": "is_native/native_nopre_new_pdbchembl",
-        "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
-        "native_pre": "is_native/native_pretrain_new_pdbchembl",
+        #"native": "is_native/native_nopre_new_pdbchembl",
+        #"native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
+        #"native_pre": "is_native/native_pretrain_new_pdbchembl",
         "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
         "dock": "dock/dock_new_pdbchembl",
         "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
