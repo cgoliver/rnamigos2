@@ -100,7 +100,7 @@ def objective(trial, cfg) -> float:
 
     if cfg.train.tune:
         lr = trial.suggest_float("train.learning_rate", 1e-5, 1e-1, log=True)
-        weight_decay = trial.suggest_float("train.weight_decay", 1e-5, 1e-2, log=True)
+        weight_decay = trial.suggest_categorical("train.weight_decay", [0, 1e-5])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
