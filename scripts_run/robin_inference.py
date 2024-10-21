@@ -215,6 +215,7 @@ def mix_all(recompute=False, swap=0):
         path2 = os.path.join(res_dir, f"{pair[1]}_raw.csv")
         df1 = pd.read_csv(path1)
         df2 = pd.read_csv(path2)
+        print(path1, path2)
 
         robin_efs, robin_raw_dfs = [], []
         for pocket_id in ROBIN_POCKETS.values():
@@ -309,7 +310,7 @@ if __name__ == "__main__":
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
     # GET ALL CSVs for the models and plot them
-    get_all_csvs(recompute=False, swap=SWAP)
+    get_all_csvs(recompute=True, swap=SWAP)
     get_dfs_docking(swap=SWAP)
     mix_all(recompute=True, swap=SWAP)
     get_merged_df(recompute=True, swap=SWAP)

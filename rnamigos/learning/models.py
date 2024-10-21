@@ -492,7 +492,10 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     """
     for_loading skips pretrained network subparts since it will be used for loading a fully pretrained model
     """
-    use_rnafm = "use_rnafm" in cfg.model and cfg.model.use_rnafm
+    use_rnafm = False
+    if "use_rnafm" in cfg.model:
+        use_rnafm = cfg.model.use_rnafm
+
     model_indim = (
         cfg.model.encoder.in_dim + 640 if use_rnafm else cfg.model.encoder.in_dim
     )

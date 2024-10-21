@@ -15,7 +15,6 @@ ROBIN_POCKETS = {
 
 POCKET_PATH = "data/json_pockets_expanded"
 
-
 def plot_all():
     big_df = []
     models = [
