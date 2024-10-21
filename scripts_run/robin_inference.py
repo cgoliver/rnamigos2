@@ -91,11 +91,7 @@ def one_robin(ligand_name, pocket_id, models=None, use_rna_fm=False):
     raw_df["pocket_id"] = pocket_id
     ef_rows = []
     for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
-        ef = enrichment_factor(
-            raw_df["score"],
-            raw_df["is_active"],
-            frac=frac,
-        )
+        ef = enrichment_factor(raw_df["score"], raw_df["is_active"], frac=frac)
         ef_rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
     return pd.DataFrame(ef_rows), pd.DataFrame(raw_df)
 
@@ -172,7 +168,7 @@ def get_dfs_docking(swap=0):
     """
 
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    ref_raw_df = pd.read_csv("outputs/robin/dock_rnafm_raw.csv")
+    ref_raw_df = pd.read_csv("outputs/robin/dock_42_raw.csv")
     docking_df = pd.read_csv("data/robin_docking_consolidated_v2.csv")
     # For each pocket, get relevant mapping smiles : normalized score,
     # then use it to create the appropriate raw, and clean csvs
@@ -197,12 +193,7 @@ def get_dfs_docking(swap=0):
         # Go from RAW to EF
         rows = []
         for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
-            ef = enrichment_factor(
-                ref_raw_df_lig["score"],
-                ref_raw_df_lig["is_active"],
-                lower_is_better=False,
-                frac=frac,
-            )
+            ef = enrichment_factor(ref_raw_df_lig["score"], ref_raw_df_lig["is_active"], frac=frac)
             rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
         all_raws.append(ref_raw_df_lig)
         all_dfs.append(pd.DataFrame(rows))
@@ -237,12 +228,7 @@ def mix_all(recompute=False, swap=0):
             robin_raw_dfs.append(mixed_df_lig)
 
             for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
-                ef = enrichment_factor(
-                    mixed_df_lig["score"],
-                    mixed_df_lig["is_active"],
-                    lower_is_better=False,
-                    frac=frac,
-                )
+                ef = enrichment_factor(mixed_df_lig["score"], mixed_df_lig["is_active"], frac=frac)
                 robin_efs.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
         robin_efs = pd.DataFrame(robin_efs)
         robin_raw_dfs = pd.concat(robin_raw_dfs)
@@ -260,15 +246,12 @@ def get_merged_df(swap=0, recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
     to_mix = [
-        # "dock",
-        # "native",
-        # "vanilla",
         "rdock",
-        "dock_rnafm",
-        "native_validation",
-        "updated_rnamigos",
-        "updated_rdocknat",
-        "updated_combined",
+        "dock_42",
+        "native_42",
+        "rnamigos",
+        "rdocknat",
+        "combined",
     ]
     big_df = None
     for name in to_mix:
@@ -285,22 +268,12 @@ def get_merged_df(swap=0, recompute=False):
 def print_results(swap=0):
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
     to_print = [
-        # "dock",
-        # "native",
-        # "vanilla",
         "rdock",
-        "dock_rnafm",
-        "native_pre_rnafm",
-        "native_validation",
-        "native_validation_dout",
+        "dock_42",
+        "native_42",
         "rnamigos",
-        "updated_rnamigos",
-        "rnamigos_dout",
-        "updated_rdocknat",
-        "rdocknat_dout",
-        "updated_combined",
-        "combined_dout",
-        "dock_rdock",
+        "rdocknat",
+        "combined",
     ]
     for method in to_print:
         in_csv = os.path.join(res_dir, f"{method}_raw.csv")
@@ -314,32 +287,16 @@ if __name__ == "__main__":
         # "native": "is_native/native_nopre_new_pdbchembl",
         # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
         # "native_pre": "is_native/native_pretrain_new_pdbchembl",
-        "native_pre_rnafm": "is_native/native_pretrain_new_pdbchembl_rnafm",
-        "native_validation": "is_native/native_rnafm_dout3_4",
-        "native_validation_dout": "is_native/native_rnafm_dout5_4",
-        # "is_native_old": "is_native/native_42",
-        # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
-        # "dock": "dock/dock_new_pdbchembl",
-        "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
-        # "dock_rnafm_2": "dock/dock_rnafm_2",
-        # "dock_rnafm_3": "dock/dock_rnafm_3",
+        "native_42": "is_native/native_rnafm_dout5_4",
+        "dock_42": "dock/dock_rnafm_3",
     }
 
     PAIRS = {
-        # ("native", "dock"): "vanilla",
-        # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
-        # ("native_pre", "dock"): "pre",
-        # ("native_pre_rnafm_tune", "dock_rnafm"): "pre_fm",
-        # ("native_pre_rnafm", "dock_rnafm"): "native_pre_dock_fm",
-        ("rdock", "dock_rnafm"): "dock_rdock",
-        ("native_pre_rnafm", "dock_rnafm"): "rnamigos",
-        ("native_validation", "dock_rnafm"): "updated_rnamigos",
-        ("native_validation_dout", "dock_rnafm"): "rnamigos_dout",
+        ("rdock", "dock_42"): "dock_rdock",
+        ("native_42", "dock_42"): "rnamigos",
         # Which one is migos++ ?
-        ("updated_rnamigos", "rdock"): "updated_combined",
-        ("native_validation", "rdock"): "updated_rdocknat",
-        ("rnamigos_dout", "rdock"): "combined_dout",
-        ("native_validation_dout", "rdock"): "rdocknat_dout",
+        ("rnamigos", "rdock"): "combined",
+        ("native_42", "rdock"): "rdocknat",
     }
 
     SWAP = 0
