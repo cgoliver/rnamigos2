@@ -16,52 +16,20 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from scripts_fig.plot_utils import PALETTE_DICT, group_df
+from rnamigos.utils.virtual_screen import mean_active_rank
 
 
-def enrichment_factor(scores, is_active, lower_is_better=True, frac=0.01):
+def enrichment_factor(scores, is_active, frac=0.01):
+    """
+    Redefine the VS one to return thresholds
+    """
     n_actives = np.sum(is_active)
     n_screened = int(frac * len(scores))
-    is_active_sorted = [
-        a for _, a in sorted(zip(scores, is_active), reverse=not lower_is_better)
-    ]
-    scores_sorted = [
-        s for s, _ in sorted(zip(scores, is_active), reverse=not lower_is_better)
-    ]
+    is_active_sorted = [a for _, a in sorted(zip(scores, is_active), reverse=True)]
+    scores_sorted = [s for s, _ in sorted(zip(scores, is_active), reverse=True)]
     n_actives_screened = np.sum(is_active_sorted[:n_screened])
     ef = (n_actives_screened / n_screened) / (n_actives / len(scores))
     return ef, scores_sorted[n_screened]
-
-
-def mean_active_rank(scores, is_active, lower_is_better=True, **kwargs):
-    """Compute the average rank of actives in the scored ligand set
-
-    Arguments
-    ----------
-    scores (list): list of scalar scores for each ligand in the library
-    is_active (list): binary vector with 1 if ligand is active or 0 else, one for each of the scores
-    lower_is_better (bool): True if a lower score means higher binding likelihood, False v.v.
-
-    Returns
-    ---------
-    int
-        Mean rank of the active ligand [0, 1], 1 is the best score.
-
-
-    >>> mean_active_rank([-1, -5, 1], [0, 1, 0], lower_is_better=True)
-    >>> 1.0
-
-    """
-    is_active_sorted = sorted(zip(scores, is_active), reverse=lower_is_better)
-    return (
-        np.mean(
-            [
-                rank
-                for rank, (score, is_active) in enumerate(is_active_sorted)
-                if is_active
-            ]
-        )
-        + 1
-    ) / len(scores)
 
 
 pocket_names = [
@@ -180,16 +148,16 @@ def get_dfs_migos(pocket_name, swap=False, swap_on="merged", normalize=False):
 
     if normalize:
         df["is_native"] = df["is_native"] - df["is_native"].min() / (
-            df["is_native"].max() - df["is_native"].min()
+                df["is_native"].max() - df["is_native"].min()
         )
         df["dock"] = df["dock"] - df["dock"].min() / (
-            df["dock"].max() - df["dock"].min()
+                df["dock"].max() - df["dock"].min()
         )
     return df
 
 
 def make_fig(
-    score_to_use="dock_nat", swap=False, normalize_migos=True, prefix="robin_fig"
+        score_to_use="dock_nat", swap=False, normalize_migos=True, prefix="robin_fig"
 ):
     # fig, axs = plt.subplots(1, 4, figsize=(18, 5))
     # plt.gca().set_yscale('custom')
@@ -216,8 +184,8 @@ def make_fig(
             pocket_name=pocket_name, swap=swap, normalize=normalize_migos
         )
         merged_migos["dock_nat"] = (
-            normalize(merged_migos["is_native"]) + normalize(merged_migos["dock"])
-        ) / 2
+                                           normalize(merged_migos["is_native"]) + normalize(merged_migos["dock"])
+                                   ) / 2
         print(merged_rdock)
 
         merged = pd.merge(
@@ -225,10 +193,7 @@ def make_fig(
         )
 
         merged = merged.fillna(0)
-
         merged["RNAmigos2++"] = (merged["dock_nat"] + merged["rDock"]) / 2
-        # merged['dock_nat_rank'] = merged['dock_nat'].rank(pct=True, ascending=True)
-        # print(merged)
 
         scores = merged[score_to_use]
 
@@ -270,13 +235,7 @@ def make_fig(
         ax.set_xlim([0.3, 1])
 
         for _, frac in enumerate(fracs):
-            ef, thresh = enrichment_factor(
-                scores=scores,
-                is_active=merged["is_active"],
-                lower_is_better=False,
-                frac=frac,
-            )
-            # ax.axvline(x=thresh, ymin=0, ymax=max(scores), color=linecolors[i])
+            ef, thresh = enrichment_factor(scores=scores, is_active=merged["is_active"], frac=frac)
             rows.append(
                 {
                     "pocket": pocket_to_id[pocket_name],
@@ -320,12 +279,7 @@ def make_fig(
 
             offset += 0.05
 
-        ef, thresh = enrichment_factor(
-            scores=scores,
-            is_active=merged["is_active"],
-            lower_is_better=False,
-            frac=default_frac,
-        )
+        ef, thresh = enrichment_factor(scores=scores, is_active=merged["is_active"], frac=default_frac)
         all_efs.append(ef)
         print(f"EF@{frac} : ", pocket_name, ef)
 
@@ -344,7 +298,7 @@ def make_fig(
         # print('AuROC : ', pocket_name, auroc)
         # print()
 
-        # mar = mean_active_rank(scores, actives, lower_is_better=False)
+        # mar = mean_active_rank(scores, actives)
         # print(mar)
     #     #ef = f"EF@1\% {list(ef_df.loc[ef_df['pocket_id'] == name]['score'])[0]:.3f}"
     #     axs[i][0].text(0, 0, f"{name} EF: {ef:.3} MAR: {mar:.3}")

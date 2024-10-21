@@ -1,9 +1,12 @@
 import os
 import sys
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
 from sklearn import metrics
+
+from rnamigos.utils.virtual_screen import mean_active_rank
 
 """
 The main two functions are:
@@ -91,3 +94,20 @@ def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mi
                                                      outname=outname,
                                                      outname_col=outname_col)
     return all_efs, mixed_df, mixed_df_raw
+
+
+def unmix(mixed_df, score, decoys=('pdb', 'pdb_chembl', 'chembl'), outpath=None):
+    pockets = mixed_df['pocket_id'].unique()
+    if not isinstance(decoys, Iterable):
+        decoys = [decoys]
+    all_rows = []
+    for decoy_mode in decoys:
+        mixed_df_decoy = mixed_df[mixed_df['decoys'] == decoy_mode]
+        for pi, p in enumerate(pockets):
+            pocket_df = mixed_df_decoy.loc[mixed_df_decoy['pocket_id'] == p]
+            enrich = mean_active_rank(pocket_df[score], pocket_df['is_active'])
+            all_rows.append({"score": enrich, "metric": "MAR", "decoys": decoy_mode, "pocket_id": p})
+    df = pd.DataFrame(all_rows)
+    if outpath is not None:
+        df.to_csv(outpath)
+    return df

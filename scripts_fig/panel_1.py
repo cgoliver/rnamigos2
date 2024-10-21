@@ -42,7 +42,7 @@ def barcodes(grouped=True):
     prev_pockets = None
     for csv_name in name_runs.values():
         # print(m)
-        df = pd.read_csv(f"outputs/{csv_name}")
+        df = pd.read_csv(f"outputs/pockets/{csv_name}")
         if grouped:
             df = group_df(df)
         row = df[df['decoys'] == 'pdb_chembl'].sort_values(by='pocket_id')
@@ -63,7 +63,7 @@ def barcodes(grouped=True):
             new_row = rows[i].values[order]
             rows[i] = new_row
 
-    n_over = 35
+    n_over = 25
     # sns.heatmap(rows, cmap='binary_r')
     # cmap = sns.color_palette("vlag_r", as_cmap=True)
     # cmap = sns.diverging_palette(0, 245, s=100, l=50, as_cmap=True)

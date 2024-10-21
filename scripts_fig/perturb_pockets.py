@@ -260,8 +260,7 @@ def compute_efs_model(model, dataloader, lower_is_better):
     ef_rows = []
     for frac in (0.01, 0.02, 0.05):
         for pocket, group in raw_df.groupby('pocket_id'):
-            ef_frac = enrichment_factor(group['raw_score'], group['is_active'], frac=frac,
-                                        lower_is_better=lower_is_better)
+            ef_frac = enrichment_factor(group['raw_score'], group['is_active'], frac=frac)
             ef_rows.append({'score': ef_frac,
                             'pocket_id': pocket,
                             'frac': frac
@@ -379,7 +378,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
         ef_rows = []
         for frac in (0.01, 0.02, 0.05):
             for pocket, group in mixed_df_raw.groupby('pocket_id'):
-                ef_frac = enrichment_factor(group['mixed'], group['is_active'], frac=frac, lower_is_better=False)
+                ef_frac = enrichment_factor(group['mixed'], group['is_active'], frac=frac)
                 ef_rows.append({'score': ef_frac,
                                 'pocket_id': pocket,
                                 'frac': frac
@@ -407,10 +406,7 @@ def do_robin(ligand_name, pocket_path, use_rnafm=False):
     final_df['pocket_id'] = pocket_id
     ef_rows = []
     for frac in (0.01, 0.02, 0.05):
-        ef = enrichment_factor(final_df['mixed_score'],
-                               final_df['is_active'],
-                               lower_is_better=False,
-                               frac=frac)
+        ef = enrichment_factor(final_df['mixed_score'], final_df['is_active'], frac=frac)
         ef_rows.append({'pocket_id': pocket_id, 'score': ef, 'frac': frac})
     ef_df = pd.DataFrame(ef_rows)
     return ef_df, final_df
@@ -436,13 +432,13 @@ def get_perf_robin(pocket_path, base_name=None, out_dir=None):
     return np.mean(df_score['score'].values)
 
 
-def get_efs(all_perturbed_pockets_path='figs/perturbations/perturbed',
-            out_df='figs/perturbations/perturbed/aggregated.csv',
-            recompute=True,
-            fractions=None,
-            compute_overlap=False,
-            metric='ef',
-            ef_frac=0.02):
+def get_results_dfs(all_perturbed_pockets_path='figs/perturbations/perturbed',
+                    out_df='figs/perturbations/perturbed/aggregated.csv',
+                    recompute=True,
+                    fractions=None,
+                    compute_overlap=False,
+                    metric='ef',
+                    ef_frac=0.02):
     list_of_results = []
     todo = list(sorted([x for x in os.listdir(all_perturbed_pockets_path) if not x.endswith('.csv')]))
 
@@ -511,13 +507,13 @@ def get_all_perturbed_bfs(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicates=
                                   fractions=fractions,
                                   max_replicates=max_replicates,
                                   recompute=recompute)
-        df = get_efs(all_perturbed_pockets_path=out_path,
-                     out_df=out_df,
-                     fractions=fractions,
-                     recompute=recompute,
-                     compute_overlap=compute_overlap,
-                     metric=metric,
-                     ef_frac=ef_frac)
+        df = get_results_dfs(all_perturbed_pockets_path=out_path,
+                             out_df=out_df,
+                             fractions=fractions,
+                             recompute=recompute,
+                             compute_overlap=compute_overlap,
+                             metric=metric,
+                             ef_frac=ef_frac)
         dfs.append(df)
     return dfs
 
@@ -540,13 +536,13 @@ def get_all_perturbed_soft(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
                               perturbation='soft',
                               recompute=recompute,
                               final_bfs=final_bfs)
-    df = get_efs(all_perturbed_pockets_path=out_path,
-                 out_df=out_df,
-                 fractions=fractions,
-                 recompute=recompute,
-                 compute_overlap=compute_overlap,
-                 metric=metric,
-                 ef_frac=ef_frac)
+    df = get_results_dfs(all_perturbed_pockets_path=out_path,
+                         out_df=out_df,
+                         fractions=fractions,
+                         recompute=recompute,
+                         compute_overlap=compute_overlap,
+                         metric=metric,
+                         ef_frac=ef_frac)
     return df
 
 
@@ -563,12 +559,12 @@ def get_all_perturbed_rognan(fractions=(0.7, 0.85, 1.0, 1.15, 1.3), max_replicat
                               perturbation='rognan like',
                               recompute=recompute,
                               final_bfs=final_bfs)
-    df = get_efs(all_perturbed_pockets_path=out_path,
-                 out_df=out_df,
-                 fractions=fractions,
-                 recompute=recompute,
-                 metric=metric,
-                 ef_frac=ef_frac)
+    df = get_results_dfs(all_perturbed_pockets_path=out_path,
+                         out_df=out_df,
+                         fractions=fractions,
+                         recompute=recompute,
+                         metric=metric,
+                         ef_frac=ef_frac)
     return df
 
 
@@ -743,7 +739,7 @@ def main_chembl():
     end_plot()
     plot_list(dfs=dfs_hard, fractions=fractions, colors=colors, metric=metric, label="Hard strategy")
     end_plot()
-    plot_one(df_rognan, fractions=fractions, color='black', metric=metric, label='Rognan strategy')    # Plot rognan
+    plot_one(df_rognan, fractions=fractions, color='black', metric=metric, label='Rognan strategy')  # Plot rognan
     plot_list(dfs=dfs_soft, fractions=fractions, colors=colors, metric=metric, label="Soft strategy")
     end_plot()
 

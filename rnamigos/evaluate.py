@@ -15,7 +15,7 @@ if __name__ == "__main__":
 from rnamigos.learning.dataset import get_systems_from_cfg
 from rnamigos.learning.dataloader import get_vs_loader
 from rnamigos.learning.models import get_model_from_dirpath
-from rnamigos.utils.virtual_screen import get_efs
+from rnamigos.utils.virtual_screen import get_results_dfs
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 torch.set_num_threads(1)
@@ -25,7 +25,6 @@ torch.set_num_threads(1)
 def main(cfg: DictConfig):
     # Setup hardware, cpu is fastest for inference
     torch.multiprocessing.set_sharing_strategy('file_system')
-    device = 'cpu'
 
     # Load params from file
     print(OmegaConf.to_yaml(cfg))
@@ -39,7 +38,6 @@ def main(cfg: DictConfig):
 
     # Get model
     model = get_model_from_dirpath(cfg.saved_model_dir)
-    model = model.to(device)
 
     # Setup data
     if cfg.custom_dir:
@@ -49,24 +47,25 @@ def main(cfg: DictConfig):
 
     # Run VS
     decoys = ['chembl', 'pdb', 'pdb_chembl', 'decoy_finder'] if cfg.decoys == 'all' else [cfg.decoys]
-    rows, raw_rows = [], []
+    ef_dfs, raw_dfs = [], []
     for decoy_mode in decoys:
         dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg_load, rognan=cfg.rognan)
-
-        # Experiment Setup
-        decoy_rows, decoys_raw_rows = get_efs(model=model, dataloader=dataloader, decoy_mode=decoy_mode, cfg=cfg,
-                                              verbose=True)
-        rows += decoy_rows
-        raw_rows += decoys_raw_rows
+        decoy_efs, decoys_raw = get_results_dfs(model=model,
+                                                dataloader=dataloader,
+                                                decoy_mode=decoy_mode,
+                                                cfg=cfg,
+                                                verbose=True)
+        ef_dfs += decoy_efs
+        raw_dfs += decoys_raw
 
     # Make it a df
-    df = pd.DataFrame(rows)
-    df_raw = pd.DataFrame(raw_rows)
+    ef_df = pd.concat(ef_dfs)
+    df_raw = pd.DataFrame(raw_dfs)
 
     # Dump csvs
     d = Path(cfg.result_dir, parents=True, exist_ok=True)
     base_name = Path(cfg.csv_name).stem
-    df.to_csv(d / (base_name + '.csv'))
+    ef_df.to_csv(d / (base_name + '.csv'))
     df_raw.to_csv(d / (base_name + "_raw.csv"))
 
 

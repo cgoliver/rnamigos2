@@ -4,6 +4,7 @@ Convert consolidated csv with RDOCK to output/ format
 JUST ADAPT THE EVALUATE SCRIPT
 """
 import os
+import pathlib
 import sys
 
 from dgl.dataloading import GraphDataLoader
@@ -16,7 +17,7 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos.utils.virtual_screen import mean_active_rank
+from rnamigos.utils.virtual_screen import mean_active_rank, run_results_to_raw_df, run_results_to_ef_df
 from rnamigos.learning.dataset import get_systems
 
 
@@ -93,7 +94,7 @@ class VirtualScreenDatasetDocking:
             return None, None, None
 
 
-def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER', **kwargs):
+def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER'):
     """run_virtual_screen.
 
     :param model: trained affinity prediction model
@@ -105,7 +106,6 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER', **kwar
     :returns inds: list of indices in the dataloader for which the score computation was successful
     """
     efs, all_scores, status, all_smiles, pocket_names = [], [], [], [], []
-    print(f"Doing VS on {len(dataloader)} pockets.")
     failed = 0
     for i, (pocket_name, smiles, is_active) in enumerate(dataloader):
         # Some ligfiles are missing
@@ -126,67 +126,66 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER', **kwar
             if len(relevant_row) == 0:
                 pass
             else:
-                score = float(relevant_row[score_to_use].values)
+                score = float(relevant_row[score_to_use].item())
                 scores.append(score)
                 selected_actives.append(is_active[i])
                 selected_smiles.append(sm)
         selected_actives = np.array(selected_actives)
-        scores = np.array(scores)
-        efs.append(mean_active_rank(scores, selected_actives, **kwargs))
+        scores = -np.array(scores)
+        efs.append(mean_active_rank(scores, selected_actives))
         all_scores.append(list(scores))
         status.append(list(selected_actives))
         pocket_names.append(pocket_name)
         all_smiles.append(selected_smiles)
-    print(f"VS failed on {failed} systems")
-    print(efs)
     return efs, all_scores, status, pocket_names, all_smiles
 
 
-rows, raw_rows = [], []
-test_systems = get_systems(target="native_fp",
-                           rnamigos1_split=-2,
-                           use_rnamigos1_train=False,
-                           use_rnamigos1_ligands=False,
-                           return_test=True)
-
-df = pd.read_csv("data/rnamigos2_dataset_consolidated.csv")
-df = df[['PDB_ID_POCKET', 'LIGAND_SMILES', 'LIGAND_SOURCE', 'TOTAL', 'INTER']]
-df = df[df['PDB_ID_POCKET'].isin(test_systems['PDB_ID_POCKET'].unique())]
-script_dir = os.path.dirname(__file__)
-
-decoys = ['chembl', 'pdb', 'pdb_chembl']
-for decoy_mode in decoys:
-    dataset = VirtualScreenDatasetDocking(ligands_path=os.path.join(script_dir, '../data/ligand_db'),
-                                          systems=test_systems,
-                                          decoy_mode=decoy_mode,
-                                          group_ligands=True,
-                                          reps_only=False)
-
+def get_dfs_rdock(test_systems, data_df):
+    script_dir = os.path.dirname(__file__)
+    rows, raw_rows = [], []
+    decoys = ['chembl', 'pdb', 'pdb_chembl']
     loader_args = {'shuffle': False,
                    'batch_size': 1,
                    'num_workers': 4,
                    'collate_fn': lambda x: x[0]
                    }
-    dataloader = GraphDataLoader(dataset=dataset, **loader_args)
-    # df_decoy = df[df['LIGAND_SOURCE'].isin([mode.upper() for mode in decoy_mode.split('_')])]
-    efs, scores, status, pocket_names, all_smiles = run_virtual_screen_docking(systems=df,
-                                                                               dataloader=dataloader,
-                                                                               lower_is_better=True,
-                                                                               )
-    for pocket_id, score_list, status_list, smiles_list in zip(pocket_names, scores, status, all_smiles):
-        for score, status, smiles in zip(score_list, status_list, smiles_list):
-            raw_rows.append({'raw_score': score, 'is_active': status, 'pocket_id': pocket_id, 'smiles': smiles,
-                             'decoys': decoy_mode})
+    for decoy_mode in decoys:
+        print(f"Doing rDock inference and VS on {decoy_mode} decoys.")
+        dataset = VirtualScreenDatasetDocking(ligands_path=os.path.join(script_dir, '../data/ligand_db'),
+                                              systems=test_systems,
+                                              decoy_mode=decoy_mode,
+                                              group_ligands=True,
+                                              reps_only=False)
+        dataloader = GraphDataLoader(dataset=dataset, **loader_args)
+        efs, scores, status, pocket_names, all_smiles = run_virtual_screen_docking(systems=data_df,
+                                                                                   dataloader=dataloader)
+        print('Mean EF :', np.mean(efs))
+        raw_df = run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode)
+        ef_df = run_results_to_ef_df(efs, scores, pocket_names, decoy_mode)
+        rows.append(ef_df)
+        raw_rows.append(raw_df)
+    df_ef = pd.concat(rows)
+    df_raw = pd.concat(raw_rows)
+    return df_ef, df_raw
 
-    for ef, score, pocket_id in zip(efs, scores, pocket_names):
-        rows.append({
-            'score': ef,
-            'metric': 'EF' if decoy_mode == 'robin' else 'MAR',
-            'decoys': decoy_mode,
-            'pocket_id': pocket_id})
-    print('Mean EF :', np.mean(efs))
 
-df = pd.DataFrame(rows)
-df_raw = pd.DataFrame(raw_rows)
-df.to_csv("outputs/rdock.csv")
-df_raw.to_csv("outputs/rdock_raw.csv")
+if __name__ == '__main__':
+    # Get the systems name and the docking values
+    test_systems = get_systems(target="native_fp",
+                               rnamigos1_split=-2,
+                               use_rnamigos1_train=False,
+                               use_rnamigos1_ligands=False,
+                               return_test=True)
+    df_data = pd.read_csv("data/rnamigos2_dataset_consolidated.csv")
+    df_data = df_data[['PDB_ID_POCKET', 'LIGAND_SMILES', 'LIGAND_SOURCE', 'TOTAL', 'INTER']]
+    df_data = df_data[df_data['PDB_ID_POCKET'].isin(test_systems['PDB_ID_POCKET'].unique())]
+
+    # For each decoy set, do an rDock "prediction" and compute EFs
+    df_ef, df_raw = get_dfs_rdock(test_systems, df_data)
+
+    # Finally, dump the results as CSVs
+    dump_path = pathlib.Path("outputs/pockets/rdock.csv")
+    dump_path_raw = pathlib.Path("outputs/pockets/rdock_raw.csv")
+    dump_path.parent.mkdir(parents=True, exist_ok=True)
+    df_ef.to_csv(dump_path, index=False)
+    df_raw.to_csv(dump_path_raw, index=False)

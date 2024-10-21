@@ -159,6 +159,7 @@ def get_systems(
 
 def get_systems_from_cfg(cfg, return_test=False):
     group_pockets = False if return_test else cfg.train.group_pockets
+    native_filter_pdb = False if not "native_filter_pdb" in cfg.train else cfg.train.native_filter_pdb
     systems = get_systems(
         target=cfg.train.target,
         rnamigos1_split=cfg.train.rnamigos1_split,
@@ -166,7 +167,7 @@ def get_systems_from_cfg(cfg, return_test=False):
         use_rnamigos1_ligands=cfg.train.use_rnamigos1_ligands,
         group_pockets=group_pockets,
         filter_robin=cfg.train.filter_robin,
-        native_filter_pdb=cfg.train.native_filter_pdb,
+        native_filter_pdb=native_filter_pdb,
         return_test=return_test,
     )
     return systems

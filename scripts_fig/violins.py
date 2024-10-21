@@ -13,54 +13,14 @@ from scripts_fig.plot_utils import PALETTE_DICT, group_df
 
 # TEST SET
 name_runs = {
-    # r"\texttt{fp_old}": "paper_fp.csv",
-    # r"\texttt{fp_0}": "fp_split_grouped0.csv",
-    # r"\texttt{fp_pre}": "fp_split_grouped1.csv",
-    # r"\texttt{fp}": "fp_0.csv",
-    # r"\texttt{fp}": "fp_1.csv",
-    # r"RECO": "fp_42.csv",
-    # r"\texttt{recons}": "fp_42.csv",
-    # r"\texttt{fp}": "fp_1_1_2.csv",
-    # r"\texttt{fp_2}": "fp_split_grouped2.csv",
-    # r"\texttt{native_old}": "paper_native.csv",
-    # r"\texttt{native0}": "native_split_grouped0.csv", # r"\texttt{native_pre}": "native_split_grouped1.csv",
-    # r"\texttt{native}": "native_0.csv",
-    # r"\texttt{toto}": "toto_0.csv",
-    # r"\texttt{native}": "native_1.csv",
     r"COMPAT": "native_42.csv",
-    # r"\texttt{native}": "native_1.csv",
-    # r"\texttt{native2}": "native_split_grouped2.csv",
-    # r"\texttt{dock_old}": "paper_dock.csv",
-    # r"\texttt{dock0}": "dock_split_grouped0.csv",
-    # r"\texttt{dock_pre}": "dock_split_grouped1.csv",
-    # r"\texttt{dock}": "dock_0.csv",
-    # r"\texttt{dock}": "dock_1.csv",
     r"AFF": "dock_42.csv",
-    # r"\texttt{dock2}": "dock_split_grouped2.csv",
     r"rDock": "rdock.csv",
     # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
     r"MIXED": "docknat_42.csv",
-    r"MIXED+rDock": "rdocknat_42.csv",
-    # r"MIXED": ".csv",
-    # r"MIXED+rDock": "docknat_rdock_grouped_42.csv",
-    # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
-    # r"\texttt{mixed}": "mixed_grouped_42.csv",
-    # r"\texttt{mixed\newline+ rDock}": "mixed_rdock_grouped_42.csv",
+    # r"MIXED+rDock": "rdocknat_42.csv",
+    r"MIXED+rDock": "combined_42.csv",
 }
-
-# Difference Mean EF / print is because group_df() does not use group reps but subsamples.
-# 0
-#                   \textbackslash texttt\{fp\} & 0.874 \$\textbackslash pm\$ 0.220 \\ ~perf at logging epoch : 0.91
-#               \textbackslash texttt\{native\} & 0.912 \$\textbackslash pm\$ 0.241 \\ Mean EF : 0.90436 \\ ~perf at logging epoch : 0.96
-#                 \textbackslash texttt\{dock\} & 0.928 \$\textbackslash pm\$ 0.160 \\
-# 1
-#                   \textbackslash texttt\{fp\} & 0.868 \$\textbackslash pm\$ 0.211 \\ ~perf at logging epoch : 0.905
-#               \textbackslash texttt\{native\} & 0.960 \$\textbackslash pm\$ 0.138 \\ Mean EF : 0.95541
-#                 \textbackslash texttt\{dock\} & 0.945 \$\textbackslash pm\$ 0.141 \\
-# 42
-#                   \textbackslash texttt\{fp\} & 0.859 \$\textbackslash pm\$ 0.212 \\ ~perf at logging epoch : 0.92
-#               \textbackslash texttt\{native\} & 0.944 \$\textbackslash pm\$ 0.168 \\
-#                 \textbackslash texttt\{dock\} & 0.935 \$\textbackslash pm\$ 0.157 \\
 
 main_palette = [
     # PALETTE_DICT['fp'],
@@ -74,13 +34,12 @@ names = list(name_runs.keys())
 runs = list(name_runs.values())
 
 # decoy_mode = 'pdb'
-# decoy_mode = 'chembl'
-decoy_mode = 'pdb_chembl'
-
+decoy_mode = 'chembl'
+# decoy_mode = 'pdb_chembl'
 grouped = True
 
 # Parse ef data for the runs and gather them in a big database
-dfs = [pd.read_csv(f"outputs/{f}") for f in runs]
+dfs = [pd.read_csv(f"outputs/pockets/{f}") for f in runs]
 dfs = [df.assign(name=names[i]) for i, df in enumerate(dfs)]
 
 big_df = pd.concat(dfs)
