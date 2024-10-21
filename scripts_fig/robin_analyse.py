@@ -18,26 +18,13 @@ POCKET_PATH = "data/json_pockets_expanded"
 
 def plot_all():
     big_df = []
-    models = MODELS
-    models = list(MODELS) + list(PAIRS.values()) + ["rdock"]
-    models = list(MODELS) + list(PAIRS.values())
     models = [
-        # "dock",
-        # "native",
-        # "vanilla",
-        # "rdock",
-        # "dock_rnafm",
-        "native_pre_rnafm",
-        "native_validation",
-        "native_validation_dout",
-        # "rnamigos",
-        # "updated_rnamigos",
-        # "rnamigos_dout",
-        # "updated_rdocknat",
-        # "rdocknat_dout",
-        # "updated_combined",
-        # "combined_dout",
-        # "dock_rdock",
+        "rdock",
+        "dock_42",
+        "native_42",
+        "rnamigos",
+        "rdocknat",
+        "combined",
     ]
     for model in models:
         out_csv = os.path.join(RES_DIR, f"{model}.csv")
@@ -45,22 +32,7 @@ def plot_all():
         df["name"] = model
         big_df.append(df)
     big_df = pd.concat(big_df)
-
-    custom_palette = {
-        "native": "#1f77b4",  # blue
-        "native_rnafm": "#ff7f0e",  # orange (distinct for rnafm)
-        "native_pre": "#2ca02c",  # green
-        "native_pre_rnafm": "#d62728",  # red (distinct for rnafm)
-        "dock": "#9467bd",  # purple
-        "dock_rnafm": "#8c564b",  # brown (distinct for rnafm)
-        "rdock": "black",
-    }
-    custom_palette = sns.color_palette("Paired")
     custom_palette = sns.color_palette()
-
-    # custom_palette = sns.color_palette(palette=custom_palette)
-    # sns.set_palette(custom_palette)
-
     plt.rcParams["axes.grid"] = True
 
     g = sns.FacetGrid(
@@ -97,7 +69,6 @@ def plot_perturbed(model="pre_fm", group=True):
         big_df = [big_df[0], perturbed]
     big_df = pd.concat(big_df)
 
-    # custom_palette = sns.color_palette("Paired")
     custom_palette = None
     plt.rcParams["axes.grid"] = True
     g = sns.FacetGrid(
@@ -141,37 +112,14 @@ def plot_distributions(score_to_use='native_validation', in_csv="outputs/robin/b
 if __name__ == "__main__":
     SWAP = 0
     RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
-    MODELS = {
-        "native": "is_native/native_nopre_new_pdbchembl",
-        "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
-        # "native_pre": "is_native/native_pretrain_new_pdbchembl",
-        # "is_native_old": "is_native/native_42",
-        # "native_pre_rnafm_tune": "is_native/native_pretrain_new_pdbchembl_rnafm_159_best",
-        # "dock": "dock/dock_new_pdbchembl",
-        # "dock_rnafm": "dock/dock_new_pdbchembl_rnafm",
-        # "dock_rnafm_2": "dock/dock_new_pdbchembl_rnafm",
-        # "dock_rnafm_3": "dock/dock_rnafm_3",
-        "native_pre_rnafm": 'native_pre_rnafm',
-        "native_validation": 'bla',
-        # "updated native":'bla',
-    }
-
-    PAIRS = {
-        # ("native", "dock"): "vanilla",
-        # ("native_rnafm", "dock_rnafm"): "vanilla_fm",
-        # ("native_pre", "dock"): "pre",
-        # ("native_pre_rnafm_tune", "dock_rnafm"): "pre_fm",
-        # ("native_pre_rnafm", "dock_rnafm"): "native_dock_pre_fm",
-        # ("native_dock_pre_fm", "rdock"): "rnamigos++",
-    }
 
     plot_all()
     # PLOT PERTURBED VERSIONS
     # plot_perturbed(model="rnamigos++", group=True)
 
     # score_to_use = 'rdock'
-    # score_to_use = 'dock_rnafm_3'
-    # score_to_use = 'native_validation'
-    # score_to_use = 'updated_rnamigos'
-    score_to_use = 'updated_combined'
-    # plot_distributions(score_to_use=score_to_use)
+    # score_to_use = 'dock_42'
+    # score_to_use = 'native_42'
+    # score_to_use = 'rnamigos'
+    score_to_use = 'combined'
+    plot_distributions(score_to_use=score_to_use)
