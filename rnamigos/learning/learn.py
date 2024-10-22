@@ -69,7 +69,7 @@ def compute_rognan_loss(model, batch, alpha=0.3):
         batch["target"]
         * torch.max(
             torch.zeros_like(batch["target"]),
-            pred_neg - pred_pos + alpha,
+            pred_neg - pred_true + alpha,
         )
     )
 
