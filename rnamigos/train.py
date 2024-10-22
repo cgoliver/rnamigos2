@@ -36,38 +36,46 @@ def get_loaders(cfg, tune=False, trial=None):
     # Systems are basically lists of all pocket/pair/labels to consider. We then split the train_val systems.
     train_val_systems = get_systems_from_cfg(cfg, return_test=False)
     test_systems = get_systems_from_cfg(cfg, return_test=True)
-    train_systems, validation_systems = train_val_split(train_val_systems.copy(),
-                                                        system_based=cfg.train.validation_systems)
+    train_systems, validation_systems = train_val_split(
+        train_val_systems.copy(), system_based=cfg.train.validation_systems
+    )
     # We then create datasets, potentially additionally returning rings and dataloaders.
     # Dataloader creation is a bit tricky as it involves custom Samplers and Collaters that depend on the task at hand
     train_dataset = get_dataset(cfg, train_systems, training=True)
     validation_dataset = get_dataset(cfg, validation_systems, training=False)
-    train_loader = get_loader(cfg, train_dataset, train_systems, training=True, trial=trial, tune=tune)
-    val_loader = get_loader(cfg,
-                            validation_dataset,
-                            validation_systems,
-                            training=False)
+    train_loader = get_loader(
+        cfg, train_dataset, train_systems, training=True, trial=trial, tune=tune
+    )
+    val_loader = get_loader(cfg, validation_dataset, validation_systems, training=False)
 
     # In addition to those 'classical' loaders, we also create ones dedicated to VS validation.
     # Splitting for VS validation is based on systems, to avoid having too many pockets
-    _, vs_validation_systems = train_val_split(train_val_systems.copy(), system_based=True)
-    val_vs_loader = get_vs_loader(systems=vs_validation_systems,
-                                  decoy_mode=cfg.train.vs_decoy_mode,
-                                  reps_only=True,
-                                  cfg=cfg)
-    test_vs_loader = get_vs_loader(systems=test_systems,
-                                   decoy_mode=cfg.train.vs_decoy_mode,
-                                   reps_only=True,
-                                   cfg=cfg)
+    _, vs_validation_systems = train_val_split(
+        train_val_systems.copy(), system_based=True
+    )
+    val_vs_loader = get_vs_loader(
+        systems=vs_validation_systems,
+        decoy_mode=cfg.train.vs_decoy_mode,
+        reps_only=True,
+        cfg=cfg,
+    )
+    test_vs_loader = get_vs_loader(
+        systems=test_systems,
+        decoy_mode=cfg.train.vs_decoy_mode,
+        reps_only=True,
+        cfg=cfg,
+    )
 
     # Maybe monitor rognan's performance ?
     val_vs_loader_rognan = None
     if cfg.train.do_rognan:
-        val_vs_loader_rognan = get_vs_loader(systems=vs_validation_systems,
-                                             decoy_mode=cfg.train.vs_decoy_mode,
-                                             reps_only=True,
-                                             rognan=True,
-                                             cfg=cfg)
+        val_vs_loader_rognan = get_vs_loader(
+            systems=vs_validation_systems,
+            decoy_mode=cfg.train.vs_decoy_mode,
+            reps_only=True,
+            rognan=True,
+            cfg=cfg,
+        )
 
     return train_loader, val_loader, val_vs_loader, val_vs_loader_rognan, test_vs_loader
 
@@ -137,6 +145,7 @@ def objective(trial, cfg) -> float:
         early_stop_threshold=cfg.train.early_stop,
         pretrain_weight=cfg.train.pretrain_weight,
         debug=cfg.debug,
+        train_rognan=cfg.train.train_rognan,
         cfg=cfg,
     )
 

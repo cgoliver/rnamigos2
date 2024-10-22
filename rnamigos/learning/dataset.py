@@ -1,4 +1,5 @@
 import os
+import random
 
 import dgl
 import numpy as np
@@ -17,11 +18,11 @@ RDLogger.DisableLog("rdApp.*")  # disable warnings
 
 
 def rnamigos_1_split(
-        systems,
-        rnamigos1_test_split=0,
-        return_test=False,
-        use_rnamigos1_train=False,
-        use_rnamigos1_ligands=False,
+    systems,
+    rnamigos1_test_split=0,
+    return_test=False,
+    use_rnamigos1_train=False,
+    use_rnamigos1_ligands=False,
 ):
     """
 
@@ -64,14 +65,14 @@ def rnamigos_1_split(
 
 
 def get_systems(
-        target="dock",
-        rnamigos1_split=-1,
-        return_test=False,
-        use_rnamigos1_train=False,
-        use_rnamigos1_ligands=False,
-        filter_robin=False,
-        native_filter_pdb=False,
-        group_pockets=False,
+    target="dock",
+    rnamigos1_split=-1,
+    return_test=False,
+    use_rnamigos1_train=False,
+    use_rnamigos1_ligands=False,
+    filter_robin=False,
+    native_filter_pdb=False,
+    group_pockets=False,
 ):
     """
     :param target: The systems to load
@@ -97,12 +98,14 @@ def get_systems(
     elif target == "is_native":
         interactions_csv = os.path.join(script_dir, "../../data/csvs/binary_data.csv")
     else:
-        raise ValueError(f"train.target should be in {{dock, native_fp, is_native}}, received : {target}")
+        raise ValueError(
+            f"train.target should be in {{dock, native_fp, is_native}}, received : {target}"
+        )
     systems = pd.read_csv(interactions_csv, index_col=0)
 
     # Potentially only train on PDB compounds for is_native
     if target == "is_native" and native_filter_pdb:
-        systems = systems.loc[systems['LIGAND_SOURCE'] == 'PDB']
+        systems = systems.loc[systems["LIGAND_SOURCE"] == "PDB"]
 
     # Latest systems querying, based on RMscores redundancy
     if rnamigos1_split == -2:
@@ -159,7 +162,9 @@ def get_systems(
 
 def get_systems_from_cfg(cfg, return_test=False):
     group_pockets = False if return_test else cfg.train.group_pockets
-    native_filter_pdb = False if not "native_filter_pdb" in cfg.train else cfg.train.native_filter_pdb
+    native_filter_pdb = (
+        False if not "native_filter_pdb" in cfg.train else cfg.train.native_filter_pdb
+    )
     systems = get_systems(
         target=cfg.train.target,
         rnamigos1_split=cfg.train.rnamigos1_split,
@@ -185,23 +190,24 @@ def stretch_values(value):
 class DockingDataset(Dataset):
 
     def __init__(
-            self,
-            pockets_path,
-            systems,
-            target="dock",
-            use_normalized_score=False,
-            stretch_scores=False,
-            fp_type="MACCS",
-            use_graphligs=False,
-            shuffle=False,
-            seed=0,
-            debug=False,
-            cache_graphs=True,
-            undirected=False,
-            use_rings=False,
-            use_rnafm=False,
-            ligand_cache="data/ligands/lig_graphs.p",
-            use_ligand_cache=True,
+        self,
+        pockets_path,
+        systems,
+        target="dock",
+        use_normalized_score=False,
+        stretch_scores=False,
+        fp_type="MACCS",
+        use_graphligs=False,
+        shuffle=False,
+        seed=0,
+        debug=False,
+        cache_graphs=True,
+        undirected=False,
+        use_rings=False,
+        use_rnafm=False,
+        ligand_cache="data/ligands/lig_graphs.p",
+        use_ligand_cache=True,
+        train_rognan=False,
     ):
         """
         Setup for data loader.
@@ -244,6 +250,7 @@ class DockingDataset(Dataset):
         self.cache_graphs = cache_graphs
         self.use_rings = use_rings
         self.use_rnafm = use_rnafm
+        self.train_rognan = train_rognan
 
         if cache_graphs:
             all_pockets = set(self.systems["PDB_ID_POCKET"].unique())
@@ -279,6 +286,20 @@ class DockingDataset(Dataset):
             )
         ligand_fp = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
 
+        if self.train_rognan:
+            other_idx = random.randint(0, len(self))
+            other_row = self.systems.iloc[other_idx]
+            other_pocket_id = row["PDB_ID_POCKET"]
+            if self.cache_graphs:
+                other_pocket_graph, other_rings = self.all_pockets[other_pocket_id]
+            else:
+                other_pocket_graph, other_rings = load_rna_graph(
+                    rna_path=os.path.join(self.pockets_path, f"{other_pocket_id}.json"),
+                    undirected=self.undirected,
+                    use_rings=self.use_rings,
+                    use_rnafm=self.use_rnafm,
+                )
+
         # Maybe return ligand as a graph.
         if self.use_graphligs:
             lig_graph = self.ligand_graph_encoder.smiles_to_graph_one(
@@ -298,26 +319,38 @@ class DockingDataset(Dataset):
         else:
             target = row["IS_NATIVE"]
         # print("1 : ", time.perf_counter() - t0)
-        return {
-            "graph": pocket_graph,
-            "ligand_input": lig_graph if self.use_graphligs else ligand_fp,
-            "target": target,
-            "rings": rings,
-            "idx": [idx],
-        }
+
+        if self.train_rognan:
+            return {
+                "graph": pocket_graph,
+                "other_graph": other_pocket_graph,
+                "other_rings": other_rings,
+                "ligand_input": lig_graph if self.use_graphligs else ligand_fp,
+                "target": target,
+                "rings": rings,
+                "idx": [idx],
+            }
+        else:
+            return {
+                "graph": pocket_graph,
+                "ligand_input": lig_graph if self.use_graphligs else ligand_fp,
+                "target": target,
+                "rings": rings,
+                "idx": [idx],
+            }
 
 
 class VirtualScreenDataset(DockingDataset):
     def __init__(
-            self,
-            pockets_path,
-            ligands_path,
-            systems,
-            decoy_mode="pdb",
-            rognan=False,
-            reps_only=False,
-            group_ligands=True,
-            **kwargs,
+        self,
+        pockets_path,
+        ligands_path,
+        systems,
+        decoy_mode="pdb",
+        rognan=False,
+        reps_only=False,
+        group_ligands=True,
+        **kwargs,
     ):
         super().__init__(pockets_path, systems=systems, shuffle=False, **kwargs)
         self.ligands_path = ligands_path
@@ -437,7 +470,7 @@ class VirtualScreenDataset(DockingDataset):
 
 class InferenceDataset(Dataset):
     def __init__(
-            self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True
+        self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True
     ):
         self.smiles_list = smiles_list
         self.ligand_graph_encoder = (
@@ -474,11 +507,16 @@ def train_val_split(train_val_systems, frac=0.8, system_based=True):
         script_dir = os.path.dirname(__file__)
         splits_file = os.path.join(script_dir, "../../data/train_val_75.p")
         train_names, val_names, _, _ = pickle.load(open(splits_file, "rb"))
-        train_systems = train_val_systems[train_val_systems["PDB_ID_POCKET"].isin(train_names)]
-        validation_systems = train_val_systems[~train_val_systems["PDB_ID_POCKET"].isin(train_names)]
+        train_systems = train_val_systems[
+            train_val_systems["PDB_ID_POCKET"].isin(train_names)
+        ]
+        validation_systems = train_val_systems[
+            ~train_val_systems["PDB_ID_POCKET"].isin(train_names)
+        ]
     else:
-        train_systems, validation_systems = np.split(train_val_systems.sample(frac=1),
-                                                     [int(frac * len(train_val_systems))])
+        train_systems, validation_systems = np.split(
+            train_val_systems.sample(frac=1), [int(frac * len(train_val_systems))]
+        )
     return train_systems, validation_systems
 
 
@@ -497,6 +535,7 @@ def get_dataset(cfg, systems, training=True):
         "stretch_scores": cfg.train.stretch_scores,
         "use_rnafm": cfg.model.use_rnafm,
         "undirected": cfg.data.undirected,
+        "train_rognan": cfg.train.train_rognan,
     }
 
     dataset = DockingDataset(systems=systems, use_rings=use_rings, **dataset_args)
