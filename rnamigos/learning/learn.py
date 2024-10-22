@@ -63,13 +63,13 @@ def compute_rognan_loss(model, batch, alpha=0.3):
     where $\alpha$ is the margin and $p(.,.)$ is the model output for a pocket-ligand
     pair. We force decoy pockets $p'$ to have a lower score than the native pair.
     """
+    pred_true = model(batch["graph"], batch["ligand_input"])[0]
+    pred_neg = model(batch["other_graph"], batch["ligand_input"])[0]
     return torch.sum(
         batch["target"]
         * torch.max(
             torch.zeros_like(batch["target"]),
-            model(batch["other_graph"], batch["ligand_input"])[0]
-            - model(batch["graph"], batch["ligand_input"])[0]
-            + alpha,
+            pred_neg - pred_pos + alpha,
         )
     )
 
