@@ -186,7 +186,7 @@ def train_dock(
                         rognan_loss,
                         epoch * num_batches + batch_idx,
                     )
-                del rognan_loss
+                    del rognan_loss
             del loss
 
         # Log training metrics
