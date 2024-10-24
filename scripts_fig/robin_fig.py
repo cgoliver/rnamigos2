@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -82,13 +83,9 @@ def get_dfs_docking(ligand_name):
 
     all_smiles = []
     # Use this mapping to create our actives/inactives distribution dataframe
-    active_ligands_path = os.path.join(
-        "data", "ligand_db", ligand_name, "robin", "actives.txt"
-    )
+    active_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "actives.txt")
     # out_path = os.path.join(out_dir, f"{pocket_name}_actives.txt")
-    smiles_list = [
-        s.lstrip().rstrip() for s in list(open(active_ligands_path).readlines())
-    ]
+    smiles_list = [s.lstrip().rstrip() for s in list(open(active_ligands_path).readlines())]
     all_smiles.extend(smiles_list)
     actives_df = pd.DataFrame({"rDock": [mapping[sm] for sm in smiles_list]})
     actives_df["is_active"] = 1
@@ -102,13 +99,9 @@ def get_dfs_docking(ligand_name):
         f"scores over 200 : {np.sum(scores > 200)} length : {len(scores)} "
     )
 
-    inactives_ligands_path = os.path.join(
-        "data", "ligand_db", ligand_name, "robin", "decoys.txt"
-    )
+    inactives_ligands_path = os.path.join("data", "ligand_db", ligand_name, "robin", "decoys.txt")
     # out_path = os.path.join(out_dir, f"{pocket_name}_inactives.txt")
-    smiles_list = [
-        s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())
-    ]
+    smiles_list = [s.lstrip().rstrip() for s in list(open(inactives_ligands_path).readlines())]
     all_smiles.extend(smiles_list)
     inactives_df = pd.DataFrame({"rDock": [mapping[sm] for sm in smiles_list]})
     inactives_df["is_active"] = 0
@@ -127,16 +120,24 @@ def get_dfs_docking(ligand_name):
     return merged
 
 
-def get_dfs_migos(pocket_name, swap=False, swap_on="merged", normalize=False):
+def get_dfs_migos(df_path, pocket_name, swap=False, normalize=False):
+    df = pd.read_csv(df_path)
+    df = df.loc[df["pocket_id"] == pocket_name]
+    return df
+    pass
+
+
+def get_dfs_migos_(pocket_name, swap=False, swap_on="merged", normalize=False):
     # names = ["smiles", "dock", "is_native", "native_fp", "merged"]
     out_dir = "outputs/robin_docknative_rev"
-    df = pd.read_csv(os.path.join(out_dir, f"{pocket_name}_results.txt"))
+    df_path = "outputs/robin/rnamigos_rognanpocket_raw.csv"
+    df_all = pd.read_csv(df_path)
+    df = df_all.loc[df_all["pocket_id"] == pocket_name]
     # merged = pd.concat([actives_df, inactives_df])
     if swap:
         other_pocket = random.choice(list(set(pocket_names) - set([pocket_name])))
-        model_outs_other = pd.read_csv(
-            os.path.join(out_dir, f"{other_pocket}_results.txt")
-        )
+        # model_outs_other = pd.read_csv(os.path.join(out_dir, f"{other_pocket}_results.txt"))
+        model_outs_other = df_all.loc[df_all["pocket_id"] == other_pocket]
         both = df.merge(model_outs_other, on="smiles", suffixes=("_orig", "_other"))
         if swap_on == "merged":
             both["merged"] = both["merged_other"]
@@ -147,18 +148,12 @@ def get_dfs_migos(pocket_name, swap=False, swap_on="merged", normalize=False):
         return both
 
     if normalize:
-        df["is_native"] = df["is_native"] - df["is_native"].min() / (
-                df["is_native"].max() - df["is_native"].min()
-        )
-        df["dock"] = df["dock"] - df["dock"].min() / (
-                df["dock"].max() - df["dock"].min()
-        )
+        df["is_native"] = df["is_native"] - df["is_native"].min() / (df["is_native"].max() - df["is_native"].min())
+        df["dock"] = df["dock"] - df["dock"].min() / (df["dock"].max() - df["dock"].min())
     return df
 
 
-def make_fig(
-        score_to_use="dock_nat", swap=False, normalize_migos=True, prefix="robin_fig"
-):
+def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig"):
     # fig, axs = plt.subplots(1, 4, figsize=(18, 5))
     # plt.gca().set_yscale('custom')
 
@@ -176,26 +171,20 @@ def make_fig(
         # ax.set_xscale('custom')
 
         # FOR DOCKING
-        merged_rdock = get_dfs_docking(ligand_name=ligand_name)
+        # merged_rdock = get_dfs_docking(ligand_name=ligand_name)
         # score_to_use = 'docking_score'
 
         # FOR MIGOS
-        merged_migos = get_dfs_migos(
-            pocket_name=pocket_name, swap=swap, normalize=normalize_migos
-        )
-        merged_migos["dock_nat"] = (
-                                           normalize(merged_migos["is_native"]) + normalize(merged_migos["dock"])
-                                   ) / 2
-        print(merged_rdock)
+        df = get_dfs_migos(model_output, pocket_name=pocket_name, swap=swap, normalize=normalize_migos)
+        # merged_migos["dock_nat"] = (normalize(merged_migos["is_active"]) + normalize(merged_migos["dock"])) / 2
+        # print(merged_rdock)
 
-        merged = pd.merge(
-            merged_migos, merged_rdock, on=["smiles", "is_active"], how="outer"
-        )
+        # merged = pd.merge(merged_migos, merged_rdock, on=["smiles", "is_active"], how="outer")
 
-        merged = merged.fillna(0)
-        merged["RNAmigos2++"] = (merged["dock_nat"] + merged["rDock"]) / 2
+        # merged = merged.fillna(0)
+        # merged["RNAmigos2++"] = (merged["dock_nat"] + merged["rDock"]) / 2
 
-        scores = merged[score_to_use]
+        # scores = merged["score"]
 
         # GET EFS
         # fracs = [0.01, 0.05]
@@ -214,10 +203,10 @@ def make_fig(
         curve_fill = True
         # sns.kdeplot(data=merged, x=score_to_use, fill=False, hue='split', alpha=.9,
         #             palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
-        merged = merged.sort_values(by="is_active")
+        df = df.sort_values(by="is_active")
         g = sns.kdeplot(
-            data=merged,
-            x=score_to_use,
+            data=df,
+            x="score",
             hue="is_active",
             ax=ax,
             # palette={'actives': colors[i], 'inactives': 'lightgrey'},
@@ -235,13 +224,13 @@ def make_fig(
         ax.set_xlim([0.3, 1])
 
         for _, frac in enumerate(fracs):
-            ef, thresh = enrichment_factor(scores=scores, is_active=merged["is_active"], frac=frac)
+            ef, thresh = enrichment_factor(scores=df["score"], is_active=df["is_active"], frac=frac)
             rows.append(
                 {
                     "pocket": pocket_to_id[pocket_name],
                     "ef": ef,
                     "thresh": f"{frac * 100:.0f}",
-                    "score": score_to_use,
+                    "score": Path(model_output).stem,
                 }
             )
 
@@ -279,20 +268,18 @@ def make_fig(
 
             offset += 0.05
 
-        ef, thresh = enrichment_factor(scores=scores, is_active=merged["is_active"], frac=default_frac)
+        ef, thresh = enrichment_factor(scores=df["score"], is_active=df["is_active"], frac=default_frac)
         all_efs.append(ef)
         print(f"EF@{frac} : ", pocket_name, ef)
 
         ax.set_title(pocket_name)
         g.legend().remove()
         sns.despine()
-        plt.savefig(
-            f"figs/panel_3_{prefix}_{pocket_to_id[pocket_name]}.pdf", format="pdf"
-        )
+        plt.savefig(f"figs/panel_3_{prefix}_{pocket_to_id[pocket_name]}.pdf", format="pdf")
         # plt.show()
 
         # GET AUROC
-        fpr, tpr, thresholds = metrics.roc_curve(merged["is_active"], scores)
+        fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df["score"])
         auroc = metrics.auc(fpr, tpr)
         all_aurocs.append(auroc)
         # print('AuROC : ', pocket_name, auroc)
@@ -334,6 +321,9 @@ def make_table(df):
 if __name__ == "__main__":
 
     dfs = []
-    for score in ["dock_nat", "is_native", "dock", "rDock", "RNAmigos2++"]:
-        dfs.append(make_fig(score, prefix=f"repro_{score}", normalize_migos=True))
+    # for score in ["dock_nat", "is_native", "dock", "rDock", "RNAmigos2++"]:
+    #    dfs.append(make_fig(score, prefix=f"repro_{score}", normalize_migos=True))
+    for model in ["rnamigos", "rnamigos_rognanpocket", "dock_42", "rdock", "rnamigos++"]:
+        df_path = Path("outputs/robin") / f"{model}_raw.csv"
+        dfs.append(make_fig(df_path, prefix=f"repro_{model}", normalize_migos=True))
     make_table(pd.concat(dfs))
