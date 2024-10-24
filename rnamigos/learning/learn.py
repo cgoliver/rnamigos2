@@ -63,15 +63,14 @@ def compute_rognan_loss(model, batch, alpha=0.3):
     where $\alpha$ is the margin and $p(.,.)$ is the model output for a pocket-ligand
     pair. We force decoy pockets $p'$ to have a lower score than the native pair.
     """
-    pred_true = model(batch["graph"], batch["ligand_input"])[0]
-    pred_neg = model(batch["other_graph"], batch["ligand_input"])[0]
-    return torch.sum(
-        batch["target"]
-        * torch.max(
-            torch.zeros_like(batch["target"]),
-            pred_neg - pred_true + alpha,
-        )
-    )
+    pred_true = model(batch["graph"], batch["ligand_input"])[0].squeeze()
+    pred_neg = model(batch["other_graph"], batch["ligand_input"])[0].squeeze()
+    zero = torch.zeros_like(pred_true)
+    y = batch["target"]
+    themax = torch.max(zero, pred_neg - pred_true + alpha)
+    maxsum = torch.sum(y * themax)
+    normed = (1 / torch.sum(y)) * maxsum
+    return normed
 
 
 def train_dock(
@@ -91,7 +90,7 @@ def train_dock(
     early_stop_threshold=10,
     monitor_robin=False,
     pretrain_weight=0.1,
-    train_rognan=False,
+    negative_pocket="none",
     debug=False,
     cfg=None,
 ):
@@ -143,7 +142,7 @@ def train_dock(
             else:
                 loss = criterion(pred.squeeze(), target.float())
 
-            if train_rognan:
+            if negative_pocket != "none":
                 rognan_loss = compute_rognan_loss(model, batch)
                 loss += rognan_loss
                 pass
@@ -180,9 +179,9 @@ def train_dock(
                 writer.add_scalar(
                     "Training batch loss", batch_loss, epoch * num_batches + batch_idx
                 )
-                if train_rognan:
+                if negative_pocket != "none":
                     writer.add_scalar(
-                        "Training rognan loss",
+                        "Training non-pocket loss",
                         rognan_loss,
                         epoch * num_batches + batch_idx,
                     )

@@ -207,7 +207,7 @@ class DockingDataset(Dataset):
         use_rnafm=False,
         ligand_cache="data/ligands/lig_graphs.p",
         use_ligand_cache=True,
-        train_rognan=False,
+        negative_pocket="none",
     ):
         """
         Setup for data loader.
@@ -250,7 +250,7 @@ class DockingDataset(Dataset):
         self.cache_graphs = cache_graphs
         self.use_rings = use_rings
         self.use_rnafm = use_rnafm
-        self.train_rognan = train_rognan
+        self.negative_pocket = negative_pocket
 
         if cache_graphs:
             all_pockets = set(self.systems["PDB_ID_POCKET"].unique())
@@ -263,6 +263,7 @@ class DockingDataset(Dataset):
                 )
                 for pocket_id in all_pockets
             }
+        self.neg_pocket_cache = {}
         print("done caching")
 
     def __len__(self):
@@ -286,7 +287,7 @@ class DockingDataset(Dataset):
             )
         ligand_fp = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
 
-        if self.train_rognan:
+        if self.negative_pocket == "rognan":
             other_idx = random.randint(0, len(self))
             other_row = self.systems.iloc[other_idx]
             other_pocket_id = row["PDB_ID_POCKET"]
@@ -299,6 +300,35 @@ class DockingDataset(Dataset):
                     use_rings=self.use_rings,
                     use_rnafm=self.use_rnafm,
                 )
+
+        if self.negative_pocket == "non_pocket":
+            perturb_dir = Path("figs/perturbations/perturbed/")
+            perturb_slice = random.choice(os.listdir(perturb_dir))
+            perturb_path = perturb_dir / perturb_slice / f"{pocket_id}.json"
+
+            try:
+                other_pocket_graph, other_rings = self.neg_pocket_cache[perturb_path]
+            except KeyError:
+                try:
+                    other_pocket_graph, other_rings = load_rna_graph(
+                        rna_path=perturb_path,
+                        undirected=self.undirected,
+                        use_rings=self.use_rings,
+                        use_rnafm=self.use_rnafm,
+                    )
+                    self.neg_pocket_cache[perturb_path] = (
+                        other_pocket_graph,
+                        other_rings,
+                    )
+
+                except FileNotFoundError:
+                    # if missing a negative, sample a random one from cache
+                    print(f"missing negative for {pocket_id}")
+                    other_pocket_graph, other_rings = random.choice(
+                        self.neg_pocket_cache.values()
+                    )
+
+            pass
 
         # Maybe return ligand as a graph.
         if self.use_graphligs:
@@ -320,7 +350,7 @@ class DockingDataset(Dataset):
             target = row["IS_NATIVE"]
         # print("1 : ", time.perf_counter() - t0)
 
-        if self.train_rognan:
+        if self.negative_pocket != "none":
             return {
                 "graph": pocket_graph,
                 "other_graph": other_pocket_graph,
@@ -427,6 +457,9 @@ class VirtualScreenDataset(DockingDataset):
                 pocket_name = self.all_pockets_names[
                     np.random.randint(0, len(self.all_pockets_names))
                 ]
+                print(
+                    f"ROGNAN POCKET: {pocket_name} ORIGINAL: {self.all_pockets_names[idx]}"
+                )
             else:
                 pocket_name = self.all_pockets_names[idx]
 
@@ -535,7 +568,7 @@ def get_dataset(cfg, systems, training=True):
         "stretch_scores": cfg.train.stretch_scores,
         "use_rnafm": cfg.model.use_rnafm,
         "undirected": cfg.data.undirected,
-        "train_rognan": cfg.train.train_rognan,
+        "negative_pocket": cfg.train.negative_pocket,
     }
 
     dataset = DockingDataset(systems=systems, use_rings=use_rings, **dataset_args)

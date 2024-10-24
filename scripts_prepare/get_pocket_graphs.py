@@ -1,10 +1,12 @@
-import pandas as pd
+from typing import List
 import os
+
+from tqdm import tqdm
+import pandas as pd
 import networkx as nx
 from rnaglib.config import GRAPH_KEYS, TOOL
 from rnaglib.utils import graph_from_pdbid, graph_io
 from rnaglib.algorithms import graph_algos
-from tqdm import tqdm
 
 # This should work but sometimes has missing nodes
 # csv_path = 'data/rnamigos2_dataset_consolidated.csv'
@@ -89,6 +91,13 @@ def build_ring_tree_from_graph(graph, depth=2):
         edge_rings[node] = rings['edge']
     return edge_rings
 
+def sample_negative_pockets(whole_graph: nx.Graph, pocket_nodes: List, n_samples = 10: int) -> List[nx.Graph]:
+    """ Sample pockets at random from the rest of the RNA. Sample a random node and add nodes to it with bfs. 
+    Try to get them to match the size
+    of the original pocket by selecting the right bfs depth for each..
+    """
+
+    pass
 
 failed_set = set()
 for pocket in tqdm(os.listdir(old_path)):

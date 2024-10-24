@@ -145,7 +145,7 @@ def objective(trial, cfg) -> float:
         early_stop_threshold=cfg.train.early_stop,
         pretrain_weight=cfg.train.pretrain_weight,
         debug=cfg.debug,
-        train_rognan=cfg.train.train_rognan,
+        negative_pocket=cfg.train.negative_pocket,
         cfg=cfg,
     )
 

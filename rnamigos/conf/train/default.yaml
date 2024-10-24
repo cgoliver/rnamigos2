@@ -30,7 +30,7 @@ num_epochs: 100
 learning_rate: 1e-3
 pretrain_weight: 0.
 clf_lam: 1.0
-train_rognan: False
+negative_pocket: 'none'
 reconstruction_lam: 1.0
 early_stop: 10
 target: dock # dock or native_fp or is_native
