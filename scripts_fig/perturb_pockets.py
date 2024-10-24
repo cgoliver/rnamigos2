@@ -78,15 +78,136 @@ def get_expanded_subgraph_from_list(rglib_graph, nodelist, bfs_depth=4):
     return expanded_graph
 
 
+def random_perturb(around_pocket, n_nodes_to_sample):
+    # just use random nodes from the list
+    sorted_around_pocket = sorted(list(around_pocket))
+    noisy_nodelist = list(
+        np.random.choice(
+            sorted_around_pocket, replace=False, size=n_nodes_to_sample
+        )
+    )
+    return noisy_nodelist
+
+
+def soft_perturb(around_pocket, in_pocket_filtered, n_nodes_to_sample):
+    # start from the pocket, and subsample/oversample, starting from the pocket
+    sorted_neighbors_bfs = sorted(
+        list(around_pocket.difference(in_pocket_filtered))
+    )
+    sorted_in_pocket = sorted(list(in_pocket_filtered))
+
+    shuffled_in_pocket = list(
+        np.random.choice(
+            sorted_in_pocket,
+            replace=False,
+            size=len(in_pocket_filtered),
+        )
+    )
+    shuffled_neigh = list(
+        np.random.choice(
+            sorted_neighbors_bfs,
+            replace=False,
+            size=len(sorted_neighbors_bfs),
+        )
+    )
+    shuffled_in_pocket.extend(shuffled_neigh)
+    noisy_nodelist = shuffled_in_pocket[:n_nodes_to_sample]
+    return noisy_nodelist
+
+
+def hard_perturb(around_pocket, rglib_graph, in_pocket_filtered, perturb_bfs_depth, n_nodes_to_sample):
+    # Sample a pocket around a random node of the perimeter
+    smaller_bfs = bfs(
+        rglib_graph,
+        in_pocket_filtered,
+        depth=perturb_bfs_depth - 1,
+        label="LW",
+    )
+    perimeter = sorted(list(around_pocket.difference(smaller_bfs)))
+    if len(perimeter) == 0:
+        raise ValueError(
+            f"Buggy pocket it spans the whole connected component and cannot be expanded"
+        )
+    seed_pertubed_pocket = np.random.choice(perimeter, size=1).item()
+
+    # Now expand this seed with increasing radius up to getting more than target node
+    prev_perturbed_pocket = {}
+    perturbed_pocket = {seed_pertubed_pocket}
+    expander = 1
+    while len(perturbed_pocket) < n_nodes_to_sample and expander <= 10:
+        prev_perturbed_pocket = perturbed_pocket
+        perturbed_pocket = bfs(
+            rglib_graph, perturbed_pocket, depth=expander, label="LW"
+        )
+        expander += 1
+        # When querying with very large fractions, sometimes we cannot return as many nodes as queried
+        # Note: nx.connected_component does not work for directed graphs...
+        if expander > 10:
+            print(
+                "Cannot craft a large enough pocket, maybe we seeded using a disconnected component"
+            )
+            break
+
+    # Finally, subsample the last parameter to get the final pocket.
+    last_perimeter = sorted(
+        list(perturbed_pocket.difference(prev_perturbed_pocket))
+    )
+    missing_nbr_nodes = n_nodes_to_sample - len(prev_perturbed_pocket)
+    last_nodes = list(
+        np.random.choice(
+            list(last_perimeter), replace=False, size=missing_nbr_nodes
+        )
+    )
+    noisy_nodelist = list(prev_perturbed_pocket) + last_nodes
+    return noisy_nodelist
+
+
+def rognan_like(rglib_graph, n_nodes_to_sample):
+    # Sample a pocket around a random node of the perimeter
+    seed_pertubed_pocket = np.random.choice(
+        rglib_graph.nodes(), size=1
+    ).item()
+
+    # Now expand this seed with increasing radius up to getting more than target node
+    prev_perturbed_pocket = {}
+    perturbed_pocket = {seed_pertubed_pocket}
+    expander = 1
+    while len(perturbed_pocket) < n_nodes_to_sample and expander <= 10:
+        prev_perturbed_pocket = perturbed_pocket
+        perturbed_pocket = bfs(
+            rglib_graph, perturbed_pocket, depth=expander, label="LW"
+        )
+        expander += 1
+    # When querying with very large fractions, sometimes we cannot return as many nodes as queried
+    # Note: nx.connected_component does not work for directed graphs...
+    if expander > 10:
+        raise ValueError(
+            "Cannot craft a large enough pocket, maybe we seeded using a disconnected component"
+        )
+
+    # Finally, subsample the last parameter to get the final pocket.
+    last_perimeter = sorted(
+        list(perturbed_pocket.difference(prev_perturbed_pocket))
+    )
+    missing_nbr_nodes = n_nodes_to_sample - len(prev_perturbed_pocket)
+    last_nodes = list(
+        np.random.choice(
+            list(last_perimeter), replace=False, size=missing_nbr_nodes
+        )
+    )
+    noisy_nodelist = list(prev_perturbed_pocket) + last_nodes
+    return noisy_nodelist
+
+
 def get_perturbed_pockets(
-    unperturbed_path="data/json_pockets_expanded",
-    out_path="figs/perturbations/perturbed",
-    fractions=(0.7, 0.8, 0.9, 1.0, 1.1, 1.2),
-    perturb_bfs_depth=1,
-    max_replicates=5,
-    recompute=True,
-    perturbation="random",
-    final_bfs=4,
+        unperturbed_path="data/json_pockets_expanded",
+        out_path="figs/perturbations/perturbed",
+        fractions=(0.7, 0.8, 0.9, 1.0, 1.1, 1.2),
+        perturb_bfs_depth=1,
+        max_replicates=5,
+        recompute=True,
+        perturbation="random",
+        final_bfs=4,
 ):
     existing_pockets = set(
         [pocket.rstrip(".json") for pocket in os.listdir(unperturbed_path)]
@@ -128,127 +249,35 @@ def get_perturbed_pockets(
                 if os.path.exists(out_name) and not recompute:
                     continue
 
-                # Sample a broken binding site
-                # To get reproducible results, we need to sort sets
-                if perturbation == "random":
-                    # just use random nodes from the list
-                    sorted_around_pocket = sorted(list(around_pocket))
-                    noisy_nodelist = list(
-                        np.random.choice(
-                            sorted_around_pocket, replace=False, size=n_nodes_to_sample
-                        )
+                try:
+                    # Sample a broken binding site
+                    # To get reproducible results, we need to sort sets
+                    if perturbation == "random":
+                        noisy_nodelist = random_perturb(around_pocket, n_nodes_to_sample)
+                    elif perturbation == "soft":
+                        noisy_nodelist = soft_perturb(around_pocket, in_pocket_filtered, n_nodes_to_sample)
+                    elif perturbation == "hard":
+                        noisy_nodelist = hard_perturb(around_pocket, rglib_graph, in_pocket_filtered, perturb_bfs_depth,
+                                                      n_nodes_to_sample)
+                    elif perturbation == "rognan like":
+                        noisy_nodelist = rognan_like(rglib_graph, n_nodes_to_sample)
+                    elif perturbation == "rognan true":
+                        noisy_nodelist = soft_perturb(around_pocket, in_pocket_filtered, n_nodes_to_sample)
+                        actual_pocket_id = pockets_to_compute.index(pocket)
+                        rognaned = (actual_pocket_id + replicate + 1) % len(pockets_to_compute)
+                        out_name = os.path.join(out_dir, f"{pockets_to_compute[rognaned]}.json")
+                    else:
+                        raise NotImplementedError
+                    expanded_graph = get_expanded_subgraph_from_list(
+                        rglib_graph=rglib_graph,
+                        nodelist=noisy_nodelist,
+                        bfs_depth=final_bfs,
                     )
-                elif perturbation == "soft":
-                    # start from the pocket, and subsample/oversample, starting from the pocket
-                    sorted_neighbors_bfs = sorted(
-                        list(around_pocket.difference(in_pocket_filtered))
-                    )
-                    sorted_in_pocket = sorted(list(in_pocket_filtered))
-
-                    shuffled_in_pocket = list(
-                        np.random.choice(
-                            sorted_in_pocket,
-                            replace=False,
-                            size=len(in_pocket_filtered),
-                        )
-                    )
-                    shuffled_neigh = list(
-                        np.random.choice(
-                            sorted_neighbors_bfs,
-                            replace=False,
-                            size=len(sorted_neighbors_bfs),
-                        )
-                    )
-                    shuffled_in_pocket.extend(shuffled_neigh)
-                    noisy_nodelist = shuffled_in_pocket[:n_nodes_to_sample]
-                elif perturbation == "hard":
-                    # Sample a pocket around a random node of the perimeter
-                    smaller_bfs = bfs(
-                        rglib_graph,
-                        in_pocket_filtered,
-                        depth=perturb_bfs_depth - 1,
-                        label="LW",
-                    )
-                    perimeter = sorted(list(around_pocket.difference(smaller_bfs)))
-                    if len(perimeter) == 0:
-                        print(
-                            f"Buggy pocket: {pocket}, it spans the whole connected component and cannot be expanded"
-                        )
-                        continue
-                    seed_pertubed_pocket = np.random.choice(perimeter, size=1).item()
-
-                    # Now expand this seed with increasing radius up to getting more than target node
-                    prev_perturbed_pocket = {}
-                    perturbed_pocket = {seed_pertubed_pocket}
-                    expander = 1
-                    while len(perturbed_pocket) < n_nodes_to_sample and expander <= 10:
-                        prev_perturbed_pocket = perturbed_pocket
-                        perturbed_pocket = bfs(
-                            rglib_graph, perturbed_pocket, depth=expander, label="LW"
-                        )
-                        expander += 1
-                    # When querying with very large fractions, sometimes we cannot return as many nodes as queried
-                    # Note: nx.connected_component does not work for directed graphs...
-                    if expander > 10:
-                        print(
-                            "Cannot craft a large enough pocket, maybe we seeded using a disconnected component"
-                        )
-                        break
-
-                    # Finally, subsample the last parameter to get the final pocket.
-                    last_perimeter = sorted(
-                        list(perturbed_pocket.difference(prev_perturbed_pocket))
-                    )
-                    missing_nbr_nodes = n_nodes_to_sample - len(prev_perturbed_pocket)
-                    last_nodes = list(
-                        np.random.choice(
-                            list(last_perimeter), replace=False, size=missing_nbr_nodes
-                        )
-                    )
-                    noisy_nodelist = list(prev_perturbed_pocket) + last_nodes
-                elif perturbation == "rognan like":
-                    # Sample a pocket around a random node of the perimeter
-                    seed_pertubed_pocket = np.random.choice(
-                        rglib_graph.nodes(), size=1
-                    ).item()
-
-                    # Now expand this seed with increasing radius up to getting more than target node
-                    prev_perturbed_pocket = {}
-                    perturbed_pocket = {seed_pertubed_pocket}
-                    expander = 1
-                    while len(perturbed_pocket) < n_nodes_to_sample and expander <= 10:
-                        prev_perturbed_pocket = perturbed_pocket
-                        perturbed_pocket = bfs(
-                            rglib_graph, perturbed_pocket, depth=expander, label="LW"
-                        )
-                        expander += 1
-                    # When querying with very large fractions, sometimes we cannot return as many nodes as queried
-                    # Note: nx.connected_component does not work for directed graphs...
-                    if expander > 10:
-                        print(
-                            "Cannot craft a large enough pocket, maybe we seeded using a disconnected component"
-                        )
-                        break
-
-                    # Finally, subsample the last parameter to get the final pocket.
-                    last_perimeter = sorted(
-                        list(perturbed_pocket.difference(prev_perturbed_pocket))
-                    )
-                    missing_nbr_nodes = n_nodes_to_sample - len(prev_perturbed_pocket)
-                    last_nodes = list(
-                        np.random.choice(
-                            list(last_perimeter), replace=False, size=missing_nbr_nodes
-                        )
-                    )
-                    noisy_nodelist = list(prev_perturbed_pocket) + last_nodes
-
-                else:
-                    raise NotImplementedError
-                expanded_graph = get_expanded_subgraph_from_list(
-                    rglib_graph=rglib_graph,
-                    nodelist=noisy_nodelist,
-                    bfs_depth=final_bfs,
-                )
+                except Exception as e:
+                    if isinstance(e, NotImplementedError):
+                        raise e
+                    else:
+                        print(e)
                 if len(expanded_graph) == 0:
                     print(
                         "Tried to create empty graph, skipped system: ",
@@ -304,7 +333,7 @@ def compute_efs_model(model, dataloader, lower_is_better):
         model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better
     )
     for pocket_id, score_list, status_list, smiles_list in zip(
-        pocket_names, scores, status, all_smiles
+            pocket_names, scores, status, all_smiles
     ):
         for score, status, smiles in zip(score_list, status_list, smiles_list):
             raw_rows.append(
@@ -435,7 +464,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
             normalized_docking = normalize(docking_scores)
             normalized_new = normalize(new_scores)
             pocket_df["mixed"] = (
-                0.5 * normalized_docking + 0.5 * normalized_new
+                    0.5 * normalized_docking + 0.5 * normalized_new
             ).values
             fpr, tpr, thresholds = metrics.roc_curve(
                 pocket_df["is_active"], pocket_df["mixed"], drop_intermediate=True
@@ -496,8 +525,8 @@ def get_perf_robin(pocket_path, base_name=None, out_dir=None):
     ef_dfs = []
     raw_dfs = []
     for ef_df, raw in Parallel(n_jobs=4)(
-        delayed(do_robin)(ligand_name, os.path.join(pocket_path, pocket))
-        for ligand_name, pocket in ROBIN_POCKETS.items()
+            delayed(do_robin)(ligand_name, os.path.join(pocket_path, pocket))
+            for ligand_name, pocket in ROBIN_POCKETS.items()
     ):
         ef_dfs.append(ef_df)
         raw_dfs.append(raw)
@@ -509,13 +538,13 @@ def get_perf_robin(pocket_path, base_name=None, out_dir=None):
 
 
 def get_results_dfs(
-    all_perturbed_pockets_path="figs/perturbations/perturbed",
-    out_df="figs/perturbations/perturbed/aggregated.csv",
-    recompute=True,
-    fractions=None,
-    compute_overlap=False,
-    metric="ef",
-    ef_frac=0.02,
+        all_perturbed_pockets_path="figs/perturbations/perturbed",
+        out_df="figs/perturbations/perturbed/aggregated.csv",
+        recompute=True,
+        fractions=None,
+        compute_overlap=False,
+        metric="ef",
+        ef_frac=0.02,
 ):
     list_of_results = []
     todo = list(
@@ -543,14 +572,14 @@ def get_results_dfs(
         base_name = Path(perturbed_pocket_path).name
         if ROBIN:
             out_csv_path = out_dir / (
-                base_name + f"{'_ef' if metric == 'ef' else ''}.csv"
+                    base_name + f"{'_ef' if metric == 'ef' else ''}.csv"
             )
         else:
             # out_csv_path = out_dir / (base_name + "_dock.csv")
             # out_csv_path = out_dir / (base_name + "_native.csv")
             # out_csv_path = out_dir / (base_name + "_mixed.csv")
             out_csv_path = out_dir / (
-                base_name + f"_mixed{'_ef' if metric == 'ef' else ''}.csv"
+                    base_name + f"_mixed{'_ef' if metric == 'ef' else ''}.csv"
             )
         if recompute or not os.path.exists(out_csv_path):
             if ROBIN:
@@ -588,14 +617,14 @@ def get_results_dfs(
 
 
 def get_all_perturbed_bfs(
-    fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
-    max_replicates=10,
-    hard=False,
-    recompute=True,
-    use_cached_pockets=True,
-    compute_overlap=False,
-    metric="ef",
-    ef_frac=0.02,
+        fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
+        max_replicates=10,
+        hard=False,
+        recompute=True,
+        use_cached_pockets=True,
+        compute_overlap=False,
+        metric="ef",
+        ef_frac=0.02,
 ):
     dfs = []
     for i in range(1, 4):
@@ -624,14 +653,14 @@ def get_all_perturbed_bfs(
 
 
 def get_all_perturbed_soft(
-    fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
-    max_replicates=10,
-    recompute=True,
-    use_cached_pockets=True,
-    final_bfs=4,
-    compute_overlap=False,
-    metric="ef",
-    ef_frac=0.02,
+        fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
+        max_replicates=10,
+        recompute=True,
+        use_cached_pockets=True,
+        final_bfs=4,
+        compute_overlap=False,
+        metric="ef",
+        ef_frac=0.02,
 ):
     out_path = (
         f'figs/perturbations/perturbed_soft{"_robin" if ROBIN else ""}_{final_bfs}'
@@ -661,14 +690,14 @@ def get_all_perturbed_soft(
     return df
 
 
-def get_all_perturbed_rognan(
-    fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
-    max_replicates=10,
-    recompute=True,
-    use_cached_pockets=False,
-    final_bfs=4,
-    metric="ef",
-    ef_frac=0.02,
+def get_all_perturbed_rognan_like(
+        fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
+        max_replicates=10,
+        recompute=True,
+        use_cached_pockets=False,
+        final_bfs=4,
+        metric="ef",
+        ef_frac=0.02,
 ):
     out_path = f'figs/perturbations/perturbed_rognan{"_robin" if ROBIN else ""}'
     out_df = f'figs/perturbations/aggregated_rognan{"_robin" if ROBIN else ""}.csv'
@@ -679,6 +708,38 @@ def get_all_perturbed_rognan(
             fractions=fractions,
             max_replicates=max_replicates,
             perturbation="rognan like",
+            recompute=recompute,
+            final_bfs=final_bfs,
+        )
+    df = get_results_dfs(
+        all_perturbed_pockets_path=out_path,
+        out_df=out_df,
+        fractions=fractions,
+        recompute=recompute,
+        metric=metric,
+        ef_frac=ef_frac,
+    )
+    return df
+
+
+def get_all_perturbed_rognan_true(
+        fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
+        max_replicates=10,
+        recompute=True,
+        use_cached_pockets=False,
+        final_bfs=4,
+        metric="ef",
+        ef_frac=0.02,
+):
+    out_path = f'figs/perturbations/perturbed_rognan_true{"_robin" if ROBIN else ""}'
+    out_df = f'figs/perturbations/aggregated_rognan_true{"_robin" if ROBIN else ""}.csv'
+    if not use_cached_pockets:
+        get_perturbed_pockets(
+            out_path=out_path,
+            perturb_bfs_depth=2,
+            fractions=fractions,
+            max_replicates=max_replicates,
+            perturbation="rognan true",
             recompute=recompute,
             final_bfs=final_bfs,
         )
@@ -706,7 +767,7 @@ def add_pert_magnitude(df):
     pert_magn = (df["extra"].values + df["missing"].values) / df["pocket_size"].values
     # jaccard
     pert_magn = (df["pocket_size"].values - df["missing"].values) / (
-        df["pocket_size"].values + df["extra"].values
+            df["pocket_size"].values + df["extra"].values
     )
     df["magnitude"] = pert_magn
     return df
@@ -721,7 +782,7 @@ def plot_overlap(df, filter_good=True, **kwargs):
 
 
 def get_low_high(
-    df, fractions, to_plot="score", filter_good=True, error_bar=True, metric="ef"
+        df, fractions, to_plot="score", filter_good=True, error_bar=True, metric="ef"
 ):
     if not isinstance(fractions, (list, tuple)):
         fractions = [fractions]
@@ -746,13 +807,13 @@ def get_low_high(
 
 
 def plot_one(
-    df,
-    fractions,
-    filter_good=False,
-    plot_delta=False,
-    color="blue",
-    label="default_label",
-    metric="ef",
+        df,
+        fractions,
+        filter_good=False,
+        plot_delta=False,
+        color="blue",
+        label="default_label",
+        metric="ef",
 ):
     if plot_delta:
         df = add_delta(df)
@@ -864,7 +925,15 @@ def main_chembl():
     )
 
     # Rognan like
-    df_rognan = get_all_perturbed_rognan(
+    df_rognan_like = get_all_perturbed_rognan_like(
+        fractions=fractions,
+        recompute=recompute,
+        metric=metric,
+        use_cached_pockets=use_cached_pockets,
+    )
+
+    # Rognan
+    df_rognan_true = get_all_perturbed_rognan_true(
         fractions=fractions,
         recompute=recompute,
         metric=metric,
@@ -924,7 +993,7 @@ def main_chembl():
     )
     end_plot()
     plot_one(
-        df_rognan,
+        df_rognan_like,
         fractions=fractions,
         color="black",
         metric=metric,
@@ -1029,8 +1098,8 @@ if __name__ == "__main__":
         "collate_fn": lambda x: x[0],
     }
     TEST_SYSTEMS, ALL_POCKETS, ALL_POCKETS_GRAPHS, DF_UNPERTURBED, ROBIN, DECOYS = [
-        None,
-    ] * 6
+                                                                                       None,
+                                                                                   ] * 6
 
     ALL_POCKETS = [Path(f).stem for f in os.listdir("data/json_pockets_expanded")]
     ALL_POCKETS_GRAPHS = {
@@ -1040,7 +1109,7 @@ if __name__ == "__main__":
         for pocket_id in ALL_POCKETS
     }
 
-    get_perturbed_pockets(perturbation="rognan like")
+    get_perturbed_pockets(perturbation="rognan true")
 
     # main_chembl()
     # main_robin()

@@ -1,5 +1,7 @@
 # Reproducing the results
 
+## Setting up the environment
+
 If you want to reproduce the results from scratch, first you need to set up the environment,
 data and model as detailed in the README.md.
 
@@ -20,7 +22,7 @@ tar -xzvf rnamigos2_data.tar.gz
 
 and skip to the model training section.
 
-## Getting initial pocket data
+### Getting initial pocket data
 
 Initially, we download all pdb containing RNA + small molecule, filter them and save resulting pockets as node ids +
 ligands...
@@ -30,7 +32,7 @@ ligands...
 
 Download pocket graphs [here](https://drive.proton.me/urls/SC9AQCF2SC#JYQ3K9yNUJ4U)
 
-## Generate actives and decoys list
+### Generate actives and decoys list
 
 Once equiped with this initial data, we select the decoys corresponding to our actives.
 This is done by running :
@@ -50,7 +52,7 @@ We now have pockets, native ligands and different sets of decoys.
 
 These decoys can be downloaded [here](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR)
 
-## Get docking scores
+### Get docking scores
 
 We can now proceed to docking all relevant pairs.
 The docking experiment can be launched using :
@@ -69,7 +71,7 @@ python scripts_prepare/build_csvs.py
 
 This should take about 3 minutes.
 
-## Pockets as 2.5d graphs, ligands as graphs and fingerprints
+### Pockets as 2.5d graphs, ligands as graphs and fingerprints
 
 We now want to prepare our pockets and ligands for learning our tool.
 This can be obtained using our scripts.
@@ -82,7 +84,7 @@ This can be obtained using our scripts.
 python scripts_prepare/get_pocket_graphs.py
 ```
 
-## Splitting the data
+### Splitting the data
 
 We first need to compute RMScores and then to split the data according to the RMscores.
 
@@ -95,7 +97,7 @@ final splits. Simply run:
 python scripts_prepare/split.py
 ```
 
-## Model training
+## Model training and inference
 
 Fetch the whole RNAs for pretraining [here](https://drive.proton.me/urls/Y8TTCWKDVC#vs29rzJ1h9YN)
 
@@ -128,42 +130,25 @@ To get results in a similar format for rDock, please run:
 python scripts_run/rdock_output.py
 ```
 
-# Generate the figures from the results
+Finally, you can generate csvs containing RNAmigos results for the validation on pockets with Chembl decoys and ROBIN
+validation by running:
 
-If you followed the previous steps, we expect the *outputs/* directory to hold {native, dock, rdock}_{, _raw}.csv files.
+```bash
+python scripts_run/chembl_inference.py
+python scripts_run/robin_inference.py
+```
 
-Those files are directly available for download at :
+## Generate the figures from the results
 
 [//]: # (TODO get dl files)
 
 
-The first step is to produce ensembling results, by running
-
-```bash
-python scripts_fig/mixing.py
-```
-
-We now have the table of mixing results as well as the best ensemble models.
-In addition, we have blended our models to produce csvs with mixed and mixed+rdock results.
-
-We can now run :
+We now have the table of mixing results as well as the best ensemble models. 
+To obtain the different plots of the paper, one can now run :
 
 ```bash
 python scripts_fig/violins.py
 python scripts_fig/ef_time.py
-```
-
-to produce the remaining Figures of the paper.
-
-For the ROBIN experiment, we will first need to produce predictions for four ROBIN targets.
-To get these predictions, please run (takes about 20 minutes):
-
-```
-python scripts_fig/robin_inference.py
-```
-
-Finally, you will obtain the ROBIN plot with :
-
-```
-python scripts_fig/robin_fig.py
+python scripts_fig/panel_1.py
+python scripts_fig/robin_analyze.py
 ```
