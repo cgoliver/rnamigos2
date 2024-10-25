@@ -115,8 +115,8 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     dock_model_path = "results/trained_models/dock/dock_rnafm_3"
     dock_model = get_model_from_dirpath(dock_model_path)
     df_dock_aurocs, df_dock_raw, df_dock_ef = compute_efs_model(dock_model,
-                                                         dataloader=dataloader,
-                                                         lower_is_better=True)
+                                                                dataloader=dataloader,
+                                                                lower_is_better=True)
     df_dock_aurocs.to_csv(out_dir / (base_name + "_dock.csv"))
     df_dock_raw.to_csv(out_dir / (base_name + "_dock_raw.csv"))
     df_dock_ef.to_csv(out_dir / (base_name + "_dock_ef.csv"))
@@ -125,27 +125,22 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     native_model_path = "results/trained_models/is_native/native_rnafm_dout5_4"
     native_model = get_model_from_dirpath(native_model_path)
     df_native_aurocs, df_native_raw, df_native_ef = compute_efs_model(native_model,
-                                                               dataloader=dataloader,
-                                                               lower_is_better=False)
+                                                                      dataloader=dataloader,
+                                                                      lower_is_better=False)
     df_native_aurocs.to_csv(out_dir / (base_name + "_native.csv"))
     df_native_raw.to_csv(out_dir / (base_name + "_native_raw.csv"))
     df_native_ef.to_csv(out_dir / (base_name + "_native_ef.csv"))
 
     # Now merge those two results to get a final mixed performance
-    all_efs, mixed_df, mixed_df_raw = mix_two_dfs(df_native_raw, df_dock_raw, score_1="raw_score")
-    ef_rows = []
-    for frac in (0.01, 0.02, 0.05):
-        for pocket, group in mixed_df_raw.groupby("pocket_id"):
-            ef_frac = enrichment_factor(
-                group["mixed"], group["is_active"], frac=frac
-            )
-            ef_rows.append({"score": ef_frac, "pocket_id": pocket, "frac": frac})
-    mixed_df_ef = pd.DataFrame(ef_rows)
-
-    mixed_df.to_csv(out_dir / (base_name + "_mixed.csv"))
+    all_aurocs, mixed_df_aurocs, mixed_df_raw = mix_two_dfs(df_native_raw,
+                                                            df_dock_raw,
+                                                            score_1="raw_score",
+                                                            outname_col="mixed")
+    mixed_df_ef = raw_df_to_efs(mixed_df_raw, score='mixed')
+    mixed_df_aurocs.to_csv(out_dir / (base_name + "_mixed.csv"))
     mixed_df_raw.to_csv(out_dir / (base_name + "_mixed_raw.csv"))
     mixed_df_ef.to_csv(out_dir / (base_name + "_mixed_ef.csv"))
-    return np.mean(mixed_df["score"].values)
+    return np.mean(mixed_df_aurocs["score"].values)
 
 
 def do_robin(ligand_name, pocket_path, use_rnafm=False):
@@ -158,13 +153,7 @@ def do_robin(ligand_name, pocket_path, use_rnafm=False):
     final_df = robin_inference_raw(ligand_name, dgl_pocket_graph)
     pocket_id = Path(pocket_path).stem
     final_df["pocket_id"] = pocket_id
-    ef_rows = []
-    for frac in (0.01, 0.02, 0.05):
-        ef = enrichment_factor(
-            final_df["mixed_score"], final_df["is_active"], frac=frac
-        )
-        ef_rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
-    ef_df = pd.DataFrame(ef_rows)
+    ef_df = raw_df_to_efs(final_df, score='mixed_score')
     return ef_df, final_df
 
 

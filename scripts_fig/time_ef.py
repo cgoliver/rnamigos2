@@ -218,7 +218,8 @@ def line_plot(df, mixed_model='combined', robin=False):
         mixed_means = [0.924] * 20
         print('Unexpected model, dashed line is confused')
     if not robin:
-        ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
+        ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'],
+                linestyle='--')
 
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)

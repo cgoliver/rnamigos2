@@ -126,9 +126,7 @@ def raw_df_to_efs(raw_df, score="raw_score", fracs=(0.01, 0.02, 0.05)):
     ef_rows = []
     for frac in fracs:
         for pocket, group in raw_df.groupby("pocket_id"):
-            ef_frac = enrichment_factor(
-                group[score], group["is_active"], frac=frac
-            )
+            ef_frac = enrichment_factor(group[score], group["is_active"], frac=frac)
             ef_rows.append({"score": ef_frac, "pocket_id": pocket, "frac": frac})
     df_ef = pd.DataFrame(ef_rows)
     return df_ef
