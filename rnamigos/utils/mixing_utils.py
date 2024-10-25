@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from sklearn import metrics
 
-from rnamigos.utils.virtual_screen import mean_active_rank
+from rnamigos.utils.virtual_screen import get_auroc
 
 """
 The main two functions are:
@@ -32,10 +32,10 @@ def add_mixed_score(df, score1='dock', score2='native', out_col='mixed'):
 
 def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col='mixed', add_decoy=True):
     """
-    Mix two scores, and return raw, efs and mean efs. Optionally dump the dataframes.
+    Mix two scores, and return raw, aurocs and mean aurocs. Optionally dump the dataframes.
     """
     pockets = df['pocket_id'].unique()
-    all_efs = []
+    all_aurocs = []
     all_pockets = []
     all_dfs = []
     for pi, p in enumerate(pockets):
@@ -49,7 +49,7 @@ def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col
                                                  pocket_df['temp_name'],
                                                  drop_intermediate=True)
         enrich = metrics.auc(fpr, tpr)
-        all_efs.append(enrich)
+        all_aurocs.append(enrich)
         all_pockets.append(p)
         all_dfs.append(pocket_df[['pocket_id', 'smiles', 'is_active', 'temp_name']])
 
@@ -63,18 +63,18 @@ def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col
         dumb_decoy = [DECOY for _ in range(len(mixed_df_raw))]
         mixed_df_raw.insert(len(mixed_df_raw.columns), "decoys", dumb_decoy)
 
-    mixed_df = pd.DataFrame({"pocket_id": all_pockets,
-                             'decoys': [DECOY for _ in all_pockets],
-                             'score': all_efs})
+    mixed_df_aurocs = pd.DataFrame({"pocket_id": all_pockets,
+                                    'decoys': [DECOY for _ in all_pockets],
+                                    'score': all_aurocs})
     if outname is not None:
         mixed_df_raw.to_csv(f"outputs/{outname}_raw.csv")
-        mixed_df.to_csv(f"outputs/{outname}.csv")
-    return all_efs, mixed_df, mixed_df_raw
+        mixed_df_aurocs.to_csv(f"outputs/{outname}.csv")
+    return all_aurocs, mixed_df_aurocs, mixed_df_raw
 
 
 def get_mix_score(df, score1='dock', score2='native'):
-    all_efs, _, _ = mix_two_scores(df, score1=score1, score2=score2)
-    return np.mean(all_efs)
+    all_aurocs, _, _ = mix_two_scores(df, score1=score1, score2=score2)
+    return np.mean(all_aurocs)
 
 
 def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mixed'):
@@ -88,12 +88,12 @@ def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mi
     df_2[renamed_score] = df_2[score_2]
     df_2 = df_2[['pocket_id', 'smiles', 'is_active', renamed_score]]
     df_to_use = df_1.merge(df_2, on=['pocket_id', 'smiles', 'is_active'], how='outer')
-    all_efs, mixed_df, mixed_df_raw = mix_two_scores(df_to_use,
-                                                     score_1,
-                                                     renamed_score,
-                                                     outname=outname,
-                                                     outname_col=outname_col)
-    return all_efs, mixed_df, mixed_df_raw
+    all_aurocs, mixed_df_aurocs, mixed_df_raw = mix_two_scores(df_to_use,
+                                                               score_1,
+                                                               renamed_score,
+                                                               outname=outname,
+                                                               outname_col=outname_col)
+    return all_aurocs, mixed_df_aurocs, mixed_df_raw
 
 
 def unmix(mixed_df, score, decoys=('pdb', 'pdb_chembl', 'chembl'), outpath=None):
@@ -105,7 +105,7 @@ def unmix(mixed_df, score, decoys=('pdb', 'pdb_chembl', 'chembl'), outpath=None)
         mixed_df_decoy = mixed_df[mixed_df['decoys'] == decoy_mode]
         for pi, p in enumerate(pockets):
             pocket_df = mixed_df_decoy.loc[mixed_df_decoy['pocket_id'] == p]
-            enrich = mean_active_rank(pocket_df[score], pocket_df['is_active'])
+            enrich = get_auroc(pocket_df[score], pocket_df['is_active'])
             all_rows.append({"score": enrich, "metric": "MAR", "decoys": decoy_mode, "pocket_id": p})
     df = pd.DataFrame(all_rows)
     if outpath is not None:

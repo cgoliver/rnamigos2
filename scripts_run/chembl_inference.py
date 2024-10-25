@@ -14,7 +14,7 @@ from rnamigos.learning.dataset import get_systems_from_cfg
 from rnamigos.learning.dataloader import get_vs_loader
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.utils.mixing_utils import mix_two_scores, mix_two_dfs, get_mix_score, unmix
-from rnamigos.utils.virtual_screen import get_results_dfs, get_mar_one
+from rnamigos.utils.virtual_screen import get_results_dfs, raw_df_to_mean_auroc
 from scripts_fig.plot_utils import group_df
 
 
@@ -26,42 +26,42 @@ def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None):
 
     test_systems = get_systems_from_cfg(cfg, return_test=True)
     model = model.to("cpu")
-    ef_rows, raw_rows = [], []
+    rows_aurocs, rows_raws = [], []
     if decoys is None:
         decoys = ["chembl", "pdb", "pdb_chembl", "decoy_finder"]
     elif isinstance(decoys, str):
         decoys = [decoys]
     for decoy_mode in decoys:
         dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg, cache_graphs=False)
-        decoy_ef_dfs, decoys_raw_dfs = get_results_dfs(model=model,
-                                                       dataloader=dataloader,
-                                                       decoy_mode=decoy_mode,
-                                                       cfg=cfg,
-                                                       verbose=verbose)
-        ef_rows.append(decoy_ef_dfs)
-        raw_rows.append(decoys_raw_dfs)
+        decoy_df_aurocs, decoys_dfs_raws = get_results_dfs(model=model,
+                                                           dataloader=dataloader,
+                                                           decoy_mode=decoy_mode,
+                                                           cfg=cfg,
+                                                           verbose=verbose)
+        rows_aurocs.append(decoy_df_aurocs)
+        rows_raws.append(decoys_dfs_raws)
 
     # Make it a df
-    df_ef = pd.concat(ef_rows)
-    df_raw = pd.concat(raw_rows)
+    df_aurocs = pd.concat(rows_aurocs)
+    df_raw = pd.concat(rows_raws)
     if dump:
         d = pathlib.Path(cfg.result_dir, parents=True, exist_ok=True)
         base_name = pathlib.Path(cfg.name).stem
         out_csv = d / (base_name + ".csv")
         out_csv_raw = d / (base_name + "_raw.csv")
-        df_ef.to_csv(out_csv, index=False)
+        df_aurocs.to_csv(out_csv, index=False)
         df_raw.to_csv(out_csv_raw, index=False)
 
         # Just printing the results
-        df_chembl = df_ef.loc[df_ef["decoys"] == "chembl"]
-        df_pdbchembl = df_ef.loc[df_ef["decoys"] == "pdb_chembl"]
+        df_chembl = df_aurocs.loc[df_aurocs["decoys"] == "chembl"]
+        df_pdbchembl = df_aurocs.loc[df_aurocs["decoys"] == "pdb_chembl"]
         df_chembl_grouped = group_df(df_chembl)
         df_pdbchembl_grouped = group_df(df_pdbchembl)
-        logger.info(f"{cfg.name} Mean EF on chembl: {np.mean(df_chembl['score'].values)}")
-        logger.info(f"{cfg.name} Mean grouped EF on chembl: {np.mean(df_chembl_grouped['score'].values)}")
-        logger.info(f"{cfg.name} Mean EF on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
-        logger.info(f"{cfg.name} Mean grouped EF on pdbchembl: {np.mean(df_pdbchembl_grouped['score'].values)}")
-    return df_ef, df_raw
+        logger.info(f"{cfg.name} Mean AuROC on chembl: {np.mean(df_chembl['score'].values)}")
+        logger.info(f"{cfg.name} Mean grouped AuROC on chembl: {np.mean(df_chembl_grouped['score'].values)}")
+        logger.info(f"{cfg.name} Mean AuROC on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
+        logger.info(f"{cfg.name} Mean grouped AuROC on pdbchembl: {np.mean(df_pdbchembl_grouped['score'].values)}")
+    return df_aurocs, df_raw
 
 
 def get_all_csvs(recompute=False):
@@ -70,7 +70,7 @@ def get_all_csvs(recompute=False):
     os.makedirs(res_dir, exist_ok=True)
     decoys = ['chembl', 'pdb', 'pdb_chembl']
     for model_name, model_path in MODELS.items():
-        decoys_efs, decoys_raws = list(), list()
+        decoys_df_aurocs, decoys_df_raws = list(), list()
         out_csv = os.path.join(res_dir, f"{model_name}.csv")
         out_csv_raw = os.path.join(res_dir, f"{model_name}_raw.csv")
         if os.path.exists(out_csv) and not recompute:
@@ -78,13 +78,13 @@ def get_all_csvs(recompute=False):
         for decoy_mode in decoys:
             full_model_path = os.path.join(model_dir, model_path)
             model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
-            df_ef, df_raw = pdb_eval(cfg, model, dump=False, verbose=True, decoys=decoy_mode)
-            decoys_efs.append(df_ef)
-            decoys_raws.append(df_raw)
-        all_efs = pd.concat(decoys_efs)
-        all_raws = pd.concat(decoys_raws)
-        all_efs.to_csv(out_csv, index=False)
-        all_raws.to_csv(out_csv_raw, index=False)
+            df_aurocs, df_raw = pdb_eval(cfg, model, dump=False, verbose=True, decoys=decoy_mode)
+            decoys_df_aurocs.append(df_aurocs)
+            decoys_df_raws.append(df_raw)
+        all_df_aurocs = pd.concat(decoys_df_aurocs)
+        all_df_raws = pd.concat(decoys_df_raws)
+        all_df_aurocs.to_csv(out_csv, index=False)
+        all_df_raws.to_csv(out_csv_raw, index=False)
 
 
 def compute_mix_csvs():
@@ -142,7 +142,7 @@ def compute_mix_csvs():
         out_path_raw = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
         big_df_raw.to_csv(out_path_raw)
 
-        # Dump efs dataframes for newly combined methods
+        # Dump aurocs dataframes for newly combined methods
         for method in ['docknat', 'rdocknat', 'combined']:
             outpath = f'outputs/pockets/{method}_{seed}.csv'
             unmix(big_df_raw, score=method, outpath=outpath)
@@ -156,29 +156,29 @@ def compute_all_self_mix():
         out_path_raw_2 = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{SEEDS[to_compare[1]]}_raw.csv'
         big_df_raw_2 = pd.read_csv(out_path_raw_2)
         for score in ['native', 'dock']:
-            all_efs, _, _ = mix_two_dfs(big_df_raw_1, big_df_raw_2, score)
-            print(score, np.mean(all_efs))
+            all_aurocs, _, _ = mix_two_dfs(big_df_raw_1, big_df_raw_2, score)
+            print(score, np.mean(all_aurocs))
 
 
-def get_one_mixing_table(df):
+def get_one_mixing_table(raw_df):
     all_methods = ['native', 'dock', 'rdock']
     all_res = {}
     # Do singletons
     for method in all_methods:
-        result = get_mar_one(df, score=method)
+        result = raw_df_to_mean_auroc(raw_df, score=method)
         all_res[method] = result
 
     # Do pairs
     # for pair in itertools.combinations(all_methods, 2):
-    #     mean_ef = get_mix_score(df, score1=pair[0], score2=pair[1])
-    #     all_res[pair] = mean_ef
-    mean_ef = get_mix_score(df, score1="dock", score2="rdock")
-    all_res['dock/rdock'] = mean_ef
+    #     mean_auroc = get_mix_score(df, score1=pair[0], score2=pair[1])
+    #     all_res[pair] = mean_auroc
+    mean_aurocs = get_mix_score(raw_df, score1="dock", score2="rdock")
+    all_res['dock/rdock'] = mean_aurocs
 
     all_methods_2 = ['docknat', 'rdocknat', 'combined']
     # Do singletons but dump them as a single csv since they did not exist
     for method in all_methods_2:
-        result = get_mar_one(df, score=method)
+        result = raw_df_to_mean_auroc(raw_df, score=method)
         all_res[method] = result
 
     for k, v in all_res.items():

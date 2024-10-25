@@ -13,7 +13,7 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos.utils.virtual_screen import enrichment_factor, get_mar_one
+from rnamigos.utils.virtual_screen import enrichment_factor, raw_df_to_mean_auroc
 from rnamigos.utils.graph_utils import load_rna_graph
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.inference import inference_raw, get_models
@@ -278,8 +278,8 @@ def print_results(swap=0):
     for method in to_print:
         in_csv = os.path.join(res_dir, f"{method}_raw.csv")
         df = pd.read_csv(in_csv)
-        mar = get_mar_one(df, "score")
-        print(method, mar)
+        auroc = raw_df_to_mean_auroc(df, "score")
+        print(method, auroc)
 
 
 if __name__ == "__main__":

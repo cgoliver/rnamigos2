@@ -34,22 +34,17 @@ import pandas as pd
 import random
 from rnaglib.utils import graph_io
 import seaborn as sns
-from sklearn import metrics
 import torch
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.learning.dataset import VirtualScreenDataset, get_systems
-from rnamigos.utils.virtual_screen import (
-    mean_active_rank,
-    run_virtual_screen,
-    enrichment_factor,
-)
-from rnamigos.utils.mixing_utils import mix_two_scores, mix_two_dfs
+from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.utils.graph_utils import load_rna_graph
-from rnamigos.utils.virtual_screen import run_results_to_raw_df, run_results_to_ef_df
+from rnamigos.utils.mixing_utils import mix_two_dfs
+from rnamigos.utils.virtual_screen import get_auroc, run_virtual_screen, enrichment_factor
+from rnamigos.utils.virtual_screen import run_results_to_raw_df, run_results_to_auroc_df, raw_df_to_efs
 from scripts_run.robin_inference import robin_inference_raw
 from scripts_fig.perturbations.get_perturbed_pockets import get_perturbed_pockets, compute_overlaps
 from scripts_fig.perturbations.pertub_plot_utils import end_plot, plot_one, plot_list
@@ -63,20 +58,12 @@ def compute_efs_model(model, dataloader, lower_is_better):
     Given a model and a dataloader, make the inference on all pocket-ligand pairs and dump raw and aggregated csvs
     """
     efs, scores, status, pocket_names, all_smiles = run_virtual_screen(
-        model, dataloader, metric=mean_active_rank, lower_is_better=lower_is_better
+        model, dataloader, metric=get_auroc, lower_is_better=lower_is_better
     )
-    ef_df = run_results_to_ef_df(efs, scores, pocket_names, decoy_mode=DECOYS)
-    raw_df = run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode=DECOYS)
-
-    ef_rows = []
-    for frac in (0.01, 0.02, 0.05):
-        for pocket, group in raw_df.groupby("pocket_id"):
-            ef_frac = enrichment_factor(
-                group["raw_score"], group["is_active"], frac=frac
-            )
-            ef_rows.append({"score": ef_frac, "pocket_id": pocket, "frac": frac})
-    df_ef = pd.DataFrame(ef_rows)
-    return ef_df, raw_df, df_ef
+    df_aurocs = run_results_to_auroc_df(efs, scores, pocket_names, decoy_mode=DECOYS)
+    df_raw = run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode=DECOYS)
+    df_ef = raw_df_to_efs(df_raw)
+    return df_aurocs, df_raw, df_ef
 
 
 # Copied from evaluate except reps_only=True to save time
@@ -127,20 +114,20 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     # Get dock performance
     dock_model_path = "results/trained_models/dock/dock_rnafm_3"
     dock_model = get_model_from_dirpath(dock_model_path)
-    df_dock, df_dock_raw, df_dock_ef = compute_efs_model(dock_model,
+    df_dock_aurocs, df_dock_raw, df_dock_ef = compute_efs_model(dock_model,
                                                          dataloader=dataloader,
                                                          lower_is_better=True)
-    df_dock.to_csv(out_dir / (base_name + "_dock.csv"))
+    df_dock_aurocs.to_csv(out_dir / (base_name + "_dock.csv"))
     df_dock_raw.to_csv(out_dir / (base_name + "_dock_raw.csv"))
     df_dock_ef.to_csv(out_dir / (base_name + "_dock_ef.csv"))
 
     # Get native performance
     native_model_path = "results/trained_models/is_native/native_rnafm_dout5_4"
     native_model = get_model_from_dirpath(native_model_path)
-    df_native, df_native_raw, df_native_ef = compute_efs_model(native_model,
+    df_native_aurocs, df_native_raw, df_native_ef = compute_efs_model(native_model,
                                                                dataloader=dataloader,
                                                                lower_is_better=False)
-    df_native.to_csv(out_dir / (base_name + "_native.csv"))
+    df_native_aurocs.to_csv(out_dir / (base_name + "_native.csv"))
     df_native_raw.to_csv(out_dir / (base_name + "_native_raw.csv"))
     df_native_ef.to_csv(out_dir / (base_name + "_native_ef.csv"))
 

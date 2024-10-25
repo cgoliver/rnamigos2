@@ -16,7 +16,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from scripts_fig.plot_utils import PALETTE_DICT, group_df
-from rnamigos.utils.virtual_screen import mean_active_rank
+from rnamigos.utils.virtual_screen import get_auroc
 
 
 def enrichment_factor(scores, is_active, frac=0.01):
@@ -298,8 +298,8 @@ def make_fig(
         # print('AuROC : ', pocket_name, auroc)
         # print()
 
-        # mar = mean_active_rank(scores, actives)
-        # print(mar)
+        # auroc = get_auroc(scores, actives)
+        # print(auroc)
     #     #ef = f"EF@1\% {list(ef_df.loc[ef_df['pocket_id'] == name]['score'])[0]:.3f}"
     #     axs[i][0].text(0, 0, f"{name} EF: {ef:.3} MAR: {mar:.3}")
     #     axs[i][0].axis("off")

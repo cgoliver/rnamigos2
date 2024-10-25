@@ -9,7 +9,7 @@ from sklearn import metrics
 import torch
 
 
-def mean_active_rank(scores, is_active):
+def get_auroc(scores, is_active):
     fpr, tpr, thresholds = metrics.roc_curve(is_active, scores, drop_intermediate=True)
     auroc = metrics.auc(fpr, tpr)
     return auroc
@@ -23,7 +23,7 @@ def enrichment_factor(scores, is_active, frac=0.01):
     return (n_actives_screened / n_screened) / (n_actives / len(scores))
 
 
-def run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_better=False):
+def run_virtual_screen(model, dataloader, metric=get_auroc, lower_is_better=False):
     """run_virtual_screen.
 
     :param model: trained affinity prediction model
@@ -31,7 +31,7 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_bett
     :param metric: function that takes a list of prediction and an is_active indicator and returns a score
     :param lower_is_better: set to true for dock and native_fp models
     """
-    efs, all_scores, status, all_smiles, pocket_names = [], [], [], [], []
+    aurocs, all_scores, status, all_smiles, pocket_names = [], [], [], [], []
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
     failed_set = set()
     failed = 0
@@ -52,13 +52,13 @@ def run_virtual_screen(model, dataloader, metric=mean_active_rank, lower_is_bett
         if lower_is_better:
             scores = -scores
         is_active = is_active.numpy()
-        efs.append(metric(scores, is_active))
+        aurocs.append(metric(scores, is_active))
         all_scores.append(list(scores))
         status.append(list(is_active))
         pocket_names.append(pocket_name)
         all_smiles.append(smiles)
     logger.debug(f"VS failed on {failed_set}")
-    return efs, all_scores, status, pocket_names, all_smiles
+    return aurocs, all_scores, status, pocket_names, all_smiles
 
 
 def run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode):
@@ -73,11 +73,11 @@ def run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode):
     return pd.DataFrame(raw_rows)
 
 
-def run_results_to_ef_df(efs, scores, pocket_names, decoy_mode):
+def run_results_to_auroc_df(aurocs, scores, pocket_names, decoy_mode):
     rows = list()
-    for ef, score, pocket_id in zip(efs, scores, pocket_names):
-        rows.append({"score": ef,
-                     "metric": "EF" if decoy_mode == "robin" else "MAR",
+    for auroc, score, pocket_id in zip(aurocs, scores, pocket_names):
+        rows.append({"score": auroc,
+                     "metric": "EF" if decoy_mode == "robin" else "AuROC",
                      "decoys": decoy_mode,
                      "pocket_id": pocket_id})
     return pd.DataFrame(rows)
@@ -85,32 +85,50 @@ def run_results_to_ef_df(efs, scores, pocket_names, decoy_mode):
 
 def get_results_dfs(model, dataloader, decoy_mode, cfg, verbose=False):
     lower_is_better = cfg.train.target in ["dock", "native_fp"]
-    metric = enrichment_factor if decoy_mode == "robin" else mean_active_rank
+    metric = enrichment_factor if decoy_mode == "robin" else get_auroc
     if verbose:
         print(f"DOING: {cfg.name}, LOWER IS BETTER: {lower_is_better}")
-    efs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
-                                                                       dataloader,
-                                                                       metric=metric,
-                                                                       lower_is_better=lower_is_better)
-    ef_df = run_results_to_ef_df(efs, scores, pocket_names, decoy_mode)
+    aurocs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
+                                                                          dataloader,
+                                                                          metric=metric,
+                                                                          lower_is_better=lower_is_better)
+    auroc_df = run_results_to_auroc_df(aurocs, scores, pocket_names, decoy_mode)
     raw_df = run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode)
     if verbose:
-        print(f"Mean EF for {decoy_mode} {cfg.name}:", np.mean(efs))
-    return ef_df, raw_df
+        print(f"Mean AuROC for {decoy_mode} {cfg.name}:", np.mean(aurocs))
+    return auroc_df, raw_df
 
 
-def get_mar_one(df, score):
+def raw_df_to_mean_auroc(raw_df, score):
     """
     df_raw => MAR
+    :param raw_df:
+    :param score:
+    :return:
+    """
+    pockets = raw_df['pocket_id'].unique()
+    all_aurocs = []
+    for pi, p in enumerate(pockets):
+        pocket_df = raw_df.loc[raw_df['pocket_id'] == p]
+        auroc = get_auroc(pocket_df[score], pocket_df['is_active'])
+        all_aurocs.append(auroc)
+    return np.mean(all_aurocs)
+
+
+def raw_df_to_efs(raw_df, score="raw_score", fracs=(0.01, 0.02, 0.05)):
+    """
+    df_raw => efs
     :param df:
     :param score:
     :param outname:
     :return:
     """
-    pockets = df['pocket_id'].unique()
-    all_efs = []
-    for pi, p in enumerate(pockets):
-        pocket_df = df.loc[df['pocket_id'] == p]
-        enrich = mean_active_rank(pocket_df[score], pocket_df['is_active'])
-        all_efs.append(enrich)
-    return np.mean(all_efs)
+    ef_rows = []
+    for frac in fracs:
+        for pocket, group in raw_df.groupby("pocket_id"):
+            ef_frac = enrichment_factor(
+                group[score], group["is_active"], frac=frac
+            )
+            ef_rows.append({"score": ef_frac, "pocket_id": pocket, "frac": frac})
+    df_ef = pd.DataFrame(ef_rows)
+    return df_ef
