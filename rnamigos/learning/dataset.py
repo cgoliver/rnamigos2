@@ -457,9 +457,6 @@ class VirtualScreenDataset(DockingDataset):
                 pocket_name = self.all_pockets_names[
                     np.random.randint(0, len(self.all_pockets_names))
                 ]
-                print(
-                    f"ROGNAN POCKET: {pocket_name} ORIGINAL: {self.all_pockets_names[idx]}"
-                )
             else:
                 pocket_name = self.all_pockets_names[idx]
 
