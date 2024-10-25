@@ -237,7 +237,7 @@ def get_merged_df(swap=0, recompute=False):
     This is useful for plotting scripts, such as time_ef.py
     """
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    out_csv = os.path.join(res_dir, "big_df_raw.csv")
+    out_csv = os.path.join(res_dir, "carlos_big_df_raw.csv")
     if not recompute and os.path.exists(out_csv):
         return
     to_mix = [
@@ -247,6 +247,14 @@ def get_merged_df(swap=0, recompute=False):
         "rnamigos",
         "rdocknat",
         "combined",
+        "native_nonpocket",
+        "native_rognanpocket",
+        "rnamigos_nonpocket",
+        "rnamigos_rognanpocket",
+        "native_tune_bestrobin_val",
+        "native_tune_bestrobin_test",
+        "rnamigos_nativetune_val",
+        "rnamigos_nativetune_test",
     ]
     big_df = None
     for name in to_mix:
@@ -289,20 +297,20 @@ def print_results(swap=0):
 
 if __name__ == "__main__":
     MODELS = {
-        # "native": "is_native/native_nopre_new_pdbchembl",
-        # "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
-        # "native_pre": "is_native/native_pretrain_new_pdbchembl",
-        # "native_42": "is_native/native_rnafm_dout5_4",
+        "native": "is_native/native_nopre_new_pdbchembl",
+        "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
+        "native_pre": "is_native/native_pretrain_new_pdbchembl",
+        "native_42": "is_native/native_rnafm_dout5_4",
         "native_nonpocket": "is_native/native_rnafm_dout5_4_nonpocket",
         "native_rognanpocket": "is_native/native_rnafm_dout5_4_rognan",
         "native_tune_bestrobin_val": "is_native/models_dout/native_rnafm_dout5_4_tune_21_best",
         "native_tune_bestrobin_test": "is_native/models_dout/native_rnafm_dout5_4_tune_9",
-        # "dock_42": "dock/dock_rnafm_3",
+        "dock_42": "dock/dock_rnafm_3",
     }
 
     PAIRS = {
-        # ("rdock", "dock_42"): "dock_rdock",
-        # ("native_42", "dock_42"): "rnamigos",
+        ("rdock", "dock_42"): "dock_rdock",
+        ("native_42", "dock_42"): "rnamigos",
         ("native_nonpocket", "dock_42"): "rnamigos_nonpocket",
         ("native_rognanpocket", "dock_42"): "rnamigos_rognanpocket",
         ("native_tune_bestrobin_test", "dock_42"): "rnamigos_nativetune_test",
@@ -312,7 +320,7 @@ if __name__ == "__main__":
         ("native_42", "rdock"): "rdocknat",
     }
 
-    SWAP = 0
+    SWAP = 1
     # TEST ONE INFERENCE
     # pocket_id = "TPP"
     # lig_name = "2GDI_Y_TPP_100"
@@ -323,7 +331,7 @@ if __name__ == "__main__":
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
 
     # GET ALL CSVs for the models and plot them
-    get_all_csvs(recompute=False, swap=SWAP)
+    get_all_csvs(recompute=True, swap=SWAP)
     get_dfs_docking(swap=SWAP)
     mix_all(recompute=True, swap=SWAP)
     get_merged_df(recompute=True, swap=SWAP)

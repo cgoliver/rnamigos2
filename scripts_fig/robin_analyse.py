@@ -15,15 +15,24 @@ ROBIN_POCKETS = {
 
 POCKET_PATH = "data/json_pockets_expanded"
 
+
 def plot_all():
     big_df = []
     models = [
-        "rdock",
-        "dock_42",
-        "native_42",
+        # "rdock",
+        # "dock_42",
+        # "native_42",
         "rnamigos",
-        "rdocknat",
-        "combined",
+        # "rdocknat",
+        # "combined",
+        # "native_nonpocket",
+        # "native_rognanpocket",
+        "rnamigos_nonpocket",
+        "rnamigos_rognanpocket",
+        # "native_tune_bestrobin_val",
+        # "native_tune_bestrobin_test",
+        "rnamigos_nativetune_val",
+        "rnamigos_nativetune_test",
     ]
     for model in models:
         out_csv = os.path.join(RES_DIR, f"{model}.csv")
@@ -86,7 +95,7 @@ def plot_perturbed(model="pre_fm", group=True):
     plt.show()
 
 
-def plot_distributions(score_to_use='native_validation', in_csv="outputs/robin/big_df_raw.csv"):
+def plot_distributions(score_to_use="native_validation", in_csv="outputs/robin/carlos_big_df_raw.csv"):
     merged = pd.read_csv(in_csv)
     colors = sns.color_palette(["#33ccff", "#00cccc", "#3366ff", "#9999ff"])
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
@@ -97,7 +106,7 @@ def plot_distributions(score_to_use='native_validation', in_csv="outputs/robin/b
             data=merged_pocket,
             x=score_to_use,
             hue="is_active",
-            palette={1: colors[i], 0: 'lightgrey'},
+            palette={1: colors[i], 0: "lightgrey"},
             fill=True,
             alpha=0.9,
             linewidth=0,
@@ -109,7 +118,7 @@ def plot_distributions(score_to_use='native_validation', in_csv="outputs/robin/b
 
 
 if __name__ == "__main__":
-    SWAP = 0
+    SWAP = 1
     RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
 
     plot_all()
@@ -119,6 +128,8 @@ if __name__ == "__main__":
     # score_to_use = 'rdock'
     # score_to_use = 'dock_42'
     # score_to_use = 'native_42'
-    # score_to_use = 'rnamigos'
-    score_to_use = 'combined'
+    score_to_use = "rnamigos"
+    # score_to_use = "combined"
+    # score_to_use = "rnamigos_nativetune_val"
+    # score_to_use = "rnamigos_rognanpocket"
     plot_distributions(score_to_use=score_to_use)

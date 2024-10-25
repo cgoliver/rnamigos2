@@ -49,9 +49,7 @@ class RGCN(nn.Module):
 
         self.batch_norm = batch_norm
         if self.batch_norm:
-            self.batch_norm_layers = nn.ModuleList(
-                [nn.BatchNorm1d(h_dim) for _ in range(num_layers)]
-            )
+            self.batch_norm_layers = nn.ModuleList([nn.BatchNorm1d(h_dim) for _ in range(num_layers)])
         self.pool = SumPooling()
 
     def build_model(self):
@@ -450,9 +448,7 @@ class RNAmigosModel(nn.Module):
 
     @property
     def use_graphligs(self):
-        return self.lig_encoder is not None and isinstance(
-            self.lig_encoder, LigandGraphEncoder
-        )
+        return self.lig_encoder is not None and isinstance(self.lig_encoder, LigandGraphEncoder)
 
     def predict_ligands(self, g, ligands):
         with torch.no_grad():
@@ -473,12 +469,13 @@ class RNAmigosModel(nn.Module):
 
     def forward(self, g, lig_fp):
         g, embeddings = self.encoder(g)
-        pred = self.pool(g, embeddings)
+        g_h = self.pool(g, embeddings)
+        lig_h = torch.tensor([0])
         if not self.lig_encoder is None:
             lig_h = self.lig_encoder(lig_fp)
-            pred = torch.cat((pred, lig_h), dim=1)
+            pred = torch.cat((g_h, lig_h), dim=1)
         pred = self.decoder(pred)
-        return pred, embeddings
+        return pred, (g_h, lig_h)
 
     def from_pretrained(self, model_path):
         state_dict = torch.load(model_path)
@@ -496,9 +493,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     if "use_rnafm" in cfg.model:
         use_rnafm = cfg.model.use_rnafm
 
-    model_indim = (
-        cfg.model.encoder.in_dim + 640 if use_rnafm else cfg.model.encoder.in_dim
-    )
+    model_indim = cfg.model.encoder.in_dim + 640 if use_rnafm else cfg.model.encoder.in_dim
 
     enc_hidden_dim = cfg.model.encoder.hidden_dim
     enc_num_layers = cfg.model.encoder.num_layers
@@ -506,15 +501,11 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     dec_num_layers = cfg.model.decoder.num_layers
 
     if tune:
-        dec_hidden_dim = trial.suggest_categorical(
-            "model.decoder.hidden_dim", [32, 128, 256]
-        )
+        dec_hidden_dim = trial.suggest_categorical("model.decoder.hidden_dim", [32, 128, 256])
         dec_num_layers = trial.suggest_int("model.decoder.num_layers", 2, 4)
 
     if tune and not cfg.model.use_pretrained:
-        enc_hidden_dim = trial.suggest_categorical(
-            "model.encoder.hidden_dim", [32, 128, 256]
-        )
+        enc_hidden_dim = trial.suggest_categorical("model.encoder.hidden_dim", [32, 128, 256])
         enc_num_layers = trial.suggest_int("model.encoder.num_layers", 2, 4)
 
     rna_encoder = Embedder(
@@ -577,11 +568,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
         num_layers=dec_num_layers,
         activation=cfg.model.decoder.activation,
         batch_norm=cfg.model.batch_norm,
-        dropout=(
-            cfg.model.dropout
-            if not tune
-            else trial.suggest_categorical("model.decoder.dropout", [0.2, 0.5])
-        ),
+        dropout=(cfg.model.dropout if not tune else trial.suggest_categorical("model.decoder.dropout", [0.2, 0.5])),
     )
 
     model = RNAmigosModel(
@@ -604,9 +591,7 @@ def get_model_from_dirpath(saved_model_dir, tune=False, trial=None, return_cfg=F
     model = cfg_to_model(cfg, for_loading=True, tune=tune, trial=trial)
 
     # Load params and use eval()
-    state_dict = torch.load(Path(saved_model_dir, "model.pth"), map_location="cpu")[
-        "model_state_dict"
-    ]
+    state_dict = torch.load(Path(saved_model_dir, "model.pth"), map_location="cpu")["model_state_dict"]
     model.load_state_dict(state_dict)
     model.eval()
     if return_cfg:
