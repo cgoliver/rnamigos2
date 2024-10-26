@@ -152,6 +152,34 @@ def get_all_csvs(recompute=False, swap=0):
         df_ef.to_csv(out_csv, index=False)
         df_raw.to_csv(out_csv_raw, index=False)
 
+# score,smiles,is_active,pocket_id
+def assess_overlap_robin():
+    res_dir = "outputs/robin"
+    docking_df = pd.read_csv(os.path.join(res_dir, "dock_42_raw.csv"))
+    smiles_dict = {}
+    pocket_ids = list(ROBIN_POCKETS.values())
+    for pocket_id in pocket_ids:
+        docking_df_lig = docking_df[docking_df["pocket_id"] == pocket_id]
+        smiles = docking_df_lig[["smiles"]].values.flatten().tolist()
+        smiles_dict[pocket_id] = list(sorted(smiles))
+    smiles_0 = smiles_dict.pop(pocket_ids[0])
+    smiles_1 = smiles_dict.pop(pocket_ids[1])
+    overlap = set(smiles_0).intersection(set(smiles_1))
+    a = 1
+
+def assess_overlap_docking():
+    docking_df = pd.read_csv("data/robin_docking_consolidated_v2.csv")
+    smiles_dict = {}
+    for ligand_name, pocket_id in ROBIN_POCKETS.items():
+        docking_df_lig = docking_df[docking_df["TARGET"] == ligand_name]
+        smiles = docking_df_lig[["SMILE"]].values.flatten().tolist()
+        smiles_dict[ligand_name] = list(sorted(smiles))
+    robin_sys = list(ROBIN_POCKETS.keys())
+    smiles_0 = smiles_dict.pop(robin_sys[0])
+    smiles_1 = smiles_dict.pop(robin_sys[1])
+    overlap = set(smiles_0).intersection(set(smiles_1))
+    a = 1
+
 
 def get_dfs_docking(swap=0):
     """
@@ -164,20 +192,21 @@ def get_dfs_docking(swap=0):
     """
 
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    ref_raw_df = pd.read_csv("outputs/robin/dock_42_raw.csv")
+    ref_raw_df = pd.read_csv(os.path.join(res_dir, "dock_42_raw.csv"))
     docking_df = pd.read_csv("data/robin_docking_consolidated_v2.csv")
     # For each pocket, get relevant mapping smiles : normalized score,
     # then use it to create the appropriate raw, and clean csvs
     all_raws, all_dfs = [], []
     robin_lig_pocket_dict, new_to_old = get_swapped_pocketlig(swap=swap)
     for ligand_name, pocket_id in robin_lig_pocket_dict.items():
+        # Get relevant subpart of the original docking data and normalize it
         docking_df_lig = docking_df[docking_df["TARGET"] == ligand_name]
-        scores = -pd.to_numeric(
-            docking_df_lig["INTER"], errors="coerce"
-        ).values.squeeze()
+        scores = -pd.to_numeric(docking_df_lig["INTER"], errors="coerce").values.squeeze()
         scores[scores < 0] = 0
         scores = np.nan_to_num(scores, nan=0)
         normalized_scores = (scores - scores.min()) / (scores.max() - scores.min())
+
+        # Now get the docking specific mapping {smiles: score}
         mapping = {}
         for smiles, score in zip(docking_df_lig[["SMILE"]].values, normalized_scores):
             mapping[smiles[0]] = score
@@ -284,6 +313,7 @@ if __name__ == "__main__":
     }
 
     SWAP = 0
+
     # TEST ONE INFERENCE
     # pocket_id = "TPP"
     # lig_name = "2GDI_Y_TPP_100"
@@ -292,9 +322,10 @@ if __name__ == "__main__":
     # full_model_path = os.path.join(model_dir, model_path)
     # model = get_model_from_dirpath(full_model_path)
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
+    assess_overlap_robin()
 
     # GET ALL CSVs for the models and plot them
-    get_all_csvs(recompute=True, swap=SWAP)
+    get_all_csvs(recompute=False, swap=SWAP)
     get_dfs_docking(swap=SWAP)
     mix_all(recompute=True, swap=SWAP)
     get_merged_df(recompute=True, swap=SWAP)
