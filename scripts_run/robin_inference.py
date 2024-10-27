@@ -13,7 +13,7 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos.utils.virtual_screen import enrichment_factor, get_mar_one
+from rnamigos.utils.virtual_screen import enrichment_factor, raw_df_to_mean_auroc, raw_df_to_efs
 from rnamigos.utils.graph_utils import load_rna_graph
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.inference import inference_raw, get_models
@@ -87,11 +87,7 @@ def one_robin(ligand_name, pocket_id, models=None, use_rna_fm=False):
         debug=False,
     )
     raw_df["pocket_id"] = pocket_id
-    ef_rows = []
-    for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
-        ef = enrichment_factor(raw_df["score"], raw_df["is_active"], frac=frac)
-        ef_rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
-    return pd.DataFrame(ef_rows), pd.DataFrame(raw_df)
+    return pd.DataFrame(raw_df)
 
 
 def get_swapped_pocketlig(swap=0):
@@ -107,20 +103,20 @@ def get_swapped_pocketlig(swap=0):
 
 def get_all_preds(model, use_rna_fm, swap=0):
     robin_lig_pocket_dict, new_to_old = get_swapped_pocketlig(swap=swap)
-    robin_dfs = [
+    robin_raw_dfs = [
         df
         for df in Parallel(n_jobs=4)(
             delayed(one_robin)(ligand_name, pocket_id, model, use_rna_fm)
             for ligand_name, pocket_id in robin_lig_pocket_dict.items()
         )
     ]
-    robin_efs, robin_raw_dfs = list(map(list, zip(*robin_dfs)))
-    robin_ef_df = pd.concat(robin_efs)
     robin_raw_df = pd.concat(robin_raw_dfs)
 
     # The naming is based on the pocket. So to keep ligands swap consistent, we need to change that
-    robin_ef_df["pocket_id"] = robin_ef_df["pocket_id"].map(new_to_old)
     robin_raw_df["pocket_id"] = robin_raw_df["pocket_id"].map(new_to_old)
+
+    # Finally, compute EFs
+    robin_ef_df = raw_df_to_efs(robin_raw_df, score="score", fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
     return robin_ef_df, robin_raw_df
 
 
@@ -154,6 +150,36 @@ def get_all_csvs(recompute=False, swap=0):
         df_raw.to_csv(out_csv_raw, index=False)
 
 
+# score,smiles,is_active,pocket_id
+def assess_overlap_robin():
+    res_dir = "outputs/robin"
+    docking_df = pd.read_csv(os.path.join(res_dir, "dock_42_raw.csv"))
+    smiles_dict = {}
+    pocket_ids = list(ROBIN_POCKETS.values())
+    for pocket_id in pocket_ids:
+        docking_df_lig = docking_df[docking_df["pocket_id"] == pocket_id]
+        smiles = docking_df_lig[["smiles"]].values.flatten().tolist()
+        smiles_dict[pocket_id] = list(sorted(smiles))
+    smiles_0 = smiles_dict.pop(pocket_ids[0])
+    smiles_1 = smiles_dict.pop(pocket_ids[1])
+    overlap = set(smiles_0).intersection(set(smiles_1))
+    a = 1
+
+
+def assess_overlap_docking():
+    docking_df = pd.read_csv("data/robin_docking_consolidated_v2.csv")
+    smiles_dict = {}
+    for ligand_name, pocket_id in ROBIN_POCKETS.items():
+        docking_df_lig = docking_df[docking_df["TARGET"] == ligand_name]
+        smiles = docking_df_lig[["SMILE"]].values.flatten().tolist()
+        smiles_dict[ligand_name] = list(sorted(smiles))
+    robin_sys = list(ROBIN_POCKETS.keys())
+    smiles_0 = smiles_dict.pop(robin_sys[0])
+    smiles_1 = smiles_dict.pop(robin_sys[1])
+    overlap = set(smiles_0).intersection(set(smiles_1))
+    a = 1
+
+
 def get_dfs_docking(swap=0):
     """
     Go from columns:
@@ -165,18 +191,21 @@ def get_dfs_docking(swap=0):
     """
 
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    ref_raw_df = pd.read_csv("outputs/robin/dock_42_raw.csv")
+    ref_raw_df = pd.read_csv(os.path.join(res_dir, "dock_42_raw.csv"))
     docking_df = pd.read_csv("data/robin_docking_consolidated_v2.csv")
     # For each pocket, get relevant mapping smiles : normalized score,
     # then use it to create the appropriate raw, and clean csvs
     all_raws, all_dfs = [], []
     robin_lig_pocket_dict, new_to_old = get_swapped_pocketlig(swap=swap)
     for ligand_name, pocket_id in robin_lig_pocket_dict.items():
+        # Get relevant subpart of the original docking data and normalize it
         docking_df_lig = docking_df[docking_df["TARGET"] == ligand_name]
         scores = -pd.to_numeric(docking_df_lig["INTER"], errors="coerce").values.squeeze()
         scores[scores < 0] = 0
         scores = np.nan_to_num(scores, nan=0)
         normalized_scores = (scores - scores.min()) / (scores.max() - scores.min())
+
+        # Now get the docking specific mapping {smiles: score}
         mapping = {}
         for smiles, score in zip(docking_df_lig[["SMILE"]].values, normalized_scores):
             mapping[smiles[0]] = score
@@ -184,18 +213,11 @@ def get_dfs_docking(swap=0):
         ref_raw_df_lig = ref_raw_df[ref_raw_df["pocket_id"] == pocket_id].copy()
         docking_scores = [mapping[smile] for smile in ref_raw_df_lig["smiles"].values]
         ref_raw_df_lig["score"] = docking_scores
-
-        # Go from RAW to EF
-        rows = []
-        for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
-            ef = enrichment_factor(ref_raw_df_lig["score"], ref_raw_df_lig["is_active"], frac=frac)
-            rows.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
         all_raws.append(ref_raw_df_lig)
-        all_dfs.append(pd.DataFrame(rows))
     all_raws = pd.concat(all_raws)
-    all_dfs = pd.concat(all_dfs)
+    all_efs = raw_df_to_efs(all_raws, score="score", fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
     all_raws.to_csv(f"{res_dir}/rdock_raw.csv")
-    all_dfs.to_csv(f"{res_dir}/rdock.csv")
+    all_efs.to_csv(f"{res_dir}/rdock.csv")
 
 
 def mix_all(recompute=False, swap=0):
@@ -210,9 +232,7 @@ def mix_all(recompute=False, swap=0):
         path2 = os.path.join(res_dir, f"{pair[1]}_raw.csv")
         df1 = pd.read_csv(path1)
         df2 = pd.read_csv(path2)
-        print(path1, path2)
-
-        robin_efs, robin_raw_dfs = [], []
+        robin_raw_dfs = []
         for pocket_id in ROBIN_POCKETS.values():
             df1_lig = df1[df1["pocket_id"] == pocket_id]
             df2_lig = df2[df2["pocket_id"] == pocket_id]
@@ -221,14 +241,11 @@ def mix_all(recompute=False, swap=0):
             mixed_df_lig = mixed_df_lig[["pocket_id", "smiles", "is_active", "mixed"]]
             mixed_df_lig = mixed_df_lig.rename(columns={"mixed": "score"})
             robin_raw_dfs.append(mixed_df_lig)
-
-            for frac in (0.01, 0.02, 0.05, 0.1, 0.2):
-                ef = enrichment_factor(mixed_df_lig["score"], mixed_df_lig["is_active"], frac=frac)
-                robin_efs.append({"pocket_id": pocket_id, "score": ef, "frac": frac})
-        robin_efs = pd.DataFrame(robin_efs)
         robin_raw_dfs = pd.concat(robin_raw_dfs)
-        robin_efs.to_csv(outpath, index=False)
         robin_raw_dfs.to_csv(outpath_raw, index=False)
+
+        robin_efs = raw_df_to_efs(robin_raw_dfs, score="score", fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
+        robin_efs.to_csv(outpath, index=False)
 
 
 def get_merged_df(swap=0, recompute=False):
@@ -293,6 +310,8 @@ def print_results(swap=0):
         ef = enrichment_factor(df["score"], df["is_active"])
         print("MAR: ", method, mar)
         print("EF: 2% ", method, ef)
+        auroc = raw_df_to_mean_auroc(df, "score")
+        print("AUROC: ", method, auroc)
 
 
 if __name__ == "__main__":
@@ -320,7 +339,8 @@ if __name__ == "__main__":
         ("native_42", "rdock"): "rdocknat",
     }
 
-    SWAP = 1
+    SWAP = 0
+
     # TEST ONE INFERENCE
     # pocket_id = "TPP"
     # lig_name = "2GDI_Y_TPP_100"
@@ -329,9 +349,10 @@ if __name__ == "__main__":
     # full_model_path = os.path.join(model_dir, model_path)
     # model = get_model_from_dirpath(full_model_path)
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
+    assess_overlap_robin()
 
     # GET ALL CSVs for the models and plot them
-    get_all_csvs(recompute=True, swap=SWAP)
+    get_all_csvs(recompute=False, swap=SWAP)
     get_dfs_docking(swap=SWAP)
     mix_all(recompute=True, swap=SWAP)
     get_merged_df(recompute=True, swap=SWAP)

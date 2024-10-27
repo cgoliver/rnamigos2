@@ -17,7 +17,7 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos.utils.virtual_screen import mean_active_rank, run_results_to_raw_df, run_results_to_ef_df
+from rnamigos.utils.virtual_screen import get_auroc, run_results_to_raw_df, run_results_to_auroc_df
 from rnamigos.learning.dataset import get_systems
 
 
@@ -105,7 +105,7 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER'):
     :returns scores: list of scores, one for each graph in the dataset
     :returns inds: list of indices in the dataloader for which the score computation was successful
     """
-    efs, all_scores, status, all_smiles, pocket_names = [], [], [], [], []
+    aurocs, all_scores, status, all_smiles, pocket_names = [], [], [], [], []
     failed = 0
     for i, (pocket_name, smiles, is_active) in enumerate(dataloader):
         # Some ligfiles are missing
@@ -132,12 +132,12 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER'):
                 selected_smiles.append(sm)
         selected_actives = np.array(selected_actives)
         scores = -np.array(scores)
-        efs.append(mean_active_rank(scores, selected_actives))
+        aurocs.append(get_auroc(scores, selected_actives))
         all_scores.append(list(scores))
         status.append(list(selected_actives))
         pocket_names.append(pocket_name)
         all_smiles.append(selected_smiles)
-    return efs, all_scores, status, pocket_names, all_smiles
+    return aurocs, all_scores, status, pocket_names, all_smiles
 
 
 def get_dfs_rdock(test_systems, data_df):
@@ -157,16 +157,16 @@ def get_dfs_rdock(test_systems, data_df):
                                               group_ligands=True,
                                               reps_only=False)
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
-        efs, scores, status, pocket_names, all_smiles = run_virtual_screen_docking(systems=data_df,
-                                                                                   dataloader=dataloader)
-        print('Mean EF :', np.mean(efs))
-        raw_df = run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode)
-        ef_df = run_results_to_ef_df(efs, scores, pocket_names, decoy_mode)
-        rows.append(ef_df)
-        raw_rows.append(raw_df)
-    df_ef = pd.concat(rows)
-    df_raw = pd.concat(raw_rows)
-    return df_ef, df_raw
+        aurocs, scores, status, pocket_names, all_smiles = run_virtual_screen_docking(systems=data_df,
+                                                                                      dataloader=dataloader)
+        print('Mean AuROC :', np.mean(aurocs))
+        df_raw = run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode)
+        df_aurocs = run_results_to_auroc_df(aurocs, scores, pocket_names, decoy_mode)
+        rows.append(df_aurocs)
+        raw_rows.append(df_raw)
+    all_df_aurocs = pd.concat(rows)
+    all_df_raw = pd.concat(raw_rows)
+    return all_df_aurocs, all_df_raw
 
 
 if __name__ == '__main__':
@@ -180,12 +180,12 @@ if __name__ == '__main__':
     df_data = df_data[['PDB_ID_POCKET', 'LIGAND_SMILES', 'LIGAND_SOURCE', 'TOTAL', 'INTER']]
     df_data = df_data[df_data['PDB_ID_POCKET'].isin(test_systems['PDB_ID_POCKET'].unique())]
 
-    # For each decoy set, do an rDock "prediction" and compute EFs
-    df_ef, df_raw = get_dfs_rdock(test_systems, df_data)
+    # For each decoy set, do an rDock "prediction" and compute AuROCs
+    df_aurocs, df_raw = get_dfs_rdock(test_systems, df_data)
 
     # Finally, dump the results as CSVs
     dump_path = pathlib.Path("outputs/pockets/rdock.csv")
     dump_path_raw = pathlib.Path("outputs/pockets/rdock_raw.csv")
     dump_path.parent.mkdir(parents=True, exist_ok=True)
-    df_ef.to_csv(dump_path, index=False)
+    df_aurocs.to_csv(dump_path, index=False)
     df_raw.to_csv(dump_path_raw, index=False)

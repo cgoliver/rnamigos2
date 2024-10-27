@@ -23,7 +23,7 @@ def partial_virtual_screen(df, sort_up_to=0, score_column='rdock'):
     return enrich
 
 
-def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True, recompute=False):
+def build_auroc_df(out_csv='fig_script/time_auroc.csv', grouped=True, recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
     big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_42_raw.csv')
@@ -31,7 +31,7 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True, recomput
 
     # Now iterate
     pockets = big_df_raw['pocket_id'].unique()
-    ef_df_rows = []
+    df_aurocs_rows = []
     nsteps = 20
     nshuffles = 10
     for pi, pocket in enumerate(pockets):
@@ -46,42 +46,42 @@ def build_ef_df(out_csv='fig_script/time_ef_grouped.csv', grouped=True, recomput
             # Shuffle
             pocket_df = pocket_df.sample(frac=1, random_state=n)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                aurocs = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
                 res = {'sort_up_to': i,
                        'pocket': pocket,
-                       'ef': ef,
+                       'auroc': aurocs,
                        'model': 'rdock',
                        'seed': n}
-                ef_df_rows.append(res)
+                df_aurocs_rows.append(res)
 
         # Presort
         for sort_col in ['dock', 'native', 'docknat']:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                aurocs = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
                 res = {'sort_up_to': i,
                        'pocket': pocket,
-                       'ef': ef,
+                       'auroc': aurocs,
                        'model': sort_col,
                        'seed': 0}
-                ef_df_rows.append(res)
+                df_aurocs_rows.append(res)
 
         # docknat+rdocknat
         pocket_df = pocket_df.sort_values(by='docknat', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            s = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdocknat')
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdocknat')
             res = {'sort_up_to': i,
                    'pocket': pocket,
-                   'ef': s,
+                   'auroc': auroc,
                    'model': "rdocknat",
                    'seed': 0}
-            ef_df_rows.append(res)
-    df = pd.DataFrame(ef_df_rows)
+            df_aurocs_rows.append(res)
+    df = pd.DataFrame(df_aurocs_rows)
     df.to_csv(out_csv)
     return df
 
 
-def build_ef_df_robin(out_csv='fig_script/time_ef_robin.csv', recompute=False):
+def build_auroc_df_robin(out_csv='fig_script/time_auroc_robin.csv', recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
     big_df_raw = pd.read_csv(f'outputs/robin/big_df_raw.csv')
@@ -89,7 +89,7 @@ def build_ef_df_robin(out_csv='fig_script/time_ef_robin.csv', recompute=False):
 
     # Now iterate
     pockets = big_df_raw['pocket_id'].unique()
-    ef_df_rows = []
+    df_auroc_rows = []
     nsteps = 20
     nshuffles = 10
     for pi, pocket in enumerate(pockets):
@@ -101,47 +101,47 @@ def build_ef_df_robin(out_csv='fig_script/time_ef_robin.csv', recompute=False):
             # Shuffle
             pocket_df = pocket_df.sample(frac=1, random_state=n)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
                 res = {'sort_up_to': i,
                        'pocket': pocket,
-                       'ef': ef,
+                       'auroc': auroc,
                        'model': 'rdock',
                        'seed': n}
-                ef_df_rows.append(res)
+                df_auroc_rows.append(res)
 
         # Presort
         for sort_col in ['dock_rnafm_3', 'native_validation', 'updated_rnamigos']:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
+                auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
                 res = {'sort_up_to': i,
                        'pocket': pocket,
-                       'ef': ef,
+                       'auroc': auroc,
                        'model': sort_col,
                        'seed': 0}
-                ef_df_rows.append(res)
+                df_auroc_rows.append(res)
 
         pocket_df = pocket_df.sort_values(by='updated_rnamigos', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_rdocknat')
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_rdocknat')
             res = {'sort_up_to': i,
                    'pocket': pocket,
-                   'ef': ef,
+                   'auroc': auroc,
                    'model': "updated_rdocknat",
                    'seed': 0}
-            ef_df_rows.append(res)
+            df_auroc_rows.append(res)
 
         pocket_df = pocket_df.sort_values(by='updated_rnamigos', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            ef = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_combined')
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_combined')
             res = {'sort_up_to': i,
                    'pocket': pocket,
-                   'ef': ef,
+                   'auroc': auroc,
                    'model': "updated_combined",
                    'seed': 0}
-            ef_df_rows.append(res)
+            df_auroc_rows.append(res)
 
-    df = pd.DataFrame(ef_df_rows)
+    df = pd.DataFrame(df_auroc_rows)
     df.to_csv(out_csv)
     return df
 
@@ -154,18 +154,18 @@ def get_means_stds(df, model):
     # all_stds = list()
     # for step in model_df['sort_up_to'].unique():
     #     subset = model_df[model_df['sort_up_to'] == step]
-    #     mean = subset['ef'].mean()
-    #     std = subset['ef'].std()
+    #     mean = subset['auroc'].mean()
+    #     std = subset['auroc'].std()
     #     all_means.append(mean)
     #     all_stds.append(std)
 
     model_df_gb = model_df.groupby(['sort_up_to'], as_index=False)
     model_df_gb = model_df.groupby(['sort_up_to'])
-    model_df_means = model_df_gb[['ef']].mean().values.squeeze()
-    model_df_stds = model_df_gb[['ef']].std().values.squeeze()
+    model_df_means = model_df_gb[['auroc']].mean().values.squeeze()
+    model_df_stds = model_df_gb[['auroc']].std().values.squeeze()
     n_pockets = len(model_df['pocket'].unique())
     model_df_stds = model_df_stds / np.sqrt(n_pockets)
-    # model_df_stds = np.square(model_df_gb.std()[['ef']].values.squeeze())
+    # model_df_stds = np.square(model_df_gb.std()[['auroc']].values.squeeze())
     return model_df_means, model_df_stds
 
 
@@ -218,7 +218,8 @@ def line_plot(df, mixed_model='combined', robin=False):
         mixed_means = [0.924] * 20
         print('Unexpected model, dashed line is confused')
     if not robin:
-        ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'], linestyle='--')
+        ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'],
+                linestyle='--')
 
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
@@ -252,7 +253,7 @@ def vax_plot(df, mixed_model='combined'):
     ref_std = ref.groupby('pocket').std().reset_index()
     ref_aucs = {p: {'mean': m, 'std': st} for p, m, st in zip(ref_mean['pocket'], ref_mean[0], ref_std[0])}
     efficiency_df = df.groupby(['pocket', 'model', 'seed']).apply(
-        lambda group: np.trapz(group['ef']) / ref_aucs[group.name[0]]['mean']).reset_index().rename(
+        lambda group: np.trapz(group['auroc']) / ref_aucs[group.name[0]]['mean']).reset_index().rename(
         columns={0: 'efficiency'})
     # efficiency_df_agg = efficiency_df.groupby(['model', 'pocket']).mean().reset_index().rename(columns={0: 'efficiency_mean'})
     # efficiency_df_agg['efficiency_std'] = efficiency_df.groupby(['model', 'pocket']).std().reset_index().rename(columns={0: 'efficiency_std'})['efficiency_std']
@@ -308,15 +309,15 @@ def vax_plot(df, mixed_model='combined'):
 
 if __name__ == "__main__":
     # Build the time df for making the figures
-    out_csv = 'scripts_fig/time_ef.csv'
+    out_csv = 'scripts_fig/time_auroc.csv'
     recompute = False
     # recompute = True
-    build_ef_df(out_csv=out_csv, recompute=recompute)
+    build_auroc_df(out_csv=out_csv, recompute=recompute)
 
-    out_csv_robin = 'scripts_fig/time_ef_robin.csv'
+    out_csv_robin = 'scripts_fig/time_auroc_robin.csv'
     recompute = False
     # recompute = True
-    build_ef_df_robin(out_csv=out_csv_robin, recompute=recompute)
+    build_auroc_df_robin(out_csv=out_csv_robin, recompute=recompute)
 
     # Then make plots
     df = pd.read_csv(out_csv, index_col=0)
