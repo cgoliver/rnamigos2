@@ -277,44 +277,44 @@ class DockingDataset(Dataset):
             )
         ligand_fp = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
 
-        if self.negative_pocket == "rognan":
+        if self.negative_pocket == "rognan" or self.negative_pocket == "both":
             other_idx = random.randint(0, len(self))
             other_row = self.systems.iloc[other_idx]
             other_pocket_id = other_row["PDB_ID_POCKET"]
             if self.cache_graphs:
-                other_pocket_graph, other_rings = self.all_pockets[other_pocket_id]
+                rognan_pocket_graph, rognan_rings = self.all_pockets[other_pocket_id]
             else:
-                other_pocket_graph, other_rings = load_rna_graph(
+                rognan_pocket_graph, rognan_rings = load_rna_graph(
                     rna_path=os.path.join(self.pockets_path, f"{other_pocket_id}.json"),
                     undirected=self.undirected,
                     use_rings=self.use_rings,
                     use_rnafm=self.use_rnafm,
                 )
 
-        if self.negative_pocket == "non_pocket":
+        if self.negative_pocket == "non_pocket" or self.negative_pocket == "both":
             perturb_dir = Path("figs/perturbations/perturbed/")
             perturb_slice = random.choice(os.listdir(perturb_dir))
             perturb_path = perturb_dir / perturb_slice / f"{pocket_id}.json"
 
             try:
-                other_pocket_graph, other_rings = self.neg_pocket_cache[perturb_path]
+                non_pocket_graph, non_rings = self.neg_pocket_cache[perturb_path]
             except KeyError:
                 try:
-                    other_pocket_graph, other_rings = load_rna_graph(
+                    non_pocket_graph, non_rings = load_rna_graph(
                         rna_path=perturb_path,
                         undirected=self.undirected,
                         use_rings=self.use_rings,
                         use_rnafm=self.use_rnafm,
                     )
                     self.neg_pocket_cache[perturb_path] = (
-                        other_pocket_graph,
-                        other_rings,
+                        non_pocket_graph,
+                        non_rings,
                     )
 
                 except FileNotFoundError:
                     # if missing a negative, sample a random one from cache
                     print(f"missing negative for {pocket_id}")
-                    other_pocket_graph, other_rings = random.choice(list(self.neg_pocket_cache.values()))
+                    non_pocket_graph, non_rings = random.choice(list(self.neg_pocket_cache.values()))
 
             pass
 
@@ -337,15 +337,40 @@ class DockingDataset(Dataset):
         # print("1 : ", time.perf_counter() - t0)
 
         if self.negative_pocket != "none":
-            return {
-                "graph": pocket_graph,
-                "other_graph": other_pocket_graph,
-                "other_rings": other_rings,
-                "ligand_input": lig_graph if self.use_graphligs else ligand_fp,
-                "target": target,
-                "rings": rings,
-                "idx": [idx],
-            }
+            if self.negative_pocket == "rognan":
+                return {
+                    "graph": pocket_graph,
+                    "other_graph": rognan_pocket_graph,
+                    "other_rings": rognan_rings,
+                    "ligand_input": lig_graph if self.use_graphligs else ligand_fp,
+                    "target": target,
+                    "rings": rings,
+                    "idx": [idx],
+                }
+            if self.negative_pocket == "non_pocket":
+                return {
+                    "graph": pocket_graph,
+                    "other_graph": non_pocket_graph,
+                    "other_rings": non_rings,
+                    "ligand_input": lig_graph if self.use_graphligs else ligand_fp,
+                    "target": target,
+                    "rings": rings,
+                    "idx": [idx],
+                }
+
+            if self.negative_pocket == "both":
+                return {
+                    "graph": pocket_graph,
+                    "non_graph": non_pocket_graph,
+                    "non_rings": non_rings,
+                    "rognan_graph": rognan_pocket_graph,
+                    "rognan_rings": rognan_rings,
+                    "ligand_input": lig_graph if self.use_graphligs else ligand_fp,
+                    "target": target,
+                    "rings": rings,
+                    "idx": [idx],
+                }
+
         else:
             return {
                 "graph": pocket_graph,

@@ -57,20 +57,35 @@ def validate(model, val_loader, criterion, device):
     return val_loss / val_size
 
 
-def compute_rognan_loss(model, batch, mode="margin", alpha=0.3):
+def compute_rognan_loss(model, batch, mode="rognan", alpha=0.3):
     """Only for positive pocket-ligand pairs (r,l) in the batch compute the loss as:
     $$ \max(0, p(r, l) - p(r', l) + \alpha) $$,
     where $\alpha$ is the margin and $p(.,.)$ is the model output for a pocket-ligand
     pair. We force decoy pockets $p'$ to have a lower score than the native pair.
     """
+
+    def get_margin(true, neg, y):
+        zero = torch.zeros_like(true)
+        themax = torch.max(zero, neg - true + alpha)
+        maxsum = torch.sum(y * themax)  # only keep true pocket-ligand pairs
+        return (1 / torch.sum(y)) * maxsum
+
     pred_true = model(batch["graph"], batch["ligand_input"])[0].squeeze()
-    pred_neg = model(batch["other_graph"], batch["ligand_input"])[0].squeeze()
-    zero = torch.zeros_like(pred_true)
     y = batch["target"].detach()
-    themax = torch.max(zero, pred_neg - pred_true + alpha)
-    maxsum = torch.sum(y * themax)  # only keep true pocket-ligand pairs
-    normed = (1 / torch.sum(y)) * maxsum
-    return normed
+    if mode in ["rognan", "non_pocket"]:
+        pred_neg = model(batch["other_graph"], batch["ligand_input"])[0].squeeze()
+        tot = get_margin(pred_true, pred_neg, y)
+
+    if mode == "both":
+        pred_neg_rog = model(batch["rognan_graph"], batch["ligand_input"])[0].squeeze()
+        pred_neg_non = model(batch["non_graph"], batch["ligand_input"])[0].squeeze()
+
+        margin_rog = get_margin(pred_true, pred_neg_rog, y)
+        margin_non = get_margin(pred_true, pred_neg_non, y)
+
+        tot = margin_rog + margin_non
+
+    return tot
 
 
 def train_dock(
@@ -145,7 +160,7 @@ def train_dock(
             if negative_pocket != "none":
                 if margin_only:
                     loss = 0
-                rognan_loss = compute_rognan_loss(model, batch, alpha=rognan_margin)
+                rognan_loss = compute_rognan_loss(model, batch, alpha=rognan_margin, mode=negative_pocket)
                 loss += rognan_loss
                 pass
 
