@@ -93,6 +93,7 @@ def train_dock(
     negative_pocket="none",
     margin_only=False,
     debug=False,
+    rognan_margin=0.3,
     cfg=None,
 ):
     """
@@ -144,7 +145,7 @@ def train_dock(
             if negative_pocket != "none":
                 if margin_only:
                     loss = 0
-                rognan_loss = compute_rognan_loss(model, batch)
+                rognan_loss = compute_rognan_loss(model, batch, alpha=rognan_margin)
                 loss += rognan_loss
                 pass
 
