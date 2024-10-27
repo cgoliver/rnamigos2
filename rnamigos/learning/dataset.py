@@ -33,9 +33,7 @@ def rnamigos_1_split(
     :return:
     """
     script_dir = os.path.dirname(__file__)
-    interactions_csv_migos1 = os.path.join(
-        script_dir, "../../data/csvs/rnamigos1_dataset.csv"
-    )
+    interactions_csv_migos1 = os.path.join(script_dir, "../../data/csvs/rnamigos1_dataset.csv")
     systems_migos_1 = pd.read_csv(interactions_csv_migos1)
     train_split = set()
     test_split = set()
@@ -98,9 +96,7 @@ def get_systems(
     elif target == "is_native":
         interactions_csv = os.path.join(script_dir, "../../data/csvs/binary_data.csv")
     else:
-        raise ValueError(
-            f"train.target should be in {{dock, native_fp, is_native}}, received : {target}"
-        )
+        raise ValueError(f"train.target should be in {{dock, native_fp, is_native}}, received : {target}")
     systems = pd.read_csv(interactions_csv, index_col=0)
 
     # Potentially only train on PDB compounds for is_native
@@ -110,9 +106,7 @@ def get_systems(
     # Latest systems querying, based on RMscores redundancy
     if rnamigos1_split == -2:
         splits_file = os.path.join(script_dir, "../../data/train_test_75.p")
-        train_names, test_names, train_names_grouped, test_names_grouped = pickle.load(
-            open(splits_file, "rb")
-        )
+        train_names, test_names, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, "rb"))
         # If group_pockets, we only use centroid pockets and not all copies
         if group_pockets:
             train_names = list(train_names_grouped.keys())
@@ -162,9 +156,7 @@ def get_systems(
 
 def get_systems_from_cfg(cfg, return_test=False):
     group_pockets = False if return_test else cfg.train.group_pockets
-    native_filter_pdb = (
-        False if not "native_filter_pdb" in cfg.train else cfg.train.native_filter_pdb
-    )
+    native_filter_pdb = False if not "native_filter_pdb" in cfg.train else cfg.train.native_filter_pdb
     systems = get_systems(
         target=cfg.train.target,
         rnamigos1_split=cfg.train.rnamigos1_split,
@@ -238,9 +230,7 @@ class DockingDataset(Dataset):
         self.use_graphligs = use_graphligs
         self.ligand_encoder = MolFPEncoder(fp_type=fp_type)
         self.ligand_graph_encoder = (
-            MolGraphEncoder(cache_path=ligand_cache, cache=use_ligand_cache)
-            if use_graphligs
-            else None
+            MolGraphEncoder(cache_path=ligand_cache, cache=use_ligand_cache) if use_graphligs else None
         )
 
         # Setup pockets
@@ -290,7 +280,7 @@ class DockingDataset(Dataset):
         if self.negative_pocket == "rognan":
             other_idx = random.randint(0, len(self))
             other_row = self.systems.iloc[other_idx]
-            other_pocket_id = row["PDB_ID_POCKET"]
+            other_pocket_id = other_row["PDB_ID_POCKET"]
             if self.cache_graphs:
                 other_pocket_graph, other_rings = self.all_pockets[other_pocket_id]
             else:
@@ -324,17 +314,13 @@ class DockingDataset(Dataset):
                 except FileNotFoundError:
                     # if missing a negative, sample a random one from cache
                     print(f"missing negative for {pocket_id}")
-                    other_pocket_graph, other_rings = random.choice(
-                        self.neg_pocket_cache.values()
-                    )
+                    other_pocket_graph, other_rings = random.choice(list(self.neg_pocket_cache.values()))
 
             pass
 
         # Maybe return ligand as a graph.
         if self.use_graphligs:
-            lig_graph = self.ligand_graph_encoder.smiles_to_graph_one(
-                smiles=ligand_smiles
-            )
+            lig_graph = self.ligand_graph_encoder.smiles_to_graph_one(smiles=ligand_smiles)
         else:
             lig_graph = None
         if self.target == "native_fp":
@@ -396,15 +382,11 @@ class VirtualScreenDataset(DockingDataset):
             reps_file = os.path.join(script_dir, "../../data/group_reps_75.p")
             train_group_reps, test_group_reps = pickle.load(open(reps_file, "rb"))
             reps = set(train_group_reps + test_group_reps)
-            self.all_pockets_names = [
-                pocket for pocket in self.all_pockets_names if pocket in reps
-            ]
+            self.all_pockets_names = [pocket for pocket in self.all_pockets_names if pocket in reps]
 
         if self.group_ligands:
             splits_file = os.path.join(script_dir, "../../data/train_test_75.p")
-            _, _, train_names_grouped, test_names_grouped = pickle.load(
-                open(splits_file, "rb")
-            )
+            _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, "rb"))
             self.groups = {**train_names_grouped, **test_names_grouped}
             self.reverse_groups = {
                 group_member: group_rep
@@ -422,29 +404,21 @@ class VirtualScreenDataset(DockingDataset):
         return sm_list
 
     def get_ligands(self, pocket_name):
-        actives_smiles = self.parse_smiles(
-            Path(self.ligands_path, pocket_name, self.decoy_mode, "actives.txt")
-        )
-        decoys_smiles = self.parse_smiles(
-            Path(self.ligands_path, pocket_name, self.decoy_mode, "decoys.txt")
-        )
+        actives_smiles = self.parse_smiles(Path(self.ligands_path, pocket_name, self.decoy_mode, "actives.txt"))
+        decoys_smiles = self.parse_smiles(Path(self.ligands_path, pocket_name, self.decoy_mode, "decoys.txt"))
         # We need to return all actives and ensure they are not in the inactives of a pocket
         if self.group_ligands:
             group_pockets = self.groups[self.reverse_groups[pocket_name]]
             group_list = []
             for pocket in group_pockets:
                 try:
-                    active = self.parse_smiles(
-                        Path(self.ligands_path, pocket, self.decoy_mode, "actives.txt")
-                    )[0]
+                    active = self.parse_smiles(Path(self.ligands_path, pocket, self.decoy_mode, "actives.txt"))[0]
                     group_list.append(active)
                 except Exception as e:
                     pass
                     # print(e)
             group_actives = set(group_list)
-            decoys_smiles = [
-                smile for smile in decoys_smiles if smile not in group_actives
-            ]
+            decoys_smiles = [smile for smile in decoys_smiles if smile not in group_actives]
             actives_smiles = list(group_actives)
         # Filter None
         actives_smiles = [x for x in actives_smiles if x is not None]
@@ -454,12 +428,7 @@ class VirtualScreenDataset(DockingDataset):
     def __getitem__(self, idx):
         try:
             if self.rognan:
-                pocket_name = self.all_pockets_names[
-                    np.random.randint(0, len(self.all_pockets_names))
-                ]
-                print(
-                    f"ROGNAN POCKET: {pocket_name} ORIGINAL: {self.all_pockets_names[idx]}"
-                )
+                pocket_name = self.all_pockets_names[np.random.randint(0, len(self.all_pockets_names))]
             else:
                 pocket_name = self.all_pockets_names[idx]
 
@@ -502,14 +471,10 @@ class VirtualScreenDataset(DockingDataset):
 
 
 class InferenceDataset(Dataset):
-    def __init__(
-        self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True
-    ):
+    def __init__(self, smiles_list, ligand_cache=None, use_ligand_cache=False, use_graphligs=True):
         self.smiles_list = smiles_list
         self.ligand_graph_encoder = (
-            MolGraphEncoder(cache_path=ligand_cache, cache=use_ligand_cache)
-            if use_graphligs
-            else None
+            MolGraphEncoder(cache_path=ligand_cache, cache=use_ligand_cache) if use_graphligs else None
         )
         self.ligand_encoder = MolFPEncoder()
 
@@ -540,12 +505,8 @@ def train_val_split(train_val_systems, frac=0.8, system_based=True):
         script_dir = os.path.dirname(__file__)
         splits_file = os.path.join(script_dir, "../../data/train_val_75.p")
         train_names, val_names, _, _ = pickle.load(open(splits_file, "rb"))
-        train_systems = train_val_systems[
-            train_val_systems["PDB_ID_POCKET"].isin(train_names)
-        ]
-        validation_systems = train_val_systems[
-            ~train_val_systems["PDB_ID_POCKET"].isin(train_names)
-        ]
+        train_systems = train_val_systems[train_val_systems["PDB_ID_POCKET"].isin(train_names)]
+        validation_systems = train_val_systems[~train_val_systems["PDB_ID_POCKET"].isin(train_names)]
     else:
         train_systems, validation_systems = np.split(
             train_val_systems.sample(frac=1), [int(frac * len(train_val_systems))]

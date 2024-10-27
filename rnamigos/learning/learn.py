@@ -16,7 +16,7 @@ def print_gradients(model):
     """
     for param in model.named_parameters():
         name, p = param
-        print(name, p.grad)
+        print(name, p.grad.norm())
     pass
 
 
@@ -57,7 +57,7 @@ def validate(model, val_loader, criterion, device):
     return val_loss / val_size
 
 
-def compute_rognan_loss(model, batch, alpha=0.3):
+def compute_rognan_loss(model, batch, mode="margin", alpha=0.3):
     """Only for positive pocket-ligand pairs (r,l) in the batch compute the loss as:
     $$ \max(0, p(r, l) - p(r', l) + \alpha) $$,
     where $\alpha$ is the margin and $p(.,.)$ is the model output for a pocket-ligand
@@ -66,9 +66,9 @@ def compute_rognan_loss(model, batch, alpha=0.3):
     pred_true = model(batch["graph"], batch["ligand_input"])[0].squeeze()
     pred_neg = model(batch["other_graph"], batch["ligand_input"])[0].squeeze()
     zero = torch.zeros_like(pred_true)
-    y = batch["target"]
+    y = batch["target"].detach()
     themax = torch.max(zero, pred_neg - pred_true + alpha)
-    maxsum = torch.sum(y * themax)
+    maxsum = torch.sum(y * themax)  # only keep true pocket-ligand pairs
     normed = (1 / torch.sum(y)) * maxsum
     return normed
 
@@ -91,6 +91,7 @@ def train_dock(
     monitor_robin=False,
     pretrain_weight=0.1,
     negative_pocket="none",
+    margin_only=False,
     debug=False,
     cfg=None,
 ):
@@ -122,6 +123,7 @@ def train_dock(
         running_loss = 0.0
         val_ef = 0
         for batch_idx, (batch) in enumerate(train_loader):
+            # batch = test_batch
             graph, ligand_input, target, idx = (
                 batch["graph"],
                 batch["ligand_input"],
@@ -129,29 +131,26 @@ def train_dock(
                 batch["idx"],
             )
 
-            if debug and batch_idx > 5:
-                break
-
             node_sim_block, subsampled_nodes = batch["rings"]
             graph = send_graph_to_device(graph, device)
             ligand_input = ligand_input.to(device)
             target = target.to(device)
-            pred, embeddings = model(graph, ligand_input)
+            pred, (embeddings, ligand_embeddings) = model(graph, ligand_input)
             if criterion.__repr__() == "BCELoss()":
                 loss = criterion(pred.squeeze(), target.squeeze(dim=0).float())
             else:
                 loss = criterion(pred.squeeze(), target.float())
 
             if negative_pocket != "none":
+                if margin_only:
+                    loss = 0
                 rognan_loss = compute_rognan_loss(model, batch)
                 loss += rognan_loss
                 pass
 
             # Optionally keep a small weight on the pretraining objective
             if pretrain_weight > 0 and node_sim_block is not None:
-                subsampled_nodes_tensor = torch.tensor(
-                    subsampled_nodes, dtype=torch.bool
-                )
+                subsampled_nodes_tensor = torch.tensor(subsampled_nodes, dtype=torch.bool)
                 selected_embs = embeddings[torch.where(subsampled_nodes_tensor == 1)]
                 node_sim_block = node_sim_block.to(device)
                 K_predict = torch.mm(selected_embs, selected_embs.t())
@@ -160,6 +159,7 @@ def train_dock(
 
             # Backward
             loss.backward()
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             model.zero_grad()
 
@@ -176,9 +176,7 @@ def train_dock(
                 )
 
                 # tensorboard logging
-                writer.add_scalar(
-                    "Training batch loss", batch_loss, epoch * num_batches + batch_idx
-                )
+                writer.add_scalar("Training batch loss", batch_loss, epoch * num_batches + batch_idx)
                 if negative_pocket != "none":
                     writer.add_scalar(
                         "Training non-pocket loss",
@@ -198,23 +196,17 @@ def train_dock(
         writer.add_scalar("Val loss", val_loss, epoch)
 
         # Run VS metrics
-        if not epoch % vs_every:
+        if not epoch % vs_every and not debug:
             lower_is_better = cfg.train.target in ["dock", "native_fp"]
-            efs, *_ = run_virtual_screen(
-                model, val_vs_loader, lower_is_better=lower_is_better
-            )
+            efs, *_ = run_virtual_screen(model, val_vs_loader, lower_is_better=lower_is_better)
             val_ef = np.mean(efs)
             writer.add_scalar("Val EF", val_ef, epoch)
 
             if val_vs_loader_rognan is not None:
-                efs, *_ = run_virtual_screen(
-                    model, val_vs_loader_rognan, lower_is_better=lower_is_better
-                )
+                efs, *_ = run_virtual_screen(model, val_vs_loader_rognan, lower_is_better=lower_is_better)
                 writer.add_scalar("Val EF Rognan", np.mean(efs), epoch)
 
-            efs, *_ = run_virtual_screen(
-                model, test_vs_loader, lower_is_better=lower_is_better
-            )
+            efs, *_ = run_virtual_screen(model, test_vs_loader, lower_is_better=lower_is_better)
             writer.add_scalar("Test EF", np.mean(efs), epoch)
 
             if monitor_robin:

@@ -2,7 +2,10 @@ import os
 from pathlib import Path
 
 import torch
+import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.utils.graph_utils import load_rna_graph
@@ -41,6 +44,11 @@ if __name__ == "__main__":
                     print(f"failed on lig {j}")
 
     P = torch.stack(all_g_embs)
+    P_norm = F.normalize(P, p=2, dim=1)
+    cos_sim = torch.mm(P, P.t()).flatten().tolist()
+    sns.displot(cos_sim)
+    plt.show()
+
     L = torch.stack(all_lig_embs)
     writer.add_embedding(P, global_step=0, tag="pockets")
     writer.add_embedding(L, global_step=0, tag="ligands")

@@ -43,16 +43,12 @@ def get_loaders(cfg, tune=False, trial=None):
     # Dataloader creation is a bit tricky as it involves custom Samplers and Collaters that depend on the task at hand
     train_dataset = get_dataset(cfg, train_systems, training=True)
     validation_dataset = get_dataset(cfg, validation_systems, training=False)
-    train_loader = get_loader(
-        cfg, train_dataset, train_systems, training=True, trial=trial, tune=tune
-    )
+    train_loader = get_loader(cfg, train_dataset, train_systems, training=True, trial=trial, tune=tune)
     val_loader = get_loader(cfg, validation_dataset, validation_systems, training=False)
 
     # In addition to those 'classical' loaders, we also create ones dedicated to VS validation.
     # Splitting for VS validation is based on systems, to avoid having too many pockets
-    _, vs_validation_systems = train_val_split(
-        train_val_systems.copy(), system_based=True
-    )
+    _, vs_validation_systems = train_val_split(train_val_systems.copy(), system_based=True)
     val_vs_loader = get_vs_loader(
         systems=vs_validation_systems,
         decoy_mode=cfg.train.vs_decoy_mode,
@@ -88,8 +84,8 @@ def objective(trial, cfg) -> float:
     model = cfg_to_model(cfg, trial=trial, tune=cfg.train.tune)
     model = model.to(device)
 
-    train_loader, val_loader, val_vs_loader, val_vs_loader_rognan, test_vs_loader = (
-        get_loaders(cfg, tune=cfg.train.tune, trial=trial)
+    train_loader, val_loader, val_vs_loader, val_vs_loader_rognan, test_vs_loader = get_loaders(
+        cfg, tune=cfg.train.tune, trial=trial
     )
 
     # Dataset/loaders creation and splitting.
@@ -146,6 +142,7 @@ def objective(trial, cfg) -> float:
         pretrain_weight=cfg.train.pretrain_weight,
         debug=cfg.debug,
         negative_pocket=cfg.train.negative_pocket,
+        margin_only=cfg.train.margin_only,
         cfg=cfg,
     )
 
@@ -168,9 +165,7 @@ def main(cfg: DictConfig):
         trial_df = study.trials_dataframe()
         trial_df.to_csv(Path(save_path) / "trials.csv")
 
-        model = get_model_from_dirpath(
-            save_path, tune=cfg.train.tune, trial=study.best_trial
-        )
+        model = get_model_from_dirpath(save_path, tune=cfg.train.tune, trial=study.best_trial)
 
         src_path_obj = Path(save_path)
         new_dir_name = src_path_obj.name + "_best"
@@ -183,9 +178,7 @@ def main(cfg: DictConfig):
 
     # else load chosen model
     else:
-        save_path = os.path.join(
-            "results", "trained_models", cfg.train.target, cfg.name
-        )
+        save_path = os.path.join("results", "trained_models", cfg.train.target, cfg.name)
         model = get_model_from_dirpath(save_path)
 
     pdb_eval(cfg, model)

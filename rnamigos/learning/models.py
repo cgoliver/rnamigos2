@@ -157,7 +157,7 @@ class Decoder(nn.Module):
         output = x
         for layer in range(self.num_layers):
             output = self.layers[layer](output)
-            if self.batch_norm:
+            if self.batch_norm and layer != self.num_layers - 1:
                 output = self.batch_norms[layer](output)
             if layer == self.num_layers - 1:
                 output = F.dropout(output, self.dropout, training=self.training)

@@ -20,9 +20,10 @@ class IsNativeSampler(Sampler):
     At each iteration, we want to draw one positive and one negative for each pocket/group.
     """
 
-    def __init__(self, systems_dataframe, group_sampling=True):
+    def __init__(self, systems_dataframe, group_sampling=True, shuffle=True):
         super().__init__(data_source=None)
         self.group_sampling = group_sampling
+        self.shuffle = shuffle
         positives = (systems_dataframe["IS_NATIVE"] == 1).values
         negatives = 1 - positives
         if not group_sampling:
@@ -58,9 +59,7 @@ class IsNativeSampler(Sampler):
 
     def __iter__(self):
         if not self.group_sampling:
-            selected_neg_rows = np.random.choice(
-                self.negative_rows, self.num_pos_examples, replace=False
-            )
+            selected_neg_rows = np.random.choice(self.negative_rows, self.num_pos_examples, replace=False)
             selected_positive_rows = self.positive_rows
         else:
             # self.num_pos is a list with the number of positive for each group [2,4,1,1...]
@@ -69,9 +68,7 @@ class IsNativeSampler(Sampler):
             selected_neg = np.random.randint(0, self.num_neg)
             selected_positive_rows = []
             selected_neg_rows = []
-            for i, (group_pos, group_neg) in enumerate(
-                zip(self.all_positives, self.all_negatives)
-            ):
+            for i, (group_pos, group_neg) in enumerate(zip(self.all_positives, self.all_negatives)):
                 selected_positive_rows.append(group_pos[selected_pos[i]])
                 selected_neg_rows.append(group_neg[selected_neg[i]])
             selected_positive_rows = np.array(selected_positive_rows)
@@ -142,10 +139,7 @@ class RingCollater:
         assert (
             self.node_simfunc.compare(node_rings[0], node_rings[0]) > 0.99
         ), "Identical rings giving non 1 similarity."
-        sims = [
-            self.node_simfunc.compare(n1, n2)
-            for i, (n1, n2) in enumerate(itertools.combinations(node_rings, 2))
-        ]
+        sims = [self.node_simfunc.compare(n1, n2) for i, (n1, n2) in enumerate(itertools.combinations(node_rings, 2))]
         block[np.triu_indices(len(node_rings), 1)] = sims
         block += block.T
         block += np.eye(len(node_rings))
@@ -163,10 +157,7 @@ class RingCollater:
                 flat_rings = list()
                 for ring in values:
                     flat_rings.extend(ring)
-                if (
-                    self.max_size_kernel is None
-                    or len(flat_rings) < self.max_size_kernel
-                ):
+                if self.max_size_kernel is None or len(flat_rings) < self.max_size_kernel:
                     # Just take them all
                     node_ids = [1 for _ in flat_rings]
                 else:
@@ -175,9 +166,7 @@ class RingCollater:
                         0 for _ in range(len(flat_rings) - self.max_size_kernel)
                     ]
                     np.random.shuffle(node_ids)
-                    flat_rings = [
-                        node for i, node in enumerate(flat_rings) if node_ids[i] == 1
-                    ]
+                    flat_rings = [node for i, node in enumerate(flat_rings) if node_ids[i] == 1]
                 k_block = self.k_block(flat_rings)
                 batch[key] = torch.from_numpy(k_block).detach().float(), node_ids
             else:
@@ -194,7 +183,7 @@ def get_loader(cfg, dataset, systems, training=True, trial=None, tune=False):
     # Set up sampler
     # These one cannot be a shared object
     if cfg.train.target == "is_native":
-        sampler = IsNativeSampler(systems, group_sampling=cfg.train.group_sample)
+        sampler = IsNativeSampler(systems, group_sampling=cfg.train.group_sample, shuffle=cfg.train.shuffle)
     elif cfg.train.target == "native_fp":
         sampler = NativeFPSampler(systems, group_sampling=cfg.train.group_sample)
     else:
@@ -205,25 +194,19 @@ def get_loader(cfg, dataset, systems, training=True, trial=None, tune=False):
     max_size_kernel = None
     if training:
         if cfg.train.simfunc in {"R_iso", "R_1", "hungarian"}:
-            node_simfunc = SimFunctionNode(
-                cfg.train.simfunc, depth=cfg.train.simfunc_depth
-            )
+            node_simfunc = SimFunctionNode(cfg.train.simfunc, depth=cfg.train.simfunc_depth)
             max_size_kernel = cfg.train.max_kernel
     collater = RingCollater(node_simfunc=node_simfunc, max_size_kernel=max_size_kernel)
 
     loader_args = {
         "shuffle": sampler is None,
         "batch_size": (
-            cfg.train.batch_size
-            if not tune
-            else trial.suggest_categorical("train.batch_size", [8, 32, 64])
+            cfg.train.batch_size if not tune else trial.suggest_categorical("train.batch_size", [8, 32, 64])
         ),
         "num_workers": cfg.train.num_workers,
     }
 
-    loader = GraphDataLoader(
-        dataset=dataset, sampler=sampler, collate_fn=collater.collate, **loader_args
-    )
+    loader = GraphDataLoader(dataset=dataset, sampler=sampler, collate_fn=collater.collate, **loader_args)
     return loader
 
 
@@ -235,9 +218,7 @@ VS_LOADER_ARGS = {
 }
 
 
-def get_vs_loader(
-    systems, decoy_mode, cfg, reps_only=False, rognan=False, cache_graphs=True
-):
+def get_vs_loader(systems, decoy_mode, cfg, reps_only=False, rognan=False, cache_graphs=True):
     """
     Just a wrapper to factor boilerplate expansion of the cfg file.
     We keep decoy_mode exposed to use on a different decoy set than the one used in training
