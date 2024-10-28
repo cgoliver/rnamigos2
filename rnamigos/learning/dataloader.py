@@ -20,10 +20,9 @@ class IsNativeSampler(Sampler):
     At each iteration, we want to draw one positive and one negative for each pocket/group.
     """
 
-    def __init__(self, systems_dataframe, group_sampling=True, shuffle=True):
+    def __init__(self, systems_dataframe, group_sampling=True):
         super().__init__(data_source=None)
         self.group_sampling = group_sampling
-        self.shuffle = shuffle
         positives = (systems_dataframe["IS_NATIVE"] == 1).values
         negatives = 1 - positives
         if not group_sampling:
@@ -183,7 +182,7 @@ def get_loader(cfg, dataset, systems, training=True, trial=None, tune=False):
     # Set up sampler
     # These one cannot be a shared object
     if cfg.train.target == "is_native":
-        sampler = IsNativeSampler(systems, group_sampling=cfg.train.group_sample, shuffle=cfg.train.shuffle)
+        sampler = IsNativeSampler(systems, group_sampling=cfg.train.group_sample)
     elif cfg.train.target == "native_fp":
         sampler = NativeFPSampler(systems, group_sampling=cfg.train.group_sample)
     else:

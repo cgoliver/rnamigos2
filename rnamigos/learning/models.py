@@ -423,17 +423,6 @@ class Embedder(nn.Module):
 # ~~~~~~~~~~~~~~~~~~~~~~~
 class RNAmigosModel(nn.Module):
     def __init__(self, encoder, decoder, lig_encoder=None, pool="att", pool_dim=32):
-        """
-
-        :param dims: the embeddings dimensions
-        :param attributor_dims: the number of motifs to look for
-        :param num_rels: the number of possible edge types
-        :param num_bases: technical rGCN option
-        :param rec: the constant in front of reconstruction loss
-        :param mot: the constant in front of motif detection loss
-        :param orth: the constant in front of dictionnary orthogonality loss
-        :param attribute: Wether we want the network to use the attribution module
-        """
         super(RNAmigosModel, self).__init__()
 
         if pool == "att":
