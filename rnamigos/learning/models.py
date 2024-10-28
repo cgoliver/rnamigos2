@@ -24,16 +24,16 @@ class RGCN(nn.Module):
     """RGCN encoder with num_hidden_layers + 2 RGCN layers, and sum pooling."""
 
     def __init__(
-        self,
-        features_dim,
-        h_dim,
-        num_rels,
-        num_layers,
-        num_bases=-1,
-        gcn_dropout=0,
-        batch_norm=False,
-        self_loop=False,
-        jumping_knowledge=True,
+            self,
+            features_dim,
+            h_dim,
+            num_rels,
+            num_layers,
+            num_bases=-1,
+            gcn_dropout=0,
+            batch_norm=False,
+            self_loop=False,
+            jumping_knowledge=True,
     ):
         super(RGCN, self).__init__()
 
@@ -110,14 +110,15 @@ class Decoder(nn.Module):
     """
 
     def __init__(
-        self,
-        in_dim,
-        out_dim,
-        hidden_dim,
-        num_layers,
-        dropout=0.2,
-        batch_norm=True,
-        activation=None,
+            self,
+            in_dim,
+            out_dim,
+            hidden_dim,
+            num_layers,
+            dropout=0.2,
+            batch_norm=True,
+            activation=None,
+            bn_all_layers=True
     ):
         super(Decoder, self).__init__()
         # self.num_nodes = num_nodes
@@ -127,6 +128,7 @@ class Decoder(nn.Module):
         self.num_layers = num_layers
         self.batch_norm = batch_norm
         self.dropout = dropout
+        self.bn_all_layers = bn_all_layers
 
         if activation == "sigmoid":
             self.activation = nn.Sigmoid()
@@ -157,8 +159,9 @@ class Decoder(nn.Module):
         output = x
         for layer in range(self.num_layers):
             output = self.layers[layer](output)
-            if self.batch_norm and layer != self.num_layers - 1:
-                output = self.batch_norms[layer](output)
+            if self.batch_norm:
+                if self.bn_all_layers or layer != self.num_layers - 1:
+                    output = self.batch_norms[layer](output)
             if layer == self.num_layers - 1:
                 output = F.dropout(output, self.dropout, training=self.training)
             else:
@@ -174,13 +177,13 @@ class LigandEncoder(nn.Module):
     """
 
     def __init__(
-        self,
-        in_dim,
-        hidden_dim,
-        num_hidden_layers,
-        batch_norm=True,
-        dropout=0.2,
-        num_rels=19,
+            self,
+            in_dim,
+            hidden_dim,
+            num_hidden_layers,
+            batch_norm=True,
+            dropout=0.2,
+            num_rels=19,
     ):
         super(LigandEncoder, self).__init__()
         self.in_dim = in_dim
@@ -240,15 +243,15 @@ class LigandEncoder(nn.Module):
 
 class LigandGraphEncoder(nn.Module):
     def __init__(
-        self,
-        l_size=56,
-        gcn_hdim=32,
-        gcn_layers=3,
-        features_dim=22,
-        num_rels=4,
-        batch_norm=False,
-        # cat_mu_v=True,
-        cut_embeddings=False,
+            self,
+            l_size=56,
+            gcn_hdim=32,
+            gcn_layers=3,
+            features_dim=22,
+            num_rels=4,
+            batch_norm=False,
+            # cat_mu_v=True,
+            cut_embeddings=False,
     ):
         super(LigandGraphEncoder, self).__init__()
         self.features_dim = features_dim
@@ -313,15 +316,15 @@ class Embedder(nn.Module):
     """
 
     def __init__(
-        self,
-        in_dim,
-        hidden_dim,
-        num_hidden_layers,
-        subset_pocket_nodes=True,
-        batch_norm=True,
-        num_rels=20,
-        dropout=0.2,
-        num_bases=-1,
+            self,
+            in_dim,
+            hidden_dim,
+            num_hidden_layers,
+            subset_pocket_nodes=True,
+            batch_norm=True,
+            num_rels=20,
+            dropout=0.2,
+            num_bases=-1,
     ):
         super(Embedder, self).__init__()
         self.in_dim = in_dim
@@ -478,16 +481,14 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
     """
     for_loading skips pretrained network subparts since it will be used for loading a fully pretrained model
     """
-    use_rnafm = False
-    if "use_rnafm" in cfg.model:
-        use_rnafm = cfg.model.use_rnafm
-
+    use_rnafm = cfg.model.use_rnafm if "use_rnafm" in cfg.model else False
     model_indim = cfg.model.encoder.in_dim + 640 if use_rnafm else cfg.model.encoder.in_dim
 
     enc_hidden_dim = cfg.model.encoder.hidden_dim
     enc_num_layers = cfg.model.encoder.num_layers
     dec_hidden_dim = cfg.model.decoder.hidden_dim
     dec_num_layers = cfg.model.decoder.num_layers
+    dec_bn_all_layers = cfg.model.decoder.bn_all_layers if "bn_all_layers" in cfg.model.decoder else True
 
     if tune:
         dec_hidden_dim = trial.suggest_categorical("model.decoder.hidden_dim", [32, 128, 256])
@@ -558,6 +559,7 @@ def cfg_to_model(cfg, for_loading=False, tune=False, trial=None):
         activation=cfg.model.decoder.activation,
         batch_norm=cfg.model.batch_norm,
         dropout=(cfg.model.dropout if not tune else trial.suggest_categorical("model.decoder.dropout", [0.2, 0.5])),
+        bn_all_layers=dec_bn_all_layers
     )
 
     model = RNAmigosModel(

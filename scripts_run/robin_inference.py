@@ -305,9 +305,7 @@ def print_results(swap=0):
     for method in to_print:
         in_csv = os.path.join(res_dir, f"{method}_raw.csv")
         df = pd.read_csv(in_csv)
-        mar = get_mar_one(df, "score")
         ef = enrichment_factor(df["score"], df["is_active"])
-        print("MAR: ", method, mar)
         print("EF: 2% ", method, ef)
         auroc = raw_df_to_mean_auroc(df, "score")
         print("AUROC: ", method, auroc)

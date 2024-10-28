@@ -23,7 +23,8 @@ decoder:
   out_dim: 1 
   hidden_dim: 32
   num_layers: 3
-  activation: sigmoid 
+  activation: sigmoid
+  bn_all_layers: True
   dropout: 0.2
 
 pool: 'att'
