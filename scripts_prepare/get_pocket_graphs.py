@@ -1,4 +1,3 @@
-from typing import List
 import os
 
 from tqdm import tqdm
@@ -90,14 +89,6 @@ def build_ring_tree_from_graph(graph, depth=2):
                                        depth=depth)
         edge_rings[node] = rings['edge']
     return edge_rings
-
-def sample_negative_pockets(whole_graph: nx.Graph, pocket_nodes: List, n_samples = 10: int) -> List[nx.Graph]:
-    """ Sample pockets at random from the rest of the RNA. Sample a random node and add nodes to it with bfs. 
-    Try to get them to match the size
-    of the original pocket by selecting the right bfs depth for each..
-    """
-
-    pass
 
 failed_set = set()
 for pocket in tqdm(os.listdir(old_path)):
