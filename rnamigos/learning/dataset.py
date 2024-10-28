@@ -200,6 +200,7 @@ class DockingDataset(Dataset):
         ligand_cache="data/ligands/lig_graphs.p",
         use_ligand_cache=True,
         negative_pocket="none",
+        training=True,
     ):
         """
         Setup for data loader.
@@ -241,6 +242,7 @@ class DockingDataset(Dataset):
         self.use_rings = use_rings
         self.use_rnafm = use_rnafm
         self.negative_pocket = negative_pocket
+        self.training = training
 
         if cache_graphs:
             all_pockets = set(self.systems["PDB_ID_POCKET"].unique())
@@ -254,7 +256,20 @@ class DockingDataset(Dataset):
                 for pocket_id in all_pockets
             }
         self.neg_pocket_cache = {}
+
         print("done caching")
+
+        # carlos: dirty fix to make sure negative pockets not from val/test splits
+        if self.training:
+            script_dir = os.path.dirname(__file__)
+            splits_file = os.path.join(script_dir, "../../data/train_test_75.p")
+            _, _, train_names_grouped, _ = pickle.load(open(splits_file, "rb"))
+            self.train_pockets = set()
+            for rep, members in train_names_grouped.items():
+                self.train_pockets |= set([rep])
+            if self.cache_graphs:
+                self.train_pockets = list(set(self.all_pockets.keys()) & self.train_pockets)
+        ####
 
     def __len__(self):
         return len(self.systems)
@@ -277,10 +292,8 @@ class DockingDataset(Dataset):
             )
         ligand_fp = self.ligand_encoder.smiles_to_fp_one(smiles=ligand_smiles)
 
-        if self.negative_pocket == "rognan" or self.negative_pocket == "both":
-            other_idx = random.randint(0, len(self))
-            other_row = self.systems.iloc[other_idx]
-            other_pocket_id = other_row["PDB_ID_POCKET"]
+        if self.negative_pocket in ["rognan", "both"] and self.training:
+            other_pocket_id = random.choice(self.train_pockets)
             if self.cache_graphs:
                 rognan_pocket_graph, rognan_rings = self.all_pockets[other_pocket_id]
             else:
@@ -291,7 +304,7 @@ class DockingDataset(Dataset):
                     use_rnafm=self.use_rnafm,
                 )
 
-        if self.negative_pocket == "non_pocket" or self.negative_pocket == "both":
+        if self.negative_pocket in ["non_pocket", "both"] and self.training:
             perturb_dir = Path("figs/perturbations/perturbed/")
             perturb_slice = random.choice(os.listdir(perturb_dir))
             perturb_path = perturb_dir / perturb_slice / f"{pocket_id}.json"
@@ -336,7 +349,7 @@ class DockingDataset(Dataset):
             target = row["IS_NATIVE"]
         # print("1 : ", time.perf_counter() - t0)
 
-        if self.negative_pocket != "none":
+        if self.negative_pocket != "none" and self.training:
             if self.negative_pocket == "rognan":
                 return {
                     "graph": pocket_graph,
@@ -555,6 +568,7 @@ def get_dataset(cfg, systems, training=True):
         "use_rnafm": cfg.model.use_rnafm,
         "undirected": cfg.data.undirected,
         "negative_pocket": cfg.train.negative_pocket,
+        "training": training,
     }
 
     dataset = DockingDataset(systems=systems, use_rings=use_rings, **dataset_args)
