@@ -57,59 +57,82 @@ def validate(model, val_loader, criterion, device):
     return val_loss / val_size
 
 
-def compute_rognan_loss(model, batch, mode="rognan", alpha=0.3):
+def double_decoy_outputs(model, batch):
+    all_scores = model(batch["graph"], batch["ligand_input"])
+    y = batch["target"]
+
+    n_pos = torch.sum(y)
+    n_neg = 1 - n_pos
+
+    # score on true pairs (use y to select only scores we want)
+    score_positives = (1 / n_pos) * torch.sum(y * all_scores)
+    # score on decoy ligands
+    score_l_prime = (1 / n_neg) * torch.sum((1 - y) * all_scores)
+
+    # score on rognan pockets, only compute within PDB ligands
+    pos_inds = torch.nonzero(y, as_tuple=True)[0]
+    pos_pockets, pos_ligs = batch["graph"][pos_inds], batch["ligand_input"][pos_inds]
+    pos_pokets_shuffle = pos_pockets[torch.randperm(n_pos)]
+    score_p_prime = model(pos_pocket_shuffle, batch["ligand_input"]).mean()
+
+    return score_positives, 0.5 * (score_l_prime + score_p_prime)
+
+
+def compute_rognan_loss(model, batch, mode="rognan", loss="margin", alpha=0.3):
     """Only for positive pocket-ligand pairs (r,l) in the batch compute the loss as:
     $$ \max(0, p(r, l) - p(r', l) + \alpha) $$,
     where $\alpha$ is the margin and $p(.,.)$ is the model output for a pocket-ligand
     pair. We force decoy pockets $p'$ to have a lower score than the native pair.
     """
 
-    def get_margin(true, neg, y):
+    def get_margin(true, neg):
         zero = torch.zeros_like(true)
-        themax = torch.max(zero, neg - true + alpha)
-        maxsum = torch.sum(y * themax)  # only keep true pocket-ligand pairs
-        return (1 / torch.sum(y)) * maxsum
+        return torch.sum(torch.max(zero, neg - true + alpha))
 
-    pred_true = model(batch["graph"], batch["ligand_input"])[0].squeeze()
+    def get_exp(true, neg):
+        return torch.exp(-1 * true / (neg + 0.0000001))
+
     y = batch["target"].detach()
-    if mode in ["rognan", "non_pocket"]:
+    n_pos = torch.sum(y)
+
+    if mode == "rognan":
+        pred_true = model(batch["graph"], batch["ligand_input"])[0].squeeze()
         pred_neg = model(batch["other_graph"], batch["ligand_input"])[0].squeeze()
-        tot = get_margin(pred_true, pred_neg, y)
+        if loss == "margin":
+            tot = (1 / n_pos) * get_margin(y * pred_true, y * pred_neg)
 
-    if mode == "both":
-        pred_neg_rog = model(batch["rognan_graph"], batch["ligand_input"])[0].squeeze()
-        pred_neg_non = model(batch["non_graph"], batch["ligand_input"])[0].squeeze()
-
-        margin_rog = get_margin(pred_true, pred_neg_rog, y)
-        margin_non = get_margin(pred_true, pred_neg_non, y)
-
-        tot = margin_rog + margin_non
+    if mode == "double":
+        pos_pred, neg_pred = double_decoy_outputs(model, batch)
+        if loss = "margin":
+            tot = (1/n_pos) * get_margin(pos_pred, neg_pred)
+        if loss = "exp":
+            tot = get_exp(pos_pred, neg_pred)
 
     return tot
 
 
 def train_dock(
-        model,
-        criterion,
-        optimizer,
-        train_loader,
-        val_loader,
-        val_vs_loader,
-        test_vs_loader,
-        save_path,
-        val_vs_loader_rognan=None,
-        writer=None,
-        device="cpu",
-        num_epochs=25,
-        wall_time=None,
-        early_stop_threshold=10,
-        monitor_robin=False,
-        pretrain_weight=0.1,
-        negative_pocket="none",
-        bce_weight=1.0,
-        debug=False,
-        rognan_margin=0.3,
-        cfg=None,
+    model,
+    criterion,
+    optimizer,
+    train_loader,
+    val_loader,
+    val_vs_loader,
+    test_vs_loader,
+    save_path,
+    val_vs_loader_rognan=None,
+    writer=None,
+    device="cpu",
+    num_epochs=25,
+    wall_time=None,
+    early_stop_threshold=10,
+    monitor_robin=False,
+    pretrain_weight=0.1,
+    negative_pocket="none",
+    bce_weight=1.0,
+    debug=False,
+    rognan_margin=0.3,
+    cfg=None,
 ):
     """
     Performs the entire training routine
