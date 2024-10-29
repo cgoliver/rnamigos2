@@ -31,7 +31,7 @@ learning_rate: 1e-3
 pretrain_weight: 0.
 clf_lam: 1.0
 negative_pocket: 'none'
-margin_only: false
+bce_weight: 1.0
 reconstruction_lam: 1.0
 early_stop: 10
 target: dock # dock or native_fp or is_native
@@ -39,7 +39,7 @@ weight_decay: 0
 rognan_margin: 0.3
 
 # Validation
-vs_every: 20
+vs_every: 40
 vs_decoy_mode: 'pdb_chembl'
 do_rognan: True
 monitor_robin: True

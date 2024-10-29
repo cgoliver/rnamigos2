@@ -89,41 +89,30 @@ def compute_rognan_loss(model, batch, mode="rognan", alpha=0.3):
 
 
 def train_dock(
-    model,
-    criterion,
-    optimizer,
-    train_loader,
-    val_loader,
-    val_vs_loader,
-    test_vs_loader,
-    save_path,
-    val_vs_loader_rognan=None,
-    writer=None,
-    device="cpu",
-    num_epochs=25,
-    wall_time=None,
-    early_stop_threshold=10,
-    monitor_robin=False,
-    pretrain_weight=0.1,
-    negative_pocket="none",
-    margin_only=False,
-    debug=False,
-    rognan_margin=0.3,
-    cfg=None,
+        model,
+        criterion,
+        optimizer,
+        train_loader,
+        val_loader,
+        val_vs_loader,
+        test_vs_loader,
+        save_path,
+        val_vs_loader_rognan=None,
+        writer=None,
+        device="cpu",
+        num_epochs=25,
+        wall_time=None,
+        early_stop_threshold=10,
+        monitor_robin=False,
+        pretrain_weight=0.1,
+        negative_pocket="none",
+        bce_weight=1.0,
+        debug=False,
+        rognan_margin=0.3,
+        cfg=None,
 ):
     """
-    Performs the entire training routine.
-    :param model: (torch.nn.Module): the model to train
-    :param criterion: the criterion to use (e.g. CrossEntropy)
-    :param optimizer: the optimizer to use (e.g. SGD or Adam)
-    :param device: the device on which to run
-    :param train_loader: dataloader for training
-    :param val_loader: dataloader for validation
-    :param save_path: where to save the model
-    :param writer: a Tensorboard object (defined in utils)
-    :param num_epochs: int number of epochs
-    :param wall_time: The number of hours you want the model to run
-    :return:
+    Performs the entire training routine
     """
     epochs_from_best = 0
     start_time = time.time()
@@ -157,12 +146,10 @@ def train_dock(
             else:
                 loss = criterion(pred.squeeze(), target.float())
 
+            loss = bce_weight * loss
             if negative_pocket != "none":
-                if margin_only:
-                    loss = 0
                 rognan_loss = compute_rognan_loss(model, batch, alpha=rognan_margin, mode=negative_pocket)
                 loss += rognan_loss
-                pass
 
             # Optionally keep a small weight on the pretraining objective
             if pretrain_weight > 0 and node_sim_block is not None:
@@ -214,13 +201,14 @@ def train_dock(
         # Run VS metrics
         if not epoch % vs_every and not debug:
             lower_is_better = cfg.train.target in ["dock", "native_fp"]
-            efs, *_ = run_virtual_screen(model, val_vs_loader, lower_is_better=lower_is_better)
-            val_ef = np.mean(efs)
+            val_efs, *_ = run_virtual_screen(model, val_vs_loader, lower_is_better=lower_is_better)
+            val_ef = np.mean(val_efs)
             writer.add_scalar("Val EF", val_ef, epoch)
 
             if val_vs_loader_rognan is not None:
-                efs, *_ = run_virtual_screen(model, val_vs_loader_rognan, lower_is_better=lower_is_better)
-                writer.add_scalar("Val EF Rognan", np.mean(efs), epoch)
+                rognan_efs, *_ = run_virtual_screen(model, val_vs_loader_rognan, lower_is_better=lower_is_better)
+                writer.add_scalar("Val EF Rognan", np.mean(rognan_efs), epoch)
+                writer.add_scalar("EF + Rognan gap", 2 * val_ef - np.mean(rognan_efs), epoch)
 
             efs, *_ = run_virtual_screen(model, test_vs_loader, lower_is_better=lower_is_better)
             writer.add_scalar("Test EF", np.mean(efs), epoch)
