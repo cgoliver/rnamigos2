@@ -18,7 +18,7 @@ from rnamigos.utils.virtual_screen import get_results_dfs, raw_df_to_mean_auroc
 from scripts_fig.plot_utils import group_df
 
 
-def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None):
+def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None, rognan=False, reps_only=False):
     # Final VS validation on each decoy set
     if verbose:
         logger.info(f"Loading VS graphs from {cfg.data.pocket_graphs}")
@@ -32,7 +32,13 @@ def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None):
     elif isinstance(decoys, str):
         decoys = [decoys]
     for decoy_mode in decoys:
-        dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg, cache_graphs=False)
+        dataloader = get_vs_loader(systems=test_systems,
+                                   decoy_mode=decoy_mode,
+                                   cfg=cfg,
+                                   cache_graphs=False,
+                                   reps_only=reps_only,
+                                   verbose=verbose,
+                                   rognan=rognan)
         decoy_df_aurocs, decoys_dfs_raws = get_results_dfs(model=model,
                                                            dataloader=dataloader,
                                                            decoy_mode=decoy_mode,
@@ -62,6 +68,22 @@ def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None):
         logger.info(f"{cfg.name} Mean AuROC on pdbchembl: {np.mean(df_pdbchembl['score'].values)}")
         logger.info(f"{cfg.name} Mean grouped AuROC on pdbchembl: {np.mean(df_pdbchembl_grouped['score'].values)}")
     return df_aurocs, df_raw
+
+
+def get_perf_model(models, decoys='pdb_chembl', reps_only=True):
+    model_dir = "results/trained_models/"
+    for model_name, model_path in models.items():
+        full_model_path = os.path.join(model_dir, model_path)
+        model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
+        df_aurocs, _ = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoys, reps_only=reps_only)
+        df_aurocs_rognan, _ = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoys, rognan=True,
+                                       reps_only=reps_only)
+
+        # Just printing the results
+        test_auroc = np.mean(df_aurocs['score'].values)
+        test_auroc_rognan = np.mean(df_aurocs_rognan['score'].values)
+        gap_score = 2 * test_auroc - test_auroc_rognan
+        print(f"{model_name}: AuROC {test_auroc:.3f}, Rognan {test_auroc_rognan:.3f}, GapScore {gap_score:.3f}")
 
 
 def get_all_csvs(recompute=False):
@@ -206,16 +228,22 @@ if __name__ == "__main__":
         "native_new": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
     }
     RUNS = list(MODELS.keys())
+
+    # Just print perfs compared to Rognan
+    get_perf_model(models=MODELS, decoys=DECOY, reps_only=GROUPED)
+
     # GET INFERENCE CSVS FOR SEVERAL MODELS
     recompute = False
-    get_all_csvs(recompute=recompute)
+    # get_all_csvs(recompute=recompute)
 
     # PARSE INFERENCE CSVS AND MIX THEM
     TO_MIX = ['rdock'] + RUNS
-    compute_mix_csvs()
+    # compute_mix_csvs()
 
     # To compare to ensembling the same method with different seeds
     # compute_all_self_mix()
 
     # Get table with all mixing
     # get_table_mixing(decoy=DECOY)
+
+# native_new 0.8249440874510915 0.46837273850152966 1.1815154364006533

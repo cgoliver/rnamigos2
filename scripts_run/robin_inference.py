@@ -281,9 +281,9 @@ def print_results(swap=0):
     to_print = [
         "rdock",
         "dock_42",
-        "rnamigos",
+        # "rnamigos",
         # "rdocknat",
-        "combined",
+        # "combined",
     ]
     for method in to_print:
         in_csv = os.path.join(res_dir, f"{method}_raw.csv")
@@ -298,22 +298,22 @@ def print_results(swap=0):
 
 if __name__ == "__main__":
     MODELS = {
-        "native_42": "is_native/native_rnafm_dout5_4",
-        "native_new": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
-        "native_false": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlyfalse_rognan",
+        # "native_42": "is_native/native_rnafm_dout5_4",
+        # "native_new": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
+        # "native_false": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlyfalse_rognan",
         "dock_42": "dock/dock_42",
     }
 
     PAIRS = {
-        ("rdock", "dock_42"): "dock_rdock",
-        ("native_42", "dock_42"): "rnamigos_42",
-        ("native_new", "dock_42"): "rnamigos_new",
-        ("native_false", "dock_42"): "rnamigos_false",
+        # ("rdock", "dock_42"): "dock_rdock",
+        # ("native_42", "dock_42"): "rnamigos_42",
+        # ("native_new", "dock_42"): "rnamigos_new",
+        # ("native_false", "dock_42"): "rnamigos_false",
         # ("native_nonpocket", "dock_42"): "rnamigos_nonpocket",
         # Which one is migos++ ?
-        ("rnamigos", "rdock"): "combined",
-        ("rnamigos_new", "rdock"): "combined_new",
-        ("rnamigos_false", "rdock"): "combined_false",
+        # ("rnamigos", "rdock"): "combined",
+        # ("rnamigos_new", "rdock"): "combined_new",
+        # ("rnamigos_false", "rdock"): "combined_false",
         # ("native_42", "rdock"): "rdocknat",
     }
 

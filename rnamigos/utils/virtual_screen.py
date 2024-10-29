@@ -23,7 +23,7 @@ def enrichment_factor(scores, is_active, frac=0.01):
     return (n_actives_screened / n_screened) / (n_actives / len(scores))
 
 
-def run_virtual_screen(model, dataloader, metric=get_auroc, lower_is_better=False):
+def run_virtual_screen(model, dataloader, metric=get_auroc, lower_is_better=False, verbose=True):
     """run_virtual_screen.
 
     :param model: trained affinity prediction model
@@ -43,7 +43,8 @@ def run_virtual_screen(model, dataloader, metric=get_auroc, lower_is_better=Fals
             failed += 1
             continue
         if not i % 20:
-            logger.info(f"Done {i}/{len(dataloader)}")
+            if verbose:
+                logger.info(f"Done {i}/{len(dataloader)}")
         if (isinstance(ligands, torch.Tensor) and len(ligands) < 10) or (
                 isinstance(ligands, DGLGraph) and ligands.batch_size < 10):
             logger.warning(f"Skipping pocket{i}, not enough decoys")
@@ -91,7 +92,8 @@ def get_results_dfs(model, dataloader, decoy_mode, cfg, verbose=False):
     aurocs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
                                                                           dataloader,
                                                                           metric=metric,
-                                                                          lower_is_better=lower_is_better)
+                                                                          lower_is_better=lower_is_better,
+                                                                          verbose=verbose)
     auroc_df = run_results_to_auroc_df(aurocs, scores, pocket_names, decoy_mode)
     raw_df = run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode)
     if verbose:
