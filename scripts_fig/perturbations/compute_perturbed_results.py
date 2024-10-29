@@ -112,7 +112,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
         base_name = Path(pocket_path).name
 
     # Get dock performance
-    dock_model_path = "results/trained_models/dock/dock_rnafm_3"
+    dock_model_path = "results/trained_models/dock/dock_7_0"
     dock_model = get_model_from_dirpath(dock_model_path)
     df_dock_aurocs, df_dock_raw, df_dock_ef = compute_efs_model(dock_model,
                                                                 dataloader=dataloader,
@@ -122,7 +122,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     df_dock_ef.to_csv(out_dir / (base_name + "_dock_ef.csv"))
 
     # Get native performance
-    native_model_path = "results/trained_models/is_native/native_rnafm_dout5_4"
+    native_model_path = "results/trained_models/is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan"
     native_model = get_model_from_dirpath(native_model_path)
     df_native_aurocs, df_native_raw, df_native_ef = compute_efs_model(native_model,
                                                                       dataloader=dataloader,
@@ -370,17 +370,17 @@ def main_chembl():
     get_random, get_hard, get_soft, get_rognan_like, get_rognan_true = instantiate_functions(fractions=fractions,
                                                                                              metric=metric)
     # Now compute perturbed scores using the random BFS approach
-    dfs_random = get_random(recompute=recompute, use_cached_pockets=use_cached_pockets)
+    # dfs_random = get_random(recompute=recompute, use_cached_pockets=use_cached_pockets)
 
     # Hard: sample on the border
-    dfs_hard = get_hard(recompute=recompute, use_cached_pockets=use_cached_pockets)
+    # dfs_hard = get_hard(recompute=recompute, use_cached_pockets=use_cached_pockets)
 
     # Get dfs soft
-    dfs_soft = get_soft(recompute=recompute, use_cached_pockets=use_cached_pockets)
+    # dfs_soft = get_soft(recompute=recompute, use_cached_pockets=use_cached_pockets)
 
     # Rognan like and true
     dfs_rognan_like = get_rognan_like(recompute=recompute, use_cached_pockets=use_cached_pockets)
-    dfs_rognan_true = get_rognan_true(recompute=recompute, use_cached_pockets=use_cached_pockets)
+    # dfs_rognan_true = get_rognan_true(recompute=recompute, use_cached_pockets=use_cached_pockets)
 
     # PLOT
     # plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple',metric=metric,
@@ -389,13 +389,13 @@ def main_chembl():
     plot_list_partial = partial(plot_list, colors=colors, metric=metric, fractions=fractions)
 
     # Actually plot
-    plot_list_partial(dfs=dfs_random, label="Random strategy", )
-    end_plot()
-    plot_list_partial(dfs=dfs_hard, label="Hard strategy", )
-    end_plot()
-    plot_list(dfs_rognan_like, fractions=fractions, color="black", metric=metric,
+    # plot_list_partial(dfs=dfs_random, label="Random strategy", )
+    # end_plot()
+    # plot_list_partial(dfs=dfs_hard, label="Hard strategy", )
+    # end_plot()
+    plot_list(dfs_rognan_like, fractions=fractions, colors=["black"], metric=metric,
               label="Rognan strategy", )  # Plot rognan
-    plot_list_partial(dfs=dfs_soft, label="Soft strategy", )
+    # plot_list_partial(dfs=dfs_soft, label="Soft strategy", )
     end_plot()
 
     # Compute plots with overlap

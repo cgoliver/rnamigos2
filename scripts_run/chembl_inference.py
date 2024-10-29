@@ -201,8 +201,9 @@ if __name__ == "__main__":
     # SEEDS = [0, 1, 42]
 
     MODELS = {
-        "dock_42": "dock/dock_rnafm_3",
+        "dock_42": "dock/dock_42",
         "native_42": "is_native/native_rnafm_dout5_4",
+        "native_new": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
     }
     RUNS = list(MODELS.keys())
     # GET INFERENCE CSVS FOR SEVERAL MODELS
@@ -211,10 +212,10 @@ if __name__ == "__main__":
 
     # PARSE INFERENCE CSVS AND MIX THEM
     TO_MIX = ['rdock'] + RUNS
-    # compute_mix_csvs()
+    compute_mix_csvs()
 
     # To compare to ensembling the same method with different seeds
     # compute_all_self_mix()
 
     # Get table with all mixing
-    get_table_mixing(decoy=DECOY)
+    # get_table_mixing(decoy=DECOY)

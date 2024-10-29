@@ -59,7 +59,7 @@ def plot_one(
         df,
         fractions,
         filter_good=False,
-        plot_delta=False,
+        plot_delta=True,
         color="blue",
         label="default_label",
         metric="ef",

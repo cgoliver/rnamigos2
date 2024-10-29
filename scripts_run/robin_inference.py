@@ -33,13 +33,13 @@ POCKET_PATH = "data/json_pockets_expanded"
 
 
 def robin_inference_raw(
-    ligand_name,
-    dgl_pocket_graph,
-    models=None,
-    out_path=None,
-    ligand_cache=None,
-    use_ligand_cache=False,
-    debug=False,
+        ligand_name,
+        dgl_pocket_graph,
+        models=None,
+        out_path=None,
+        ligand_cache=None,
+        use_ligand_cache=False,
+        debug=False,
 ):
     """
     Given the graph pocket and ligand name, as well as models as expected by the inference script,
@@ -263,14 +263,6 @@ def get_merged_df(swap=0, recompute=False):
         "rnamigos",
         "rdocknat",
         "combined",
-        "native_nonpocket",
-        "native_rognanpocket",
-        "rnamigos_nonpocket",
-        "rnamigos_rognanpocket",
-        "native_tune_bestrobin_val",
-        "native_tune_bestrobin_test",
-        "rnamigos_nativetune_val",
-        "rnamigos_nativetune_test",
     ]
     big_df = None
     for name in to_mix:
@@ -289,55 +281,43 @@ def print_results(swap=0):
     to_print = [
         "rdock",
         "dock_42",
-        "native_42",
         "rnamigos",
-        "rdocknat",
+        # "rdocknat",
         "combined",
-        "native_nonpocket",
-        "native_rognanpocket",
-        "rnamigos_nonpocket",
-        "rnamigos_rognanpocket",
-        "native_tune_bestrobin_val",
-        "native_tune_bestrobin_test",
-        "rnamigos_nativetune_val",
-        "rnamigos_nativetune_test",
     ]
     for method in to_print:
         in_csv = os.path.join(res_dir, f"{method}_raw.csv")
         df = pd.read_csv(in_csv)
-        ef = enrichment_factor(df["score"], df["is_active"])
-        print("EF: 2% ", method, ef)
+        ef = enrichment_factor(df["score"], df["is_active"], frac=0.02)
+        # print(ef)
+        # print("EF: 2% ", method, ef)
         auroc = raw_df_to_mean_auroc(df, "score")
-        print("AUROC: ", method, auroc)
+        # print(auroc)
+        print(f"AUROC: \t {method} \t {auroc}")
 
 
 if __name__ == "__main__":
     MODELS = {
-        "native": "is_native/native_nopre_new_pdbchembl",
-        "native_rnafm": "is_native/native_nopre_new_pdbchembl_rnafm",
-        "native_pre": "is_native/native_pretrain_new_pdbchembl",
         "native_42": "is_native/native_rnafm_dout5_4",
-        "native_nonpocket": "is_native/native_rnafm_dout5_4_nonpocket",
-        "native_rognanpocket": "is_native/native_rnafm_dout5_4_rognan",
-        "native_tune_bestrobin_val": "is_native/models_dout/native_rnafm_dout5_4_tune_21_best",
-        "native_tune_bestrobin_test": "is_native/models_dout/native_rnafm_dout5_4_tune_9",
-        "dock_42": "dock/dock_rnafm_3",
+        "native_new": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
+        "native_false": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlyfalse_rognan",
+        "dock_42": "dock/dock_42",
     }
 
     PAIRS = {
         ("rdock", "dock_42"): "dock_rdock",
-        ("native_42", "dock_42"): "rnamigos",
-        ("native_nonpocket", "dock_42"): "rnamigos_nonpocket",
-        ("native_rognanpocket", "dock_42"): "rnamigos_rognanpocket",
-        ("native_tune_bestrobin_test", "dock_42"): "rnamigos_nativetune_test",
-        ("native_tune_bestrobin_val", "dock_42"): "rnamigos_nativetune_val",
+        ("native_42", "dock_42"): "rnamigos_42",
+        ("native_new", "dock_42"): "rnamigos_new",
+        ("native_false", "dock_42"): "rnamigos_false",
+        # ("native_nonpocket", "dock_42"): "rnamigos_nonpocket",
         # Which one is migos++ ?
         ("rnamigos", "rdock"): "combined",
-        ("native_42", "rdock"): "rdocknat",
+        ("rnamigos_new", "rdock"): "combined_new",
+        ("rnamigos_false", "rdock"): "combined_false",
+        # ("native_42", "rdock"): "rdocknat",
     }
 
     SWAP = 0
-
     # TEST ONE INFERENCE
     # pocket_id = "TPP"
     # lig_name = "2GDI_Y_TPP_100"
@@ -346,13 +326,13 @@ if __name__ == "__main__":
     # full_model_path = os.path.join(model_dir, model_path)
     # model = get_model_from_dirpath(full_model_path)
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
-    assess_overlap_robin()
+    # assess_overlap_robin()
 
     # GET ALL CSVs for the models and plot them
     get_all_csvs(recompute=False, swap=SWAP)
     get_dfs_docking(swap=SWAP)
     mix_all(recompute=True, swap=SWAP)
-    get_merged_df(recompute=True, swap=SWAP)
+    # get_merged_df(recompute=True, swap=SWAP)
     print_results(swap=SWAP)
 
     # COMPUTE PERTURBED VERSIONS
