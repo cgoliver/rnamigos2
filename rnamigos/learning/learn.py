@@ -1,8 +1,10 @@
 import sys
+import random
 
 import numpy as np
 import time
 import torch
+import dgl
 
 from rnamigos.utils.virtual_screen import run_virtual_screen
 from rnamigos.utils.learning_utils import send_graph_to_device
@@ -58,24 +60,24 @@ def validate(model, val_loader, criterion, device):
 
 
 def double_decoy_outputs(model, batch):
-    all_scores = model(batch["graph"], batch["ligand_input"])
+    # score on rognan pockets, only compute within PDB ligands
+    pockets = dgl.unbatch(batch["graph"])
+    ligands = dgl.unbatch(batch["ligand_input"])
     y = batch["target"]
 
-    n_pos = torch.sum(y)
-    n_neg = 1 - n_pos
+    pos_ligands = dgl.batch([l for i, l in enumerate(ligands) if y[i] == 1])
+    random_ligs = dgl.batch(random.sample(ligands, torch.sum(y)))
 
-    # score on true pairs (use y to select only scores we want)
-    score_positives = (1 / n_pos) * torch.sum(y * all_scores)
-    # score on decoy ligands
-    score_l_prime = (1 / n_neg) * torch.sum((1 - y) * all_scores)
+    pos_pockets = [p for i, p in enumerate(pockets) if y[i] == 1]
+    pos_pockets_shuffle = random.sample(pos_pockets, len(pos_pockets))
+    pos_pockets_shuffle = dgl.batch(pos_pockets_shuffle)
+    pos_pockets = dgl.batch(pos_pockets)
 
-    # score on rognan pockets, only compute within PDB ligands
-    pos_inds = torch.nonzero(y, as_tuple=True)[0]
-    pos_pockets, pos_ligs = batch["graph"][pos_inds], batch["ligand_input"][pos_inds]
-    pos_pokets_shuffle = pos_pockets[torch.randperm(n_pos)]
-    score_p_prime = model(pos_pocket_shuffle, batch["ligand_input"]).mean()
+    pos_scores = model(pos_pockets, pos_ligands)[0]  # true native pairs
+    scores_p_prime = model(pos_pockets_shuffle, pos_ligands)[0]  # shuffled pockets vs PDB ligands
+    scores_l_prime = model(pos_pockets_shuffle, random_ligs)[0]  # PDB pockets vs pdbchembl ligands
 
-    return score_positives, 0.5 * (score_l_prime + score_p_prime)
+    return pos_scores, scores_p_prime, scores_l_prime
 
 
 def compute_rognan_loss(model, batch, mode="rognan", loss="margin", alpha=0.3):
@@ -85,9 +87,11 @@ def compute_rognan_loss(model, batch, mode="rognan", loss="margin", alpha=0.3):
     pair. We force decoy pockets $p'$ to have a lower score than the native pair.
     """
 
-    def get_margin(true, neg):
+    def get_margin(true, neg, weights=None):
         zero = torch.zeros_like(true)
-        return torch.sum(torch.max(zero, neg - true + alpha))
+        if weights is None:
+            weights = torch.ones_like(true)
+        return torch.sum(weights * torch.max(zero, neg - true + alpha))
 
     def get_exp(true, neg):
         return torch.exp(-1 * true / (neg + 0.0000001))
@@ -99,14 +103,15 @@ def compute_rognan_loss(model, batch, mode="rognan", loss="margin", alpha=0.3):
         pred_true = model(batch["graph"], batch["ligand_input"])[0].squeeze()
         pred_neg = model(batch["other_graph"], batch["ligand_input"])[0].squeeze()
         if loss == "margin":
-            tot = (1 / n_pos) * get_margin(y * pred_true, y * pred_neg)
+            margin = get_margin(pred_true, pred_neg, weights=y)
+            tot = (1 / n_pos) * margin
 
     if mode == "double":
-        pos_pred, neg_pred = double_decoy_outputs(model, batch)
+        pos_pred, p_prime, l_prime = double_decoy_outputs(model, batch)
         if loss == "margin":
-            tot = (1 / n_pos) * get_margin(pos_pred, neg_pred)
+            tot = (1 / pos_pred.size(0)) * get_margin(pos_pred, (1 / 2) * (p_prime + l_prime))
         if loss == "exp":
-            tot = get_exp(pos_pred, neg_pred)
+            tot = get_exp(pos_pred.mean(), torch.mean(p_prime + l_prime))
 
     return tot
 
@@ -132,6 +137,7 @@ def train_dock(
     bce_weight=1.0,
     debug=False,
     rognan_margin=0.3,
+    rognan_lossfunc="margin",
     cfg=None,
 ):
     """
@@ -171,7 +177,9 @@ def train_dock(
 
             loss = bce_weight * loss
             if negative_pocket != "none":
-                rognan_loss = compute_rognan_loss(model, batch, alpha=rognan_margin, mode=negative_pocket)
+                rognan_loss = compute_rognan_loss(
+                    model, batch, alpha=rognan_margin, mode=negative_pocket, loss=rognan_lossfunc
+                )
                 loss += rognan_loss
 
             # Optionally keep a small weight on the pretraining objective

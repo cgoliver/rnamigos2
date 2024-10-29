@@ -37,6 +37,7 @@ early_stop: 10
 target: dock # dock or native_fp or is_native
 weight_decay: 0
 rognan_margin: 0.3
+rognan_lossfunc: 'margin'
 monitor_gap: false
 
 # Validation
