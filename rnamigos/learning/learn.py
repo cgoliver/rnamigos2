@@ -103,9 +103,9 @@ def compute_rognan_loss(model, batch, mode="rognan", loss="margin", alpha=0.3):
 
     if mode == "double":
         pos_pred, neg_pred = double_decoy_outputs(model, batch)
-        if loss = "margin":
-            tot = (1/n_pos) * get_margin(pos_pred, neg_pred)
-        if loss = "exp":
+        if loss == "margin":
+            tot = (1 / n_pos) * get_margin(pos_pred, neg_pred)
+        if loss == "exp":
             tot = get_exp(pos_pred, neg_pred)
 
     return tot
