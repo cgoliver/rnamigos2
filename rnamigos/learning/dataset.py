@@ -253,8 +253,8 @@ class DockingDataset(Dataset):
                 )
                 for pocket_id in all_pockets
             }
+            print("done caching")
         self.neg_pocket_cache = {}
-        print("done caching")
 
         # Make sure negative pockets are not from val/test splits
         if self.negative_pocket != "none":
@@ -370,6 +370,7 @@ class VirtualScreenDataset(DockingDataset):
             rognan=False,
             reps_only=False,
             group_ligands=True,
+            verbose=True,
             **kwargs,
     ):
         super().__init__(pockets_path, systems=systems, shuffle=False, **kwargs)
@@ -379,6 +380,7 @@ class VirtualScreenDataset(DockingDataset):
         self.rognan = rognan
         self.group_ligands = group_ligands
         self.reps_only = reps_only
+        self.verbose = verbose
         script_dir = os.path.dirname(__file__)
         if self.reps_only:
             # This amounts to choosing only reps.
@@ -397,7 +399,6 @@ class VirtualScreenDataset(DockingDataset):
                 for group_rep, group_members in self.groups.items()
                 for group_member in group_members
             }
-        pass
 
     def __len__(self):
         return len(self.all_pockets_names)
@@ -470,7 +471,8 @@ class VirtualScreenDataset(DockingDataset):
                 all_smiles,
             )
         except FileNotFoundError as e:
-            print(e)
+            if self.verbose:
+                print(e)
             return None, None, None, None, None
 
 

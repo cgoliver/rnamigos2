@@ -2,9 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def add_delta(df):
-    global DF_UNPERTURBED
-    df = df.merge(DF_UNPERTURBED, how="left", on="pocket_id")
+def add_delta(df, df_ref):
+    if df_ref is None:
+        raise ValueError("You must provide a df_ref (DF_UNPERT) to get deltas ")
+    df = df.merge(df_ref, how="left", on="pocket_id")
     df["delta"] = df["score"] - df["unpert_score"]
     return df
 
@@ -22,9 +23,9 @@ def add_pert_magnitude(df):
     return df
 
 
-def plot_overlap(df, filter_good=True, **kwargs):
+def plot_overlap(df, df_ref=None, filter_good=True, **kwargs):
     df = add_pert_magnitude(df)
-    df = add_delta(df)
+    df = add_delta(df, df_ref)
     if filter_good:
         df = filter_on_good_pockets(df)
     plt.scatter(df["magnitude"], df["delta"], **kwargs)
@@ -63,9 +64,10 @@ def plot_one(
         color="blue",
         label="default_label",
         metric="ef",
+        df_ref=None,
 ):
     if plot_delta:
-        df = add_delta(df)
+        df = add_delta(df, df_ref)
         to_plot = "delta"
     else:
         to_plot = "score"

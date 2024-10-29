@@ -217,7 +217,7 @@ VS_LOADER_ARGS = {
 }
 
 
-def get_vs_loader(systems, decoy_mode, cfg, reps_only=False, rognan=False, cache_graphs=True):
+def get_vs_loader(systems, decoy_mode, cfg, verbose=True, reps_only=False, rognan=False, cache_graphs=True):
     """
     Just a wrapper to factor boilerplate expansion of the cfg file.
     We keep decoy_mode exposed to use on a different decoy set than the one used in training
@@ -238,6 +238,7 @@ def get_vs_loader(systems, decoy_mode, cfg, reps_only=False, rognan=False, cache
         reps_only=reps_only,
         rognan=rognan,
         cache_graphs=cache_graphs,
+        verbose=verbose
     )
     dataloader = GraphDataLoader(dataset=vs_dataset, **VS_LOADER_ARGS)
     return dataloader

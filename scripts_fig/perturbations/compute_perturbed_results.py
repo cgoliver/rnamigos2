@@ -204,24 +204,18 @@ def get_results_dfs(
     for i, perturbed_pocket_dir in enumerate(todo):
         _, fraction, replicate = perturbed_pocket_dir.split("_")
 
-        perturbed_pocket_path = os.path.join(
-            all_perturbed_pockets_path, perturbed_pocket_dir
-        )
+        perturbed_pocket_path = os.path.join(all_perturbed_pockets_path, perturbed_pocket_dir)
 
         # Only recompute if the csv ain't here or can't be parsed correclty
         out_dir = Path(perturbed_pocket_path).parent
         base_name = Path(perturbed_pocket_path).name
         if ROBIN:
-            out_csv_path = out_dir / (
-                    base_name + f"{'_ef' if metric == 'ef' else ''}.csv"
-            )
+            out_csv_path = out_dir / (base_name + f"{'_ef' if metric == 'ef' else ''}.csv")
         else:
             # out_csv_path = out_dir / (base_name + "_dock.csv")
-            # out_csv_path = out_dir / (base_name + "_native.csv")
+            out_csv_path = out_dir / (base_name + "_native.csv")
             # out_csv_path = out_dir / (base_name + "_mixed.csv")
-            out_csv_path = out_dir / (
-                    base_name + f"_mixed{'_ef' if metric == 'ef' else ''}.csv"
-            )
+            # out_csv_path = out_dir / (base_name + f"_mixed{'_ef' if metric == 'ef' else ''}.csv")
         if recompute or not os.path.exists(out_csv_path):
             if ROBIN:
                 _ = get_perf_robin(pocket_path=perturbed_pocket_path)
@@ -344,9 +338,7 @@ def main_chembl():
     DF_UNPERTURBED = pd.read_csv(unpert_df, index_col=False)
     DF_UNPERTURBED.rename(columns={"score": "unpert_score"}, inplace=True)
     global GOOD_POCKETS
-    GOOD_POCKETS = DF_UNPERTURBED[DF_UNPERTURBED["unpert_score"] >= 0.98][
-        "pocket_id"
-    ].unique()
+    GOOD_POCKETS = DF_UNPERTURBED[DF_UNPERTURBED["unpert_score"] >= 0.98]["pocket_id"].unique()
 
     # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
     fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
@@ -386,7 +378,8 @@ def main_chembl():
     # plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple',metric=metric,
     #          label='soft 1')  # Plot soft perturbed
     colors = sns.light_palette("royalblue", n_colors=4, reverse=True)
-    plot_list_partial = partial(plot_list, colors=colors, metric=metric, fractions=fractions)
+    plot_list_partial = partial(plot_list, colors=colors, metric=metric, fractions=fractions,
+                                df_ref=DF_UNPERTURBED, plot_delta=True)
 
     # Actually plot
     # plot_list_partial(dfs=dfs_random, label="Random strategy", )
@@ -394,7 +387,7 @@ def main_chembl():
     # plot_list_partial(dfs=dfs_hard, label="Hard strategy", )
     # end_plot()
     plot_list(dfs_rognan_like, fractions=fractions, colors=["black"], metric=metric,
-              label="Rognan strategy", )  # Plot rognan
+              label="Rognan strategy", df_ref=DF_UNPERTURBED, plot_delta=False, filter_good=False)  # Plot rognan
     # plot_list_partial(dfs=dfs_soft, label="Soft strategy", )
     end_plot()
 

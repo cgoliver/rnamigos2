@@ -231,7 +231,8 @@ def train_dock(
             if val_vs_loader_rognan is not None:
                 rognan_efs, *_ = run_virtual_screen(model, val_vs_loader_rognan, lower_is_better=lower_is_better)
                 writer.add_scalar("Val EF Rognan", np.mean(rognan_efs), epoch)
-                writer.add_scalar("EF + Rognan gap", 2 * val_ef - np.mean(rognan_efs), epoch)
+                gap_val = 2 * val_ef - np.mean(rognan_efs)
+                writer.add_scalar("EF + Rognan gap", gap_val, epoch)
 
             efs, *_ = run_virtual_screen(model, test_vs_loader, lower_is_better=lower_is_better)
             writer.add_scalar("Test EF", np.mean(efs), epoch)
@@ -242,8 +243,10 @@ def train_dock(
 
         # Finally do checkpointing based on vs performance, we negate it since higher efs are better
         # loss_to_track = val_loss
-        loss_to_track = -val_ef
-
+        if val_vs_loader_rognan is not None and "monitor_gap" in cfg.train and cfg.train.monitor_gap:
+            loss_to_track = -gap_val
+        else:
+            loss_to_track = -val_ef
         # Checkpointing
         if loss_to_track < best_loss:
             best_loss = loss_to_track
