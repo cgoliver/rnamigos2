@@ -114,8 +114,8 @@ def mix_all_chembl(pairs, res_dir, recompute=False):
     for outname in pairs.values():
         raw_result = pd.read_csv(os.path.join(res_dir, f"{outname}_raw.csv"))
         raw_result_rognan = pd.read_csv(os.path.join(res_dir, f"{outname}_rognan_raw.csv"))
-        test_auroc = raw_df_to_mean_auroc(raw_result, 'score')
-        test_auroc_rognan = raw_df_to_mean_auroc(raw_result_rognan, 'score')
+        test_auroc = raw_df_to_mean_auroc(raw_result)
+        test_auroc_rognan = raw_df_to_mean_auroc(raw_result_rognan)
         gap_score = 2 * test_auroc - test_auroc_rognan
         print(f"{outname}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
 
@@ -289,12 +289,13 @@ if __name__ == "__main__":
 
     # Just print perfs compared to Rognan
     res_dir = "outputs/pockets_quick"
+    get_perf_model(models={'rdock': 'rdock'}, res_dir=res_dir, decoys="pdb_chembl", reps_only=GROUPED, recompute=False)
     get_perf_model(models=MODELS, res_dir=res_dir, decoys=DECOY, reps_only=GROUPED, recompute=False)
     mix_all_chembl(pairs=PAIRS, res_dir=res_dir, recompute=False)
 
     # GET INFERENCE CSVS FOR SEVERAL MODELS
     recompute = False
-    get_all_csvs(recompute=recompute)
+    # get_all_csvs(recompute=recompute)
 
     # PARSE INFERENCE CSVS AND MIX THEM
     TO_MIX = ['rdock'] + RUNS
