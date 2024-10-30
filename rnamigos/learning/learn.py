@@ -181,11 +181,7 @@ def train_dock(
                 # tensorboard logging
                 writer.add_scalar("Training batch loss", batch_loss, epoch * num_batches + batch_idx)
                 if negative_pocket != "none":
-                    writer.add_scalar(
-                        "Training non-pocket loss",
-                        rognan_loss,
-                        epoch * num_batches + batch_idx,
-                    )
+                    writer.add_scalar("Training non-pocket loss", rognan_loss, epoch * num_batches + batch_idx)
                     del rognan_loss
             del loss
 

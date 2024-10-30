@@ -17,7 +17,7 @@ from rnamigos.utils.virtual_screen import enrichment_factor, raw_df_to_mean_auro
 from rnamigos.utils.graph_utils import load_rna_graph
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.inference import inference_raw, get_models
-from rnamigos.utils.mixing_utils import mix_two_dfs
+from rnamigos.utils.mixing_utils import mix_all
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 torch.set_num_threads(1)
@@ -116,7 +116,7 @@ def get_all_preds(model, use_rna_fm, swap=0):
     robin_raw_df["pocket_id"] = robin_raw_df["pocket_id"].map(new_to_old)
 
     # Finally, compute EFs
-    robin_ef_df = raw_df_to_efs(robin_raw_df, score="score", fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
+    robin_ef_df = raw_df_to_efs(robin_raw_df, fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
     return robin_ef_df, robin_raw_df
 
 
@@ -211,41 +211,12 @@ def get_dfs_docking(swap=0):
         mapping = defaultdict(int, mapping)
         ref_raw_df_lig = ref_raw_df[ref_raw_df["pocket_id"] == pocket_id].copy()
         docking_scores = [mapping[smile] for smile in ref_raw_df_lig["smiles"].values]
-        ref_raw_df_lig["score"] = docking_scores
+        ref_raw_df_lig["raw_score"] = docking_scores
         all_raws.append(ref_raw_df_lig)
     all_raws = pd.concat(all_raws)
-    all_efs = raw_df_to_efs(all_raws, score="score", fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
     all_raws.to_csv(f"{res_dir}/rdock_raw.csv")
+    all_efs = raw_df_to_efs(all_raws, fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
     all_efs.to_csv(f"{res_dir}/rdock.csv")
-
-
-def mix_all(recompute=False, swap=0):
-    res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    for pair, outname in PAIRS.items():
-        outpath = os.path.join(res_dir, f"{outname}.csv")
-        outpath_raw = os.path.join(res_dir, f"{outname}_raw.csv")
-        if not recompute and os.path.exists(outpath) and os.path.exists(outpath_raw):
-            continue
-
-        path1 = os.path.join(res_dir, f"{pair[0]}_raw.csv")
-        path2 = os.path.join(res_dir, f"{pair[1]}_raw.csv")
-        df1 = pd.read_csv(path1)
-        df2 = pd.read_csv(path2)
-        robin_raw_dfs = []
-        for pocket_id in ROBIN_POCKETS.values():
-            df1_lig = df1[df1["pocket_id"] == pocket_id]
-            df2_lig = df2[df2["pocket_id"] == pocket_id]
-
-            _, _, mixed_df_lig = mix_two_dfs(df1_lig, df2_lig, score_1="score")
-            mixed_df_lig = mixed_df_lig[["pocket_id", "smiles", "is_active", "mixed"]]
-            mixed_df_lig = mixed_df_lig.rename(columns={"mixed": "score"})
-            robin_raw_dfs.append(mixed_df_lig)
-        robin_raw_dfs = pd.concat(robin_raw_dfs)
-        robin_raw_dfs.to_csv(outpath_raw, index=False)
-
-        robin_efs = raw_df_to_efs(robin_raw_dfs, score="score", fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
-        robin_efs.to_csv(outpath, index=False)
-
 
 def get_merged_df(swap=0, recompute=False):
     """
@@ -267,8 +238,8 @@ def get_merged_df(swap=0, recompute=False):
     big_df = None
     for name in to_mix:
         df = pd.read_csv(os.path.join(res_dir, f"{name}_raw.csv"))
-        df = df[["pocket_id", "smiles", "is_active", "score"]]
-        df = df.rename(columns={"score": name})
+        df = df[["pocket_id", "smiles", "is_active", "raw_score"]]
+        df = df.rename(columns={"raw_score": name})
         if big_df is None:
             big_df = df
         else:
@@ -278,43 +249,56 @@ def get_merged_df(swap=0, recompute=False):
 
 def print_results(swap=0):
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    to_print = [
-        "rdock",
-        "dock_42",
-        # "rnamigos",
-        # "rdocknat",
-        # "combined",
-    ]
+    # to_print = [
+    # "rdock",
+    # "dock_42",
+    # "rnamigos",
+    # "rdocknat",
+    # "combined",
+    # ]
+    to_print = ["rdock"] + list(MODELS.keys()) + list(PAIRS.values())
     for method in to_print:
         in_csv = os.path.join(res_dir, f"{method}_raw.csv")
-        df = pd.read_csv(in_csv)
-        ef = enrichment_factor(df["score"], df["is_active"], frac=0.02)
+        raw_df = pd.read_csv(in_csv)
+        frac = 0.05
+        # efs = raw_df_to_efs(raw_df, fracs=(frac,))
+        # ef = np.mean(efs['score'].values)
         # print(ef)
+        # print(f"EF@:{frac} {method:<30} \t {ef:>8.4f}")
         # print("EF: 2% ", method, ef)
-        auroc = raw_df_to_mean_auroc(df, "score")
+        auroc = raw_df_to_mean_auroc(raw_df)
         # print(auroc)
-        print(f"AUROC: \t {method} \t {auroc}")
+        print(f"AUROC:\t{method:<16}\t{auroc:>10.4f}")
 
 
 if __name__ == "__main__":
     MODELS = {
-        # "native_42": "is_native/native_rnafm_dout5_4",
-        # "native_new": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
-        # "native_false": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlyfalse_rognan",
         "dock_42": "dock/dock_42",
+        "native_42": "is_native/native_rnafm_dout5_4",
+        "native_bce": "is_native/native_42_gap",
+        "native_mixed": "is_native/native_w0.01_gap_nobn",
+        "native_margin": "is_native/native_margin_only_gap_nobn",
+        "native_margin_carlos": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
     }
 
     PAIRS = {
-        # ("rdock", "dock_42"): "dock_rdock",
-        # ("native_42", "dock_42"): "rnamigos_42",
-        # ("native_new", "dock_42"): "rnamigos_new",
-        # ("native_false", "dock_42"): "rnamigos_false",
-        # ("native_nonpocket", "dock_42"): "rnamigos_nonpocket",
+        ("rdock", "dock_42"): "dock_rdock",
+        ("native_42", "dock_42"): "rnamigos_42",
+        ("native_bce", "dock_42"): "rnamigos_bce",
+        ("native_mixed", "dock_42"): "rnamigos_mixed",
+        ("native_margin", "dock_42"): "rnamigos_margin",
+        ("native_margin_carlos", "dock_42"): "rnamigos_margin_carlos",
         # Which one is migos++ ?
-        # ("rnamigos", "rdock"): "combined",
-        # ("rnamigos_new", "rdock"): "combined_new",
-        # ("rnamigos_false", "rdock"): "combined_false",
-        # ("native_42", "rdock"): "rdocknat",
+        ("rnamigos_42", "rdock"): "combined_42",
+        ("rnamigos_bce", "rdock"): "combined_bce",
+        ("rnamigos_mixed", "rdock"): "combined_mixed",
+        ("rnamigos_margin", "rdock"): "combined_margin",
+        ("rnamigos_margin_carlos", "rdock"): "combined_margin_carlos",
+        ("native_42", "rdock"): "rdocknat_42",
+        ("native_bce", "rdock"): "rdocknat_bce",
+        ("native_mixed", "rdock"): "rdocknat_mixed",
+        ("native_margin", "rdock"): "rdocknat_margin",
+        ("native_margin_carlos", "rdock"): "rdocknat_margin_carlos",
     }
 
     SWAP = 0
@@ -328,10 +312,11 @@ if __name__ == "__main__":
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
     # assess_overlap_robin()
 
+    res_dir = "outputs/robin" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     # GET ALL CSVs for the models and plot them
     get_all_csvs(recompute=False, swap=SWAP)
     get_dfs_docking(swap=SWAP)
-    mix_all(recompute=True, swap=SWAP)
+    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=True)
     # get_merged_df(recompute=True, swap=SWAP)
     print_results(swap=SWAP)
 
