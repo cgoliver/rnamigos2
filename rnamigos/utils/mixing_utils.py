@@ -87,13 +87,38 @@ def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mi
     df_2 = df_2.copy()
     df_2[renamed_score] = df_2[score_2]
     df_2 = df_2[['pocket_id', 'smiles', 'is_active', renamed_score]]
-    df_to_use = df_1.merge(df_2, on=['pocket_id', 'smiles', 'is_active'], how='outer')
+    df_to_use = df_1.merge(df_2, on=['pocket_id', 'smiles', 'is_active'], how='inner')
     all_aurocs, mixed_df_aurocs, mixed_df_raw = mix_two_scores(df_to_use,
                                                                score_1,
                                                                renamed_score,
                                                                outname=outname,
                                                                outname_col=outname_col)
     return all_aurocs, mixed_df_aurocs, mixed_df_raw
+
+
+def mix_all(res_dir, pairs, recompute=False, score="raw_score"):
+    """
+    Used to go from raw dfs to mixed raw_dfs
+    :param res_dir:
+    :param pairs:
+    :param recompute:
+    :return:
+    """
+    for pair, outname in pairs.items():
+        outpath = os.path.join(res_dir, f"{outname}.csv")
+        outpath_raw = os.path.join(res_dir, f"{outname}_raw.csv")
+        if not recompute and os.path.exists(outpath) and os.path.exists(outpath_raw):
+            continue
+
+        path1 = os.path.join(res_dir, f"{pair[0]}_raw.csv")
+        path2 = os.path.join(res_dir, f"{pair[1]}_raw.csv")
+        df1 = pd.read_csv(path1)
+        df2 = pd.read_csv(path2)
+
+        _, _, robin_raw_dfs = mix_two_dfs(df1, df2, score_1=score)
+        robin_raw_dfs = robin_raw_dfs[["pocket_id", "smiles", "is_active", "mixed"]]
+        robin_raw_dfs = robin_raw_dfs.rename(columns={"mixed": "raw_score"})
+        robin_raw_dfs.to_csv(outpath_raw, index=False)
 
 
 def unmix(mixed_df, score, decoys=('pdb', 'pdb_chembl', 'chembl'), outpath=None):
