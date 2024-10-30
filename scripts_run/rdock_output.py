@@ -17,8 +17,9 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos.utils.virtual_screen import get_auroc, run_results_to_raw_df, run_results_to_auroc_df
+from rnamigos.utils.virtual_screen import get_auroc, run_results_to_raw_df, run_results_to_auroc_df, raw_df_to_aurocs
 from rnamigos.learning.dataset import get_systems
+from scripts_fig.plot_utils import group_df
 
 
 class VirtualScreenDatasetDocking:
@@ -27,13 +28,15 @@ class VirtualScreenDatasetDocking:
                  ligands_path,
                  decoy_mode='pdb',
                  group_ligands=True,
-                 reps_only=False
+                 reps_only=False,
+                 rognan=False
                  ):
         self.ligands_path = ligands_path
         self.systems = systems
         self.decoy_mode = decoy_mode
         self.all_pockets_names = list(self.systems['PDB_ID_POCKET'].unique())
 
+        self.rognan = rognan
         self.group_ligands = group_ligands
         self.reps_only = reps_only
         script_dir = os.path.dirname(__file__)
@@ -44,6 +47,11 @@ class VirtualScreenDatasetDocking:
             train_group_reps, test_group_reps = pickle.load(open(reps_file, 'rb'))
             reps = set(train_group_reps + test_group_reps)
             self.all_pockets_names = [pocket for pocket in self.all_pockets_names if pocket in reps]
+
+        # We need to shuffle pockets, not just sample a random other one
+        if rognan:
+            self.rognan_pockets_names = self.all_pockets_names.copy()
+            np.random.shuffle(self.rognan_pockets_names)
 
         if self.group_ligands:
             splits_file = os.path.join(script_dir, '../data/train_test_75.p')
@@ -88,10 +96,14 @@ class VirtualScreenDatasetDocking:
             all_smiles = actives_smiles + decoys_smiles
             is_active = np.zeros(len(all_smiles))
             is_active[:len(actives_smiles)] = 1.
-            return pocket_name, all_smiles, torch.tensor(is_active)
+            if self.rognan:
+                pocket_name_rognan = self.rognan_pockets_names[idx]
+            else:
+                pocket_name_rognan = pocket_name
+            return pocket_name, pocket_name_rognan, all_smiles, torch.tensor(is_active)
         except FileNotFoundError as e:
             # print(e)
-            return None, None, None
+            return None, None, None, None
 
 
 def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER'):
@@ -107,7 +119,7 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER'):
     """
     aurocs, all_scores, status, all_smiles, pocket_names = [], [], [], [], []
     failed = 0
-    for i, (pocket_name, smiles, is_active) in enumerate(dataloader):
+    for i, (pocket_name, pocket_name_to_compute, smiles, is_active) in enumerate(dataloader):
         # Some ligfiles are missing
         if pocket_name is None:
             failed += 1
@@ -118,7 +130,7 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER'):
             print(f"Skipping pocket{i}, not enough decoys")
             failed += 1
             continue
-        pocket_scores = systems.loc[systems['PDB_ID_POCKET'] == pocket_name]
+        pocket_scores = systems.loc[systems['PDB_ID_POCKET'] == pocket_name_to_compute]
         selected_actives, selected_smiles, scores = [], [], []
         # We need to loop to reorder the smiles and handle potential missing systems
         for i, sm in enumerate(smiles):
@@ -132,6 +144,9 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER'):
                 selected_smiles.append(sm)
         selected_actives = np.array(selected_actives)
         scores = -np.array(scores)
+        if sum(selected_actives) == 0:
+            failed += 1
+            continue
         aurocs.append(get_auroc(scores, selected_actives))
         all_scores.append(list(scores))
         status.append(list(selected_actives))
@@ -140,14 +155,14 @@ def run_virtual_screen_docking(systems, dataloader, score_to_use='INTER'):
     return aurocs, all_scores, status, pocket_names, all_smiles
 
 
-def get_dfs_rdock(test_systems, data_df):
+def get_dfs_rdock(test_systems, data_df, rognan=False):
     script_dir = os.path.dirname(__file__)
     rows, raw_rows = [], []
     decoys = ['chembl', 'pdb', 'pdb_chembl']
     loader_args = {'shuffle': False,
                    'batch_size': 1,
                    'num_workers': 4,
-                   'collate_fn': lambda x: x[0]
+                   'collate_fn': lambda x: x[0],
                    }
     for decoy_mode in decoys:
         print(f"Doing rDock inference and VS on {decoy_mode} decoys.")
@@ -155,7 +170,8 @@ def get_dfs_rdock(test_systems, data_df):
                                               systems=test_systems,
                                               decoy_mode=decoy_mode,
                                               group_ligands=True,
-                                              reps_only=False)
+                                              reps_only=False,
+                                              rognan=rognan)
         dataloader = GraphDataLoader(dataset=dataset, **loader_args)
         aurocs, scores, status, pocket_names, all_smiles = run_virtual_screen_docking(systems=data_df,
                                                                                       dataloader=dataloader)
@@ -180,12 +196,36 @@ if __name__ == '__main__':
     df_data = df_data[['PDB_ID_POCKET', 'LIGAND_SMILES', 'LIGAND_SOURCE', 'TOTAL', 'INTER']]
     df_data = df_data[df_data['PDB_ID_POCKET'].isin(test_systems['PDB_ID_POCKET'].unique())]
 
-    # For each decoy set, do an rDock "prediction" and compute AuROCs
-    df_aurocs, df_raw = get_dfs_rdock(test_systems, df_data)
+    # For each decoy set, do an rDock "prediction", compute AuROCs and dump the results as CSVs
+    # df_aurocs, df_raw = get_dfs_rdock(test_systems, df_data)
+    # dump_path = pathlib.Path("outputs/pockets/rdock.csv")
+    # dump_path_raw = pathlib.Path("outputs/pockets/rdock_raw.csv")
+    # dump_path.parent.mkdir(parents=True, exist_ok=True)
+    # df_aurocs.to_csv(dump_path, index=False)
+    # df_raw.to_csv(dump_path_raw, index=False)
+    # # df_aurocs = pd.read_csv(dump_path)
+    # # df_raw = pd.read_csv(dump_path_raw)
+    #
+    # # Dump the quick version
+    # dump_path_quick = pathlib.Path("outputs/pockets_quick/rdock.csv")
+    # dump_path_raw_quick = pathlib.Path("outputs/pockets_quick/rdock_raw.csv")
+    # df_raw = df_raw.loc[df_raw["decoys"] == "pdb_chembl"]
+    # df_raw = group_df(df_raw)
+    # df_aurocs = raw_df_to_aurocs(df_raw)
+    # df_aurocs.to_csv(dump_path_quick, index=False)
+    # df_raw.to_csv(dump_path_raw_quick, index=False)
 
-    # Finally, dump the results as CSVs
-    dump_path = pathlib.Path("outputs/pockets/rdock.csv")
-    dump_path_raw = pathlib.Path("outputs/pockets/rdock_raw.csv")
-    dump_path.parent.mkdir(parents=True, exist_ok=True)
+    # Redo the same with rognan perturbation
+    df_aurocs, df_raw = get_dfs_rdock(test_systems, df_data, rognan=True)
+    dump_path = pathlib.Path("outputs/pockets/rdock_rognan.csv")
+    dump_path_raw = pathlib.Path("outputs/pockets/rdock_rognan_raw.csv")
     df_aurocs.to_csv(dump_path, index=False)
     df_raw.to_csv(dump_path_raw, index=False)
+
+    dump_path_quick = pathlib.Path("outputs/pockets_quick/rdock_rognan.csv")
+    dump_path_raw_quick = pathlib.Path("outputs/pockets_quick/rdock_rognan_raw.csv")
+    df_raw = df_raw.loc[df_raw["decoys"] == "pdb_chembl"]
+    df_raw = group_df(df_raw)
+    df_aurocs = raw_df_to_aurocs(df_raw)
+    df_aurocs.to_csv(dump_path_quick, index=False)
+    df_raw.to_csv(dump_path_raw_quick, index=False)
