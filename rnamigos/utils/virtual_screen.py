@@ -101,7 +101,7 @@ def get_results_dfs(model, dataloader, decoy_mode, cfg, verbose=False):
     return auroc_df, raw_df
 
 
-def raw_df_to_mean_auroc(raw_df, score):
+def raw_df_to_aurocs(raw_df, score="raw_score"):
     """
     df_raw => MAR
     :param raw_df:
@@ -110,11 +110,23 @@ def raw_df_to_mean_auroc(raw_df, score):
     """
     pockets = raw_df['pocket_id'].unique()
     all_aurocs = []
-    for pi, p in enumerate(pockets):
-        pocket_df = raw_df.loc[raw_df['pocket_id'] == p]
+    for pi, pocket in enumerate(pockets):
+        pocket_df = raw_df.loc[raw_df['pocket_id'] == pocket]
         auroc = get_auroc(pocket_df[score], pocket_df['is_active'])
-        all_aurocs.append(auroc)
-    return np.mean(all_aurocs)
+        all_aurocs.append({"score": auroc, "pocket_id": pocket})
+    df_auroc = pd.DataFrame(all_aurocs)
+    return df_auroc
+
+
+def raw_df_to_mean_auroc(raw_df, score="raw_score"):
+    """
+    df_raw => MAR
+    :param raw_df:
+    :param score:
+    :return:
+    """
+    df_auroc = raw_df_to_aurocs(raw_df, score)
+    return np.mean(df_auroc['score'].values)
 
 
 def raw_df_to_efs(raw_df, score="raw_score", fracs=(0.01, 0.02, 0.05)):

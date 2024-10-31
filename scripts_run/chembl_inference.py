@@ -13,7 +13,7 @@ if __name__ == "__main__":
 from rnamigos.learning.dataset import get_systems_from_cfg
 from rnamigos.learning.dataloader import get_vs_loader
 from rnamigos.learning.models import get_model_from_dirpath
-from rnamigos.utils.mixing_utils import mix_two_scores, mix_two_dfs, get_mix_score, unmix
+from rnamigos.utils.mixing_utils import mix_two_scores, mix_two_dfs, get_mix_score, unmix, mix_all
 from rnamigos.utils.virtual_screen import get_results_dfs, raw_df_to_mean_auroc
 from scripts_fig.plot_utils import group_df
 
@@ -70,20 +70,54 @@ def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None, rognan=False, rep
     return df_aurocs, df_raw
 
 
-def get_perf_model(models, decoys='pdb_chembl', reps_only=True):
+def get_perf_model(models, res_dir, decoys='pdb_chembl', reps_only=True, recompute=False):
+    """
+    This is quite similar to below, but additionally computes rognan.
+     Also, only does it on just one decoy, and only on representatives.
+    Could be merged
+    """
     model_dir = "results/trained_models/"
+    os.makedirs(res_dir, exist_ok=True)
     for model_name, model_path in models.items():
-        full_model_path = os.path.join(model_dir, model_path)
-        model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
-        df_aurocs, _ = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoys, reps_only=reps_only)
-        df_aurocs_rognan, _ = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoys, rognan=True,
-                                       reps_only=reps_only)
+        out_csv = os.path.join(res_dir, f"{model_name}.csv")
+        out_csv_raw = os.path.join(res_dir, f"{model_name}_raw.csv")
+        out_csv_rognan = os.path.join(res_dir, f"{model_name}_rognan.csv")
+        out_csv_raw_rognan = os.path.join(res_dir, f"{model_name}_rognan_raw.csv")
+        if recompute or not os.path.exists(out_csv):
+            full_model_path = os.path.join(model_dir, model_path)
+            model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
+            df_aurocs, df_raw = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoys, reps_only=reps_only)
+            df_aurocs_rognan, df_raw_rognan = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoys,
+                                                       rognan=True,
+                                                       reps_only=reps_only)
+            df_aurocs.to_csv(out_csv, index=False)
+            df_raw.to_csv(out_csv_raw, index=False)
+            df_aurocs_rognan.to_csv(out_csv_rognan, index=False)
+            df_raw_rognan.to_csv(out_csv_raw_rognan, index=False)
+        else:
+            df_aurocs = pd.read_csv(out_csv)
+            df_aurocs_rognan = pd.read_csv(out_csv_rognan)
 
         # Just printing the results
         test_auroc = np.mean(df_aurocs['score'].values)
         test_auroc_rognan = np.mean(df_aurocs_rognan['score'].values)
         gap_score = 2 * test_auroc - test_auroc_rognan
-        print(f"{model_name}: AuROC {test_auroc:.3f}, Rognan {test_auroc_rognan:.3f}, GapScore {gap_score:.3f}")
+        print(f"{model_name}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
+
+
+def mix_all_chembl(pairs, res_dir, recompute=False):
+    new_pairs = {}
+    for (model1, model2), outname in pairs.items():
+        new_pairs[(f"{model1}_rognan", f"{model2}_rognan")] = f"{outname}_rognan"
+    new_pairs.update(pairs)
+    mix_all(pairs=new_pairs, res_dir=res_dir, recompute=recompute)
+    for outname in pairs.values():
+        raw_result = pd.read_csv(os.path.join(res_dir, f"{outname}_raw.csv"))
+        raw_result_rognan = pd.read_csv(os.path.join(res_dir, f"{outname}_rognan_raw.csv"))
+        test_auroc = raw_df_to_mean_auroc(raw_result)
+        test_auroc_rognan = raw_df_to_mean_auroc(raw_result_rognan)
+        gap_score = 2 * test_auroc - test_auroc_rognan
+        print(f"{outname}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
 
 
 def get_all_csvs(recompute=False):
@@ -225,12 +259,39 @@ if __name__ == "__main__":
     MODELS = {
         "dock_42": "dock/dock_42",
         "native_42": "is_native/native_rnafm_dout5_4",
-        "native_new": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
+        "native_bce": "is_native/native_42_gap",
+        "native_mixed": "is_native/native_w0.01_gap_nobn",
+        "native_margin": "is_native/native_margin_only_gap_nobn",
+        "native_margin_carlos": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
     }
     RUNS = list(MODELS.keys())
 
+    PAIRS = {
+        ("rdock", "dock_42"): "dock_rdock",
+        ("native_42", "dock_42"): "rnamigos_42",
+        ("native_bce", "dock_42"): "rnamigos_bce",
+        ("native_mixed", "dock_42"): "rnamigos_mixed",
+        ("native_margin", "dock_42"): "rnamigos_margin",
+        ("native_margin_carlos", "dock_42"): "rnamigos_margin_carlos",
+        # ("native_nonpocket", "dock_42"): "rnamigos_nonpocket",
+        # Which one is migos++ ?
+        ("rnamigos_42", "rdock"): "combined_42",
+        ("rnamigos_bce", "rdock"): "combined_bce",
+        ("rnamigos_mixed", "rdock"): "combined_mixed",
+        ("rnamigos_margin", "rdock"): "combined_margin",
+        ("rnamigos_margin_carlos", "rdock"): "combined_margin_carlos",
+        # ("native_42", "rdock"): "rdocknat_42",
+        # ("native_bce", "rdock"): "rdocknat_bce",
+        # ("native_mixed", "rdock"): "rdocknat_mixed",
+        # ("native_margin", "rdock"): "rdocknat_margin",
+        # ("native_margin_carlos", "rdock"): "rdocknat_margin_carlos",
+    }
+
     # Just print perfs compared to Rognan
-    get_perf_model(models=MODELS, decoys=DECOY, reps_only=GROUPED)
+    res_dir = "outputs/pockets_quick"
+    get_perf_model(models={'rdock': 'rdock'}, res_dir=res_dir, decoys="pdb_chembl", reps_only=GROUPED, recompute=False)
+    get_perf_model(models=MODELS, res_dir=res_dir, decoys=DECOY, reps_only=GROUPED, recompute=False)
+    mix_all_chembl(pairs=PAIRS, res_dir=res_dir, recompute=False)
 
     # GET INFERENCE CSVS FOR SEVERAL MODELS
     recompute = False
@@ -245,5 +306,3 @@ if __name__ == "__main__":
 
     # Get table with all mixing
     # get_table_mixing(decoy=DECOY)
-
-# native_new 0.8249440874510915 0.46837273850152966 1.1815154364006533

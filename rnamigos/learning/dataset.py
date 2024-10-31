@@ -390,6 +390,10 @@ class VirtualScreenDataset(DockingDataset):
             reps = set(train_group_reps + test_group_reps)
             self.all_pockets_names = [pocket for pocket in self.all_pockets_names if pocket in reps]
 
+        if self.rognan:
+            self.rognan_pockets_names = self.all_pockets_names.copy()
+            np.random.shuffle(self.rognan_pockets_names)
+
         if self.group_ligands:
             splits_file = os.path.join(script_dir, "../../data/train_test_75.p")
             _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, "rb"))
@@ -433,7 +437,7 @@ class VirtualScreenDataset(DockingDataset):
     def __getitem__(self, idx):
         try:
             if self.rognan:
-                pocket_name = self.all_pockets_names[np.random.randint(0, len(self.all_pockets_names))]
+                pocket_name = self.rognan_pockets_names[idx]
             else:
                 pocket_name = self.all_pockets_names[idx]
 
@@ -463,13 +467,7 @@ class VirtualScreenDataset(DockingDataset):
             else:
                 all_inputs = self.ligand_encoder.smiles_to_fp_list(all_smiles)
                 all_inputs = torch.tensor(all_inputs)
-            return (
-                pocket_name,
-                pocket_graph,
-                all_inputs,
-                torch.tensor(is_active),
-                all_smiles,
-            )
+            return pocket_name, pocket_graph, all_inputs, torch.tensor(is_active), all_smiles
         except FileNotFoundError as e:
             if self.verbose:
                 print(e)
