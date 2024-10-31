@@ -32,18 +32,18 @@ def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None, rognan=False, rep
     elif isinstance(decoys, str):
         decoys = [decoys]
     for decoy_mode in decoys:
-        dataloader = get_vs_loader(systems=test_systems,
-                                   decoy_mode=decoy_mode,
-                                   cfg=cfg,
-                                   cache_graphs=False,
-                                   reps_only=reps_only,
-                                   verbose=verbose,
-                                   rognan=rognan)
-        decoy_df_aurocs, decoys_dfs_raws = get_results_dfs(model=model,
-                                                           dataloader=dataloader,
-                                                           decoy_mode=decoy_mode,
-                                                           cfg=cfg,
-                                                           verbose=verbose)
+        dataloader = get_vs_loader(
+            systems=test_systems,
+            decoy_mode=decoy_mode,
+            cfg=cfg,
+            cache_graphs=False,
+            reps_only=reps_only,
+            verbose=verbose,
+            rognan=rognan,
+        )
+        decoy_df_aurocs, decoys_dfs_raws = get_results_dfs(
+            model=model, dataloader=dataloader, decoy_mode=decoy_mode, cfg=cfg, verbose=verbose
+        )
         rows_aurocs.append(decoy_df_aurocs)
         rows_raws.append(decoys_dfs_raws)
 
@@ -148,43 +148,47 @@ def compute_mix_csvs():
         """
         Aggregate rdock, native and dock results add mixing strategies
         """
-        decoy_modes = ('pdb', 'pdb_chembl', 'chembl')
+        decoy_modes = ("pdb", "pdb_chembl", "chembl")
         all_big_raws = []
         for decoy in decoy_modes:
             raw_dfs = [pd.read_csv(f"outputs/pockets/{r}_raw.csv") for r in to_mix]
-            raw_dfs = [df.loc[df['decoys'] == decoy] for df in raw_dfs]
-            raw_dfs = [df[['pocket_id', 'smiles', 'is_active', 'raw_score']] for df in raw_dfs]
+            raw_dfs = [df.loc[df["decoys"] == decoy] for df in raw_dfs]
+            raw_dfs = [df[["pocket_id", "smiles", "is_active", "raw_score"]] for df in raw_dfs]
             if grouped:
                 raw_dfs = [group_df(df) for df in raw_dfs]
 
             for df in raw_dfs:
-                df['smiles'] = df['smiles'].str.strip()
+                df["smiles"] = df["smiles"].str.strip()
 
-            raw_dfs[0]['rdock'] = raw_dfs[0]['raw_score'].values
-            raw_dfs[1]['dock'] = raw_dfs[1]['raw_score'].values
-            raw_dfs[2]['native'] = raw_dfs[2]['raw_score'].values
-            raw_dfs = [df.drop('raw_score', axis=1) for df in raw_dfs]
+            raw_dfs[0]["rdock"] = raw_dfs[0]["raw_score"].values
+            raw_dfs[1]["dock"] = raw_dfs[1]["raw_score"].values
+            raw_dfs[2]["native"] = raw_dfs[2]["raw_score"].values
+            raw_dfs = [df.drop("raw_score", axis=1) for df in raw_dfs]
 
             big_df_raw = raw_dfs[1]
-            big_df_raw = big_df_raw.merge(raw_dfs[2], on=['pocket_id', 'smiles', 'is_active'], how='outer')
-            big_df_raw = big_df_raw.merge(raw_dfs[0], on=['pocket_id', 'smiles', 'is_active'], how='inner')
-            big_df_raw = big_df_raw[['pocket_id', 'smiles', 'is_active', 'rdock', 'dock', 'native']]
+            big_df_raw = big_df_raw.merge(raw_dfs[2], on=["pocket_id", "smiles", "is_active"], how="outer")
+            big_df_raw = big_df_raw.merge(raw_dfs[0], on=["pocket_id", "smiles", "is_active"], how="inner")
+            big_df_raw = big_df_raw[["pocket_id", "smiles", "is_active", "rdock", "dock", "native"]]
 
-            _, _, raw_df_docknat = mix_two_scores(big_df_raw, score1='dock', score2='native', outname_col='docknat',
-                                                  add_decoy=False)
-            big_df_raw = big_df_raw.merge(raw_df_docknat, on=['pocket_id', 'smiles', 'is_active'], how='outer')
+            _, _, raw_df_docknat = mix_two_scores(
+                big_df_raw, score1="dock", score2="native", outname_col="docknat", add_decoy=False
+            )
+            big_df_raw = big_df_raw.merge(raw_df_docknat, on=["pocket_id", "smiles", "is_active"], how="outer")
 
-            _, _, raw_df_rdocknat = mix_two_scores(big_df_raw, score1='rdock', score2='native', outname_col='rdocknat',
-                                                   add_decoy=False)
-            big_df_raw = big_df_raw.merge(raw_df_rdocknat, on=['pocket_id', 'smiles', 'is_active'], how='outer')
+            _, _, raw_df_rdocknat = mix_two_scores(
+                big_df_raw, score1="rdock", score2="native", outname_col="rdocknat", add_decoy=False
+            )
+            big_df_raw = big_df_raw.merge(raw_df_rdocknat, on=["pocket_id", "smiles", "is_active"], how="outer")
 
-            _, _, raw_df_combined = mix_two_scores(big_df_raw, score1='docknat', score2='rdock', outname_col='combined',
-                                                   add_decoy=False)
-            big_df_raw = big_df_raw.merge(raw_df_combined, on=['pocket_id', 'smiles', 'is_active'], how='outer')
+            _, _, raw_df_combined = mix_two_scores(
+                big_df_raw, score1="docknat", score2="rdock", outname_col="combined", add_decoy=False
+            )
+            big_df_raw = big_df_raw.merge(raw_df_combined, on=["pocket_id", "smiles", "is_active"], how="outer")
 
-            _, _, raw_df_rdockdock = mix_two_scores(big_df_raw, score1='dock', score2='rdock', outname_col='rdockdock',
-                                                    add_decoy=False)
-            big_df_raw = big_df_raw.merge(raw_df_rdockdock, on=['pocket_id', 'smiles', 'is_active'], how='outer')
+            _, _, raw_df_rdockdock = mix_two_scores(
+                big_df_raw, score1="dock", score2="rdock", outname_col="rdockdock", add_decoy=False
+            )
+            big_df_raw = big_df_raw.merge(raw_df_rdockdock, on=["pocket_id", "smiles", "is_active"], how="outer")
 
             dumb_decoy = [decoy for _ in range(len(big_df_raw))]
             big_df_raw.insert(len(big_df_raw.columns), "decoys", dumb_decoy)
@@ -200,8 +204,8 @@ def compute_mix_csvs():
         big_df_raw.to_csv(out_path_raw)
 
         # Dump aurocs dataframes for newly combined methods
-        for method in ['docknat', 'rdocknat', 'combined']:
-            outpath = f'outputs/pockets/{method}_{seed}.csv'
+        for method in ["docknat", "rdocknat", "combined"]:
+            outpath = f"outputs/pockets/{method}_{seed}.csv"
             unmix(big_df_raw, score=method, outpath=outpath)
 
 
@@ -212,13 +216,13 @@ def compute_all_self_mix():
         big_df_raw_1 = pd.read_csv(out_path_raw_1)
         out_path_raw_2 = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{SEEDS[to_compare[1]]}_raw.csv'
         big_df_raw_2 = pd.read_csv(out_path_raw_2)
-        for score in ['native', 'dock']:
+        for score in ["native", "dock"]:
             all_aurocs, _, _ = mix_two_dfs(big_df_raw_1, big_df_raw_2, score)
             print(score, np.mean(all_aurocs))
 
 
 def get_one_mixing_table(raw_df):
-    all_methods = ['native', 'dock', 'rdock']
+    all_methods = ["native", "dock", "rdock"]
     all_res = {}
     # Do singletons
     for method in all_methods:
@@ -226,9 +230,9 @@ def get_one_mixing_table(raw_df):
         all_res[method] = result
 
     mean_aurocs = get_mix_score(raw_df, score1="dock", score2="rdock")
-    all_res['dock/rdock'] = mean_aurocs
+    all_res["dock/rdock"] = mean_aurocs
 
-    all_methods_2 = ['docknat', 'rdocknat', 'combined']
+    all_methods_2 = ["docknat", "rdocknat", "combined"]
     # Do singletons but dump them as a single csv since they did not exist
     for method in all_methods_2:
         result = raw_df_to_mean_auroc(raw_df, score=method)
@@ -242,12 +246,12 @@ def get_table_mixing(decoy):
     for seed in SEEDS:
         out_path_raw = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
         big_df_raw = pd.read_csv(out_path_raw)
-        big_df_raw = big_df_raw[big_df_raw['decoys'] == decoy]
+        big_df_raw = big_df_raw[big_df_raw["decoys"] == decoy]
         get_one_mixing_table(big_df_raw)
 
 
 if __name__ == "__main__":
-    DECOY = 'pdb_chembl'
+    DECOY = "pdb_chembl"
     # DECOY = 'chembl'
     GROUPED = True
     SEEDS = [42]

@@ -144,6 +144,7 @@ def objective(trial, cfg) -> float:
         negative_pocket=cfg.train.negative_pocket,
         bce_weight=cfg.train.bce_weight,
         rognan_margin=cfg.train.rognan_margin,
+        rognan_lossfunc=cfg.train.rognan_lossfunc,
         cfg=cfg,
     )
 

@@ -33,13 +33,13 @@ POCKET_PATH = "data/json_pockets_expanded"
 
 
 def robin_inference_raw(
-        ligand_name,
-        dgl_pocket_graph,
-        models=None,
-        out_path=None,
-        ligand_cache=None,
-        use_ligand_cache=False,
-        debug=False,
+    ligand_name,
+    dgl_pocket_graph,
+    models=None,
+    out_path=None,
+    ligand_cache=None,
+    use_ligand_cache=False,
+    debug=False,
 ):
     """
     Given the graph pocket and ligand name, as well as models as expected by the inference script,
@@ -75,12 +75,14 @@ def robin_inference_raw(
 
 def one_robin(ligand_name, pocket_id, models=None, use_rna_fm=False):
     dgl_pocket_graph, _ = load_rna_graph(POCKET_PATH / Path(pocket_id).with_suffix(".json"), use_rnafm=use_rna_fm)
-    raw_df = robin_inference_raw(ligand_name=ligand_name,
-                                 dgl_pocket_graph=dgl_pocket_graph,
-                                 models=models,
-                                 use_ligand_cache=True,
-                                 ligand_cache="data/ligands/robin_lig_graphs.p",
-                                 debug=False)
+    raw_df = robin_inference_raw(
+        ligand_name=ligand_name,
+        dgl_pocket_graph=dgl_pocket_graph,
+        models=models,
+        use_ligand_cache=True,
+        ligand_cache="data/ligands/robin_lig_graphs.p",
+        debug=False,
+    )
     raw_df["pocket_id"] = pocket_id
     return pd.DataFrame(raw_df)
 
@@ -98,8 +100,13 @@ def get_swapped_pocketlig(swap=0):
 
 def get_all_preds(model, use_rna_fm, swap=0):
     robin_lig_pocket_dict, new_to_old = get_swapped_pocketlig(swap=swap)
-    robin_raw_dfs = [df for df in Parallel(n_jobs=4)(delayed(one_robin)(ligand_name, pocket_id, model, use_rna_fm)
-                                                     for ligand_name, pocket_id in robin_lig_pocket_dict.items())]
+    robin_raw_dfs = [
+        df
+        for df in Parallel(n_jobs=4)(
+            delayed(one_robin)(ligand_name, pocket_id, model, use_rna_fm)
+            for ligand_name, pocket_id in robin_lig_pocket_dict.items()
+        )
+    ]
     robin_raw_df = pd.concat(robin_raw_dfs)
 
     # The naming is based on the pocket. So to keep ligands swap consistent, we need to change that
@@ -275,8 +282,8 @@ if __name__ == "__main__":
 
     res_dir = "outputs/robin" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     # GET ALL CSVs for the models and plot them
-    get_all_csvs(recompute=False, swap=SWAP)
     get_dfs_docking(swap=SWAP)
+    get_all_csvs(recompute=False, swap=SWAP)
     mix_all(res_dir=res_dir, pairs=PAIRS, recompute=True)
     get_merged_df(recompute=True, swap=SWAP)
     print_results(swap=SWAP)
