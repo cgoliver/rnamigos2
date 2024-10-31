@@ -198,7 +198,8 @@ if __name__ == '__main__':
 
     # Setup dump dirs
     res_dir = "outputs/pockets"
-    DECOY = 'pdb_chembl'
+    # DECOY = 'pdb_chembl'
+    DECOY = 'chembl'
     res_dir_quick = "outputs/pockets_quick_chembl" if DECOY == 'chembl' else "outputs/pockets_quick"
     os.makedirs(res_dir, exist_ok=True)
     os.makedirs(res_dir_quick, exist_ok=True)

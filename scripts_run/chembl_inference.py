@@ -70,7 +70,7 @@ def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None, rognan=False, rep
     return df_aurocs, df_raw
 
 
-def get_perf_model(models, res_dir, decoys='pdb_chembl', reps_only=True, recompute=False):
+def get_perf_model(models, res_dir, decoy_modes=('pdb', 'chembl', 'pdb_chembl'), reps_only=True, recompute=False):
     """
     This is quite similar to below, but additionally computes rognan.
      Also, only does it on just one decoy, and only on representatives.
@@ -79,26 +79,49 @@ def get_perf_model(models, res_dir, decoys='pdb_chembl', reps_only=True, recompu
     model_dir = "results/trained_models/"
     os.makedirs(res_dir, exist_ok=True)
     for model_name, model_path in models.items():
+        decoys_df_aurocs, decoys_df_raws = list(), list()
         out_csv = os.path.join(res_dir, f"{model_name}.csv")
         out_csv_raw = os.path.join(res_dir, f"{model_name}_raw.csv")
+
+        decoys_df_aurocs_rognan, decoys_df_raws_rognan = list(), list()
         out_csv_rognan = os.path.join(res_dir, f"{model_name}_rognan.csv")
         out_csv_raw_rognan = os.path.join(res_dir, f"{model_name}_rognan_raw.csv")
         if recompute or not os.path.exists(out_csv):
-            full_model_path = os.path.join(model_dir, model_path)
-            model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
-            df_aurocs, df_raw = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoys, reps_only=reps_only)
-            df_aurocs_rognan, df_raw_rognan = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoys,
-                                                       rognan=True,
-                                                       reps_only=reps_only)
-            df_aurocs.to_csv(out_csv, index=False)
-            df_raw.to_csv(out_csv_raw, index=False)
-            df_aurocs_rognan.to_csv(out_csv_rognan, index=False)
-            df_raw_rognan.to_csv(out_csv_raw_rognan, index=False)
+            for decoy_mode in decoy_modes:
+                # get model
+                full_model_path = os.path.join(model_dir, model_path)
+                model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
+                # get normal results
+                df_aurocs, df_raw = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoy_mode,
+                                             reps_only=reps_only)
+                decoys_df_aurocs.append(df_aurocs)
+                decoys_df_raws.append(df_raw)
+
+                # get rognan results
+                df_aurocs_rognan, df_raw_rognan = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoy_mode,
+                                                           rognan=True,
+                                                           reps_only=reps_only)
+                decoys_df_aurocs_rognan.append(df_aurocs_rognan)
+                decoys_df_raws_rognan.append(df_raw_rognan)
+
+            all_df_aurocs = pd.concat(decoys_df_aurocs)
+            all_df_raws = pd.concat(decoys_df_raws)
+            all_df_aurocs.to_csv(out_csv, index=False)
+            all_df_raws.to_csv(out_csv_raw, index=False)
+
+            all_df_aurocs_rognan = pd.concat(decoys_df_aurocs_rognan)
+            all_df_raws_rognan = pd.concat(decoys_df_raws_rognan)
+            all_df_aurocs_rognan.to_csv(out_csv_rognan, index=False)
+            all_df_raws_rognan.to_csv(out_csv_raw_rognan, index=False)
         else:
             df_aurocs = pd.read_csv(out_csv)
             df_aurocs_rognan = pd.read_csv(out_csv_rognan)
 
         # Just printing the results
+        # We need this special case for rdock
+        if "decoys" in df_aurocs.columns:
+            df_aurocs = df_aurocs.loc[df_aurocs["decoys"] == decoy_modes[-1]]
+            df_aurocs_rognan = df_aurocs_rognan.loc[df_aurocs_rognan["decoys"] == decoy_modes[-1]]
         test_auroc = np.mean(df_aurocs['score'].values)
         test_auroc_rognan = np.mean(df_aurocs_rognan['score'].values)
         gap_score = 2 * test_auroc - test_auroc_rognan
@@ -118,29 +141,6 @@ def mix_all_chembl(pairs, res_dir, recompute=False):
         test_auroc_rognan = raw_df_to_mean_auroc(raw_result_rognan)
         gap_score = 2 * test_auroc - test_auroc_rognan
         print(f"{outname}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
-
-
-def get_all_csvs(recompute=False):
-    model_dir = "results/trained_models/"
-    res_dir = "outputs/pockets"
-    os.makedirs(res_dir, exist_ok=True)
-    decoys = ['chembl', 'pdb', 'pdb_chembl']
-    for model_name, model_path in MODELS.items():
-        decoys_df_aurocs, decoys_df_raws = list(), list()
-        out_csv = os.path.join(res_dir, f"{model_name}.csv")
-        out_csv_raw = os.path.join(res_dir, f"{model_name}_raw.csv")
-        if os.path.exists(out_csv) and not recompute:
-            continue
-        for decoy_mode in decoys:
-            full_model_path = os.path.join(model_dir, model_path)
-            model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
-            df_aurocs, df_raw = pdb_eval(cfg, model, dump=False, verbose=True, decoys=decoy_mode)
-            decoys_df_aurocs.append(df_aurocs)
-            decoys_df_raws.append(df_raw)
-        all_df_aurocs = pd.concat(decoys_df_aurocs)
-        all_df_raws = pd.concat(decoys_df_raws)
-        all_df_aurocs.to_csv(out_csv, index=False)
-        all_df_raws.to_csv(out_csv_raw, index=False)
 
 
 def compute_mix_csvs():
@@ -194,6 +194,7 @@ def compute_mix_csvs():
 
     for seed in SEEDS:
         # Combine the learnt methods and dump results
+        TO_MIX = ['rdock', f'dock_{seed}', f'native_{seed}']
         big_df_raw = merge_csvs(to_mix=TO_MIX, grouped=GROUPED)
         out_path_raw = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
         big_df_raw.to_csv(out_path_raw)
@@ -224,10 +225,6 @@ def get_one_mixing_table(raw_df):
         result = raw_df_to_mean_auroc(raw_df, score=method)
         all_res[method] = result
 
-    # Do pairs
-    # for pair in itertools.combinations(all_methods, 2):
-    #     mean_auroc = get_mix_score(df, score1=pair[0], score2=pair[1])
-    #     all_res[pair] = mean_auroc
     mean_aurocs = get_mix_score(raw_df, score1="dock", score2="rdock")
     all_res['dock/rdock'] = mean_aurocs
 
@@ -259,6 +256,10 @@ if __name__ == "__main__":
     MODELS = {
         "dock_42": "dock/dock_42",
         "native_42": "is_native/native_42",
+        # "dock_0": "dock/dock_0",
+        # "native_0": "is_native/native_0",
+        # "dock_1": "dock/dock_1",
+        # "native_1": "is_native/native_1"
     }
     RUNS = list(MODELS.keys())
 
@@ -269,22 +270,20 @@ if __name__ == "__main__":
         ("native_42", "rdock"): "rdocknat_42",
     }
 
-    # Just print perfs compared to Rognan
-    res_dir = "outputs/pockets_quick_chembl" if DECOY=='chembl' else "outputs/pockets_quick"
-    get_perf_model(models={'rdock': 'rdock'}, res_dir=res_dir, decoys=DECOY, reps_only=GROUPED, recompute=False)
-    get_perf_model(models=MODELS, res_dir=res_dir, decoys=DECOY, reps_only=GROUPED, recompute=False)
+    # Just print perfs compared to Rognan, make inference on just one decoy
+    res_dir = "outputs/pockets_quick_chembl" if DECOY == 'chembl' else "outputs/pockets_quick"
+    get_perf_model(models={'rdock': 'rdock'}, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=False)
+    get_perf_model(models=MODELS, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=False)
     mix_all_chembl(pairs=PAIRS, res_dir=res_dir, recompute=False)
 
-    # GET INFERENCE CSVS FOR SEVERAL MODELS
-    recompute = False
-    # get_all_csvs(recompute=recompute)
+    # GET INFERENCE CSVS
+    get_perf_model(models=MODELS, res_dir="outputs/pockets", reps_only=GROUPED, recompute=False)
 
     # PARSE INFERENCE CSVS AND MIX THEM
-    TO_MIX = ['rdock'] + RUNS
-    # compute_mix_csvs()
+    compute_mix_csvs()
 
     # To compare to ensembling the same method with different seeds
-    # compute_all_self_mix()
+    compute_all_self_mix()
 
     # Get table with all mixing
-    # get_table_mixing(decoy=DECOY)
+    get_table_mixing(decoy=DECOY)

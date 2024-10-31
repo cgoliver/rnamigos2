@@ -16,9 +16,7 @@ name_runs = {
     r"COMPAT": "native_42.csv",
     r"AFF": "dock_42.csv",
     r"rDock": "rdock.csv",
-    # r"\texttt{rDock\newline TOTAL}": "rdock_total.csv",
-    r"MIXED": "docknat_42.csv",
-    # r"MIXED+rDock": "rdocknat_42.csv",
+    r"MIXED": "rnamigos_42.csv",
     r"MIXED+rDock": "combined_42.csv",
 }
 
@@ -34,8 +32,8 @@ names = list(name_runs.keys())
 runs = list(name_runs.values())
 
 # decoy_mode = 'pdb'
-decoy_mode = 'chembl'
-# decoy_mode = 'pdb_chembl'
+# decoy_mode = 'chembl'
+decoy_mode = 'pdb_chembl'
 grouped = True
 
 # Parse ef data for the runs and gather them in a big database
