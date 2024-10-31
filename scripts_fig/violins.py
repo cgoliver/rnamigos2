@@ -16,7 +16,7 @@ name_runs = {
     r"COMPAT": "native_42.csv",
     r"AFF": "dock_42.csv",
     r"rDock": "rdock.csv",
-    r"MIXED": "rnamigos_42.csv",
+    r"MIXED": "docknat_42.csv",
     r"MIXED+rDock": "combined_42.csv",
 }
 

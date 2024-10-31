@@ -121,7 +121,7 @@ def mix_all(res_dir, pairs, recompute=False, score="raw_score"):
         robin_raw_dfs.to_csv(outpath_raw, index=False)
 
 
-def unmix(mixed_df, score, decoys=('pdb', 'pdb_chembl', 'chembl'), outpath=None):
+def unmix(mixed_df, score, decoys=('pdb', 'chembl', 'pdb_chembl'), outpath=None):
     pockets = mixed_df['pocket_id'].unique()
     if not isinstance(decoys, Iterable):
         decoys = [decoys]
@@ -130,7 +130,10 @@ def unmix(mixed_df, score, decoys=('pdb', 'pdb_chembl', 'chembl'), outpath=None)
         mixed_df_decoy = mixed_df[mixed_df['decoys'] == decoy_mode]
         for pi, p in enumerate(pockets):
             pocket_df = mixed_df_decoy.loc[mixed_df_decoy['pocket_id'] == p]
-            enrich = get_auroc(pocket_df[score], pocket_df['is_active'])
+            try:
+                enrich = get_auroc(pocket_df[score], pocket_df['is_active'])
+            except:
+                continue
             all_rows.append({"score": enrich, "metric": "MAR", "decoys": decoy_mode, "pocket_id": p})
     df = pd.DataFrame(all_rows)
     if outpath is not None:
