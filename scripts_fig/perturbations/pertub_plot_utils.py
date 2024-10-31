@@ -31,14 +31,12 @@ def plot_overlap(df, df_ref=None, filter_good=True, **kwargs):
     plt.scatter(df["magnitude"], df["delta"], **kwargs)
 
 
-def get_low_high(
-        df, fractions, to_plot="score", filter_good=True, error_bar=True, metric="ef"
-):
+def get_low_high(df, fractions, to_plot="score", filter_good=True, good_pockets=None, error_bar=True, metric="ef"):
     if not isinstance(fractions, (list, tuple)):
         fractions = [fractions]
     # df = df[df['replicate'].isin([str(x) for x in (0, 1)])]
     if filter_good:
-        df = filter_on_good_pockets(df)
+        df = filter_on_good_pockets(df, good_pockets=good_pockets)
     df = df[df["thresh"].isin([str(x) for x in fractions])]
     if metric != "ef":
         df[to_plot] = 100 * df[to_plot]
@@ -60,6 +58,7 @@ def plot_one(
         df,
         fractions,
         filter_good=False,
+        good_pockets=None,
         plot_delta=True,
         color="blue",
         label="default_label",
@@ -71,9 +70,11 @@ def plot_one(
         to_plot = "delta"
     else:
         to_plot = "score"
-    means, means_low, means_high = get_low_high(
-        df, fractions, to_plot=to_plot, filter_good=filter_good, metric=metric
-    )
+    means, means_low, means_high = get_low_high(df, fractions,
+                                                to_plot=to_plot,
+                                                filter_good=filter_good,
+                                                good_pockets=good_pockets,
+                                                metric=metric)
     plt.plot(fractions, means, linewidth=2, color=color, label=label)
     plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
@@ -97,6 +98,5 @@ def end_plot():
     plt.show()
 
 
-def filter_on_good_pockets(df):
-    global GOOD_POCKETS
-    return df[df["pocket_id"].isin(GOOD_POCKETS)]
+def filter_on_good_pockets(df, good_pockets):
+    return df[df["pocket_id"].isin(good_pockets)]

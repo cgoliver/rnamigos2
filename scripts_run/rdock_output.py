@@ -196,35 +196,43 @@ if __name__ == '__main__':
     df_data = df_data[['PDB_ID_POCKET', 'LIGAND_SMILES', 'LIGAND_SOURCE', 'TOTAL', 'INTER']]
     df_data = df_data[df_data['PDB_ID_POCKET'].isin(test_systems['PDB_ID_POCKET'].unique())]
 
+    # Setup dump dirs
+    res_dir = "outputs/pockets"
+    DECOY = 'pdb_chembl'
+    res_dir_quick = "outputs/pockets_quick_chembl" if DECOY == 'chembl' else "outputs/pockets_quick"
+    os.makedirs(res_dir, exist_ok=True)
+    os.makedirs(res_dir_quick, exist_ok=True)
+
     # For each decoy set, do an rDock "prediction", compute AuROCs and dump the results as CSVs
+    dump_path = os.path.join(res_dir, "rdock.csv")
+    dump_path_raw = os.path.join(res_dir, "rdock_raw.csv")
     df_aurocs, df_raw = get_dfs_rdock(test_systems, df_data)
-    dump_path = pathlib.Path("outputs/pockets/rdock.csv")
-    dump_path_raw = pathlib.Path("outputs/pockets/rdock_raw.csv")
-    dump_path.parent.mkdir(parents=True, exist_ok=True)
     df_aurocs.to_csv(dump_path, index=False)
     df_raw.to_csv(dump_path_raw, index=False)
     # df_aurocs = pd.read_csv(dump_path)
     # df_raw = pd.read_csv(dump_path_raw)
 
     # Dump the quick version
-    dump_path_quick = pathlib.Path("outputs/pockets_quick/rdock.csv")
-    dump_path_raw_quick = pathlib.Path("outputs/pockets_quick/rdock_raw.csv")
-    df_raw = df_raw.loc[df_raw["decoys"] == "pdb_chembl"]
+    dump_path_quick = os.path.join(res_dir_quick, "rdock.csv")
+    dump_path_raw_quick = os.path.join(res_dir_quick, "rdock_raw.csv")
+    df_raw = df_raw.loc[df_raw["decoys"] == DECOY]
     df_raw = group_df(df_raw)
     df_aurocs = raw_df_to_aurocs(df_raw)
     df_aurocs.to_csv(dump_path_quick, index=False)
     df_raw.to_csv(dump_path_raw_quick, index=False)
 
     # Redo the same with rognan perturbation
+    dump_path = os.path.join(res_dir, "rdock_rognan.csv")
+    dump_path_raw = os.path.join(res_dir, "rdock_rognan_raw.csv")
     df_aurocs, df_raw = get_dfs_rdock(test_systems, df_data, rognan=True)
-    dump_path = pathlib.Path("outputs/pockets/rdock_rognan.csv")
-    dump_path_raw = pathlib.Path("outputs/pockets/rdock_rognan_raw.csv")
     df_aurocs.to_csv(dump_path, index=False)
     df_raw.to_csv(dump_path_raw, index=False)
+    # df_aurocs = pd.read_csv(dump_path)
+    # df_raw = pd.read_csv(dump_path_raw)
 
-    dump_path_quick = pathlib.Path("outputs/pockets_quick/rdock_rognan.csv")
-    dump_path_raw_quick = pathlib.Path("outputs/pockets_quick/rdock_rognan_raw.csv")
-    df_raw = df_raw.loc[df_raw["decoys"] == "pdb_chembl"]
+    dump_path_quick = os.path.join(res_dir_quick, "rdock_rognan.csv")
+    dump_path_raw_quick = os.path.join(res_dir_quick, "rdock_rognan_raw.csv")
+    df_raw = df_raw.loc[df_raw["decoys"] == DECOY]
     df_raw = group_df(df_raw)
     df_aurocs = raw_df_to_aurocs(df_raw)
     df_aurocs.to_csv(dump_path_quick, index=False)

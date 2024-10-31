@@ -249,63 +249,59 @@ def get_merged_df(swap=0, recompute=False):
 
 def print_results(swap=0):
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    # to_print = [
-    # "rdock",
-    # "dock_42",
-    # "rnamigos",
-    # "rdocknat",
-    # "combined",
-    # ]
     to_print = ["rdock"] + list(MODELS.keys()) + list(PAIRS.values())
     for method in to_print:
         in_csv = os.path.join(res_dir, f"{method}_raw.csv")
         raw_df = pd.read_csv(in_csv)
-        frac = 0.05
+        frac = 0.2
         # efs = raw_df_to_efs(raw_df, fracs=(frac,))
         # ef = np.mean(efs['score'].values)
-        # print(ef)
         # print(f"EF@:{frac} {method:<30} \t {ef:>8.4f}")
-        # print("EF: 2% ", method, ef)
         auroc = raw_df_to_mean_auroc(raw_df)
-        # print(auroc)
         print(f"AUROC:\t{method:<16}\t{auroc:>10.4f}")
 
 
 if __name__ == "__main__":
+
     MODELS = {
         "dock_42": "dock/dock_42",
-        "native_42": "is_native/native_rnafm_dout5_4",
-        "native_bce": "is_native/native_42_gap",
-        "native_mixed": "is_native/native_w0.01_gap_nobn",
-        "native_mixed_1": "is_native/native_w0.01_gap_nobn_1",
-        "native_margin": "is_native/native_margin_only_gap_nobn",
-        "native_margin_1": "is_native/native_margin_only_gap_nobn_1",
-        "native_margin_carlos": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
+        "native_42": "is_native/native_bce0.02_groupsample",
+        # "native_bce0.02": "is_native/native_bce0.02",
+        "native_bce0.02_sample": "is_native/native_bce0.02_groupsample",
+        "native_sample_nofm": "is_native/native_bce0.02_groupsample_nornafm",
+        # "native_mixed": "is_native/native_w0.01_gap_nobn",
     }
-
     PAIRS = {
-        ("native_42", "native_margin_carlos"): "native_double",
-        ("rdock", "dock_42"): "dock_rdock",
+        # ("native_42", "native_margin_carlos"): "native_double",
+        # ("rdock", "dock_42"): "dock_rdock",
         ("native_42", "dock_42"): "rnamigos_42",
-        ("native_bce", "dock_42"): "rnamigos_bce",
-        ("native_mixed", "dock_42"): "rnamigos_mixed",
-        ("native_mixed_1", "dock_42"): "rnamigos_mixed_1",
-        ("native_margin", "dock_42"): "rnamigos_margin",
-        ("native_margin_1", "dock_42"): "rnamigos_margin_1",
-        ("native_margin_carlos", "dock_42"): "rnamigos_margin_carlos",
-        ("native_double", "dock_42"): "rnamigos_double",
-        # Which one is migos++ ?
+        # ("native_bce", "dock_42"): "rnamigos_bce",
+        # ("native_bce0.01", "dock_42"): "rnamigos_bce0.01",
+        # ("native_bce0.02", "dock_42"): "rnamigos_bce0.02",
+        ("native_bce0.02_sample", "dock_42"): "rnamigos_bce0.02_sample",
+        ("native_sample_nofm", "dock_42"): "rnamigos_sample_nofm",
+        # ("native_mixed", "dock_42"): "rnamigos_mixed",
+        # ("native_mixed_0", "dock_42"): "rnamigos_mixed_0",
+        # ("native_mixed_1", "dock_42"): "rnamigos_mixed_1",
+        # ("native_margin", "dock_42"): "rnamigos_margin",
+        # ("native_margin_1", "dock_42"): "rnamigos_margin_1",
+        # ("native_margin_carlos", "dock_42"): "rnamigos_margin_carlos",
+        # ("native_double", "dock_42"): "rnamigos_double",
+        # # Which one is migos++ ?
         ("rnamigos_42", "rdock"): "combined_42",
-        ("rnamigos_bce", "rdock"): "combined_bce",
-        ("rnamigos_mixed", "rdock"): "combined_mixed",
-        ("rnamigos_margin", "rdock"): "combined_margin",
-        ("rnamigos_margin_carlos", "rdock"): "combined_margin_carlos",
-        ("rnamigos_double", "rdock"): "combined_double",
-        ("native_42", "rdock"): "rdocknat_42",
-        ("native_bce", "rdock"): "rdocknat_bce",
-        ("native_mixed", "rdock"): "rdocknat_mixed",
-        ("native_margin", "rdock"): "rdocknat_margin",
-        ("native_margin_carlos", "rdock"): "rdocknat_margin_carlos",
+        # ("rnamigos_bce", "rdock"): "combined_bce",
+        # ("rnamigos_bce0.02", "rdock"): "combined_bce0.02",
+        ("rnamigos_bce0.02_sample", "rdock"): "combined_bce0.02_sample",
+        ("rnamigos_sample_nofm", "rdock"): "combined_sample_nofm",
+        # ("rnamigos_mixed", "rdock"): "combined_mixed",
+        # ("rnamigos_margin", "rdock"): "combined_margin",
+        # ("rnamigos_margin_carlos", "rdock"): "combined_margin_carlos",
+        # ("rnamigos_double", "rdock"): "combined_double",
+        # ("native_42", "rdock"): "rdocknat_42",
+        # ("native_bce", "rdock"): "rdocknat_bce",
+        # ("native_mixed", "rdock"): "rdocknat_mixed",
+        # ("native_margin", "rdock"): "rdocknat_margin",
+        # ("native_margin_carlos", "rdock"): "rdocknat_margin_carlos",
     }
 
     SWAP = 0
