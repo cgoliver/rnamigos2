@@ -70,7 +70,7 @@ def pdb_eval(cfg, model, dump=True, verbose=True, decoys=None, rognan=False, rep
     return df_aurocs, df_raw
 
 
-def get_perf_model(models, res_dir, decoy_modes=('pdb', 'chembl', 'pdb_chembl'), reps_only=True, recompute=False):
+def get_perf_model(models, res_dir, decoy_modes=("pdb", "chembl", "pdb_chembl"), reps_only=True, recompute=False):
     """
     This is quite similar to below, but additionally computes rognan.
      Also, only does it on just one decoy, and only on representatives.
@@ -92,15 +92,16 @@ def get_perf_model(models, res_dir, decoy_modes=('pdb', 'chembl', 'pdb_chembl'),
                 full_model_path = os.path.join(model_dir, model_path)
                 model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
                 # get normal results
-                df_aurocs, df_raw = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoy_mode,
-                                             reps_only=reps_only)
+                df_aurocs, df_raw = pdb_eval(
+                    cfg, model, verbose=False, dump=False, decoys=decoy_mode, reps_only=reps_only
+                )
                 decoys_df_aurocs.append(df_aurocs)
                 decoys_df_raws.append(df_raw)
 
                 # get rognan results
-                df_aurocs_rognan, df_raw_rognan = pdb_eval(cfg, model, verbose=False, dump=False, decoys=decoy_mode,
-                                                           rognan=True,
-                                                           reps_only=reps_only)
+                df_aurocs_rognan, df_raw_rognan = pdb_eval(
+                    cfg, model, verbose=False, dump=False, decoys=decoy_mode, rognan=True, reps_only=reps_only
+                )
                 decoys_df_aurocs_rognan.append(df_aurocs_rognan)
                 decoys_df_raws_rognan.append(df_raw_rognan)
 
@@ -122,8 +123,8 @@ def get_perf_model(models, res_dir, decoy_modes=('pdb', 'chembl', 'pdb_chembl'),
         if "decoys" in df_aurocs.columns:
             df_aurocs = df_aurocs.loc[df_aurocs["decoys"] == decoy_modes[-1]]
             df_aurocs_rognan = df_aurocs_rognan.loc[df_aurocs_rognan["decoys"] == decoy_modes[-1]]
-        test_auroc = np.mean(df_aurocs['score'].values)
-        test_auroc_rognan = np.mean(df_aurocs_rognan['score'].values)
+        test_auroc = np.mean(df_aurocs["score"].values)
+        test_auroc_rognan = np.mean(df_aurocs_rognan["score"].values)
         gap_score = 2 * test_auroc - test_auroc_rognan
         print(f"{model_name}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
 
@@ -199,16 +200,20 @@ def compute_mix_csvs():
     for seed in SEEDS:
         for rognan in [True, False]:
             # Combine the learnt methods and dump results
-            TO_MIX = [f'rdock{"_rognan" if rognan else ""}',
-                      f'dock_{seed}{"_rognan" if rognan else ""}',
-                      f'native_{seed}{"_rognan" if rognan else ""}']
+            TO_MIX = [
+                f'rdock{"_rognan" if rognan else ""}',
+                f'dock_{seed}{"_rognan" if rognan else ""}',
+                f'native_{seed}{"_rognan" if rognan else ""}',
+            ]
             big_df_raw = merge_csvs(to_mix=TO_MIX, grouped=GROUPED)
-            out_path_raw = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{seed}{"_rognan" if rognan else ""}_raw.csv'
+            out_path_raw = (
+                f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{seed}{"_rognan" if rognan else ""}_raw.csv'
+            )
             big_df_raw.to_csv(out_path_raw)
 
             # Dump aurocs dataframes for newly combined methods
             for method in ["docknat", "rdocknat", "combined"]:
-                outpath = f"outputs/pockets/{method}_{seed}{"_rognan" if rognan else ""}.csv"
+                outpath = f"outputs/pockets/{method}_{seed}{'_rognan' if rognan else ''}.csv"
                 unmix(big_df_raw, score=method, outpath=outpath)
 
 
@@ -266,7 +271,7 @@ if __name__ == "__main__":
         "dock_0": "dock/dock_0",
         "native_0": "is_native/native_0",
         "dock_1": "dock/dock_1",
-        "native_1": "is_native/native_1"
+        "native_1": "is_native/native_1",
     }
     RUNS = list(MODELS.keys())
 
