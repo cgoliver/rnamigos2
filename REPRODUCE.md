@@ -134,6 +134,7 @@ Finally, you can generate csvs containing RNAmigos results for the validation on
 validation by running:
 
 ```bash
+python scripts_run/rdock_ouptut.py
 python scripts_run/chembl_inference.py
 python scripts_run/robin_inference.py
 ```

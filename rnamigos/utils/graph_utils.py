@@ -53,7 +53,8 @@ def add_rnafm(pocket_nx, rna_path, cache_path="data/pocket_embeddings"):
 
     # Otherwise load the whole graphs embeddings. This step is useful for pocket perturbation.
     elif len(missing_nodes) >= n * 0.15:
-        pdb_id = Path(rna_path).stem.split("_")[0]
+        pdb_id = list(missing_nodes)[0].split(".")[0].upper()
+        # pdb_id = Path(rna_path).stem.split("_")[0]
         large_embs = np.load(f"data/pocket_chain_embeddings/{pdb_id}.npz")
         nx.set_node_attributes(pocket_nx, large_embs, "rnafm")
 

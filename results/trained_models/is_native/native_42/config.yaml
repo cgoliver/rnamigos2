@@ -1,0 +1,115 @@
+debug: false
+name: native_bce0.02_groupsample
+device: cpu
+verbose: false
+result_dir: outputs/
+monitor_robin: false
+tokens:
+  edge_types:
+  - B53
+  - B35
+  - CWW
+  - CWH
+  - CWS
+  - CHW
+  - CHH
+  - CHS
+  - CSW
+  - CSH
+  - CSS
+  - TWW
+  - TWH
+  - TWS
+  - THW
+  - THH
+  - THS
+  - TSW
+  - TSH
+  - TSS
+  nuc_types:
+  - A
+  - U
+  - C
+  - G
+train:
+  seed: 42
+  result_dir: outputs/
+  tune: false
+  n_trials: 1
+  shuffle: true
+  batch_size: 32
+  num_workers: 0
+  use_normalized_score: true
+  stretch_scores: false
+  group_pockets: true
+  group_sample: true
+  validation_systems: true
+  use_rnamigos1_train: false
+  use_rnamigos1_ligands: false
+  filter_robin: false
+  native_filter_pdb: false
+  rnamigos1_split: -2
+  simfunc: None
+  simfunc_depth: 2
+  max_kernel: 20
+  loss: bce
+  num_epochs: 3000
+  learning_rate: 0.0001
+  pretrain_weight: 0.0
+  clf_lam: 1.0
+  negative_pocket: rognan
+  bce_weight: 0.02
+  reconstruction_lam: 1.0
+  early_stop: 300
+  target: is_native
+  weight_decay: 0
+  rognan_margin: 0.6
+  monitor_gap: true
+  vs_every: 40
+  vs_decoy_mode: pdb_chembl
+  do_rognan: true
+  monitor_robin: true
+paths:
+  model_path: models/
+  pretrain_save: pretrained/
+data:
+  pocket_graphs: data/json_pockets_expanded
+  pretrain_graphs: data/pretrain_data/nr-graphs_annotated
+  ligand_db: data/ligand_db
+  rnamigos1_test: false
+  rnamigos1_only: false
+  undirected: false
+  rnafm_cache: data/pocket_embeddings
+  rnafm_cache_pretrain: data/pretrain_data/whole_embeddings
+model:
+  encoder:
+    in_dim: 4
+    hidden_dim: 64
+    num_layers: 3
+    num_bases: -1
+    subset_pocket_nodes: true
+  lig_encoder:
+    in_dim: 166
+    hidden_dim: 32
+    num_layers: 3
+  graphlig_encoder:
+    use_pretrained: true
+    features_dim: 22
+    gcn_hdim: 32
+    gcn_layers: 3
+    l_size: 32
+  decoder:
+    in_dim: 120
+    out_dim: 1
+    hidden_dim: 32
+    num_layers: 3
+    activation: sigmoid
+    bn_all_layers: false
+    dropout: 0.5
+  pool: att
+  dropout: 0.5
+  batch_norm: true
+  use_pretrained: true
+  pretrained_path: pretrained/hungarian_64_rnafm/model.pth
+  use_graphligs: true
+  use_rnafm: true

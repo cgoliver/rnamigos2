@@ -13,7 +13,7 @@ import torch
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from rnamigos.utils.virtual_screen import enrichment_factor, raw_df_to_mean_auroc, raw_df_to_efs
+from rnamigos.utils.virtual_screen import raw_df_to_mean_auroc, raw_df_to_efs
 from rnamigos.utils.graph_utils import load_rna_graph
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.inference import inference_raw, get_models
@@ -33,13 +33,13 @@ POCKET_PATH = "data/json_pockets_expanded"
 
 
 def robin_inference_raw(
-        ligand_name,
-        dgl_pocket_graph,
-        models=None,
-        out_path=None,
-        ligand_cache=None,
-        use_ligand_cache=False,
-        debug=False,
+    ligand_name,
+    dgl_pocket_graph,
+    models=None,
+    out_path=None,
+    ligand_cache=None,
+    use_ligand_cache=False,
+    debug=False,
 ):
     """
     Given the graph pocket and ligand name, as well as models as expected by the inference script,
@@ -74,10 +74,7 @@ def robin_inference_raw(
 
 
 def one_robin(ligand_name, pocket_id, models=None, use_rna_fm=False):
-    dgl_pocket_graph, _ = load_rna_graph(
-        POCKET_PATH / Path(pocket_id).with_suffix(".json"),
-        use_rnafm=use_rna_fm,
-    )
+    dgl_pocket_graph, _ = load_rna_graph(POCKET_PATH / Path(pocket_id).with_suffix(".json"), use_rnafm=use_rna_fm)
     raw_df = robin_inference_raw(
         ligand_name=ligand_name,
         dgl_pocket_graph=dgl_pocket_graph,
@@ -149,7 +146,6 @@ def get_all_csvs(recompute=False, swap=0):
         df_raw.to_csv(out_csv_raw, index=False)
 
 
-# score,smiles,is_active,pocket_id
 def assess_overlap_robin():
     res_dir = "outputs/robin"
     docking_df = pd.read_csv(os.path.join(res_dir, "dock_42_raw.csv"))
@@ -162,7 +158,7 @@ def assess_overlap_robin():
     smiles_0 = smiles_dict.pop(pocket_ids[0])
     smiles_1 = smiles_dict.pop(pocket_ids[1])
     overlap = set(smiles_0).intersection(set(smiles_1))
-    a = 1
+    return overlap
 
 
 def assess_overlap_docking():
@@ -176,7 +172,7 @@ def assess_overlap_docking():
     smiles_0 = smiles_dict.pop(robin_sys[0])
     smiles_1 = smiles_dict.pop(robin_sys[1])
     overlap = set(smiles_0).intersection(set(smiles_1))
-    a = 1
+    return overlap
 
 
 def get_dfs_docking(swap=0):
@@ -218,22 +214,23 @@ def get_dfs_docking(swap=0):
     all_efs = raw_df_to_efs(all_raws, fracs=(0.01, 0.02, 0.05, 0.1, 0.2))
     all_efs.to_csv(f"{res_dir}/rdock.csv")
 
+
 def get_merged_df(swap=0, recompute=False):
     """
     Aggregate several scores in one big_df (like for pockets)
     This is useful for plotting scripts, such as time_ef.py
     """
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    out_csv = os.path.join(res_dir, "carlos_big_df_raw.csv")
+    out_csv = os.path.join(res_dir, "big_df_raw.csv")
     if not recompute and os.path.exists(out_csv):
         return
     to_mix = [
         "rdock",
         "dock_42",
         "native_42",
-        "rnamigos",
-        "rdocknat",
-        "combined",
+        "rnamigos_42",
+        "rdocknat_42",
+        "combined_42",
     ]
     big_df = None
     for name in to_mix:
@@ -249,71 +246,35 @@ def get_merged_df(swap=0, recompute=False):
 
 def print_results(swap=0):
     res_dir = "outputs/robin" if swap == 0 else f"outputs/robin_swap_{swap}"
-    # to_print = [
-    # "rdock",
-    # "dock_42",
-    # "rnamigos",
-    # "rdocknat",
-    # "combined",
-    # ]
     to_print = ["rdock"] + list(MODELS.keys()) + list(PAIRS.values())
     for method in to_print:
         in_csv = os.path.join(res_dir, f"{method}_raw.csv")
         raw_df = pd.read_csv(in_csv)
-        frac = 0.05
+        frac = 0.2
         # efs = raw_df_to_efs(raw_df, fracs=(frac,))
         # ef = np.mean(efs['score'].values)
-        # print(ef)
         # print(f"EF@:{frac} {method:<30} \t {ef:>8.4f}")
-        # print("EF: 2% ", method, ef)
         auroc = raw_df_to_mean_auroc(raw_df)
-        # print(auroc)
         print(f"AUROC:\t{method:<16}\t{auroc:>10.4f}")
 
 
 if __name__ == "__main__":
     MODELS = {
         "dock_42": "dock/dock_42",
-        "native_42": "is_native/native_rnafm_dout5_4",
-        "native_bce": "is_native/native_42_gap",
-        "native_mixed": "is_native/native_w0.01_gap_nobn",
-        "native_mixed_1": "is_native/native_w0.01_gap_nobn_1",
-        "native_margin": "is_native/native_margin_only_gap_nobn",
-        "native_margin_1": "is_native/native_margin_only_gap_nobn_1",
-        "native_margin_carlos": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
+        "native_42": "is_native/native_42",
     }
-
     PAIRS = {
-        ("native_42", "native_margin_carlos"): "native_double",
         ("rdock", "dock_42"): "dock_rdock",
         ("native_42", "dock_42"): "rnamigos_42",
-        ("native_bce", "dock_42"): "rnamigos_bce",
-        ("native_mixed", "dock_42"): "rnamigos_mixed",
-        ("native_mixed_1", "dock_42"): "rnamigos_mixed_1",
-        ("native_margin", "dock_42"): "rnamigos_margin",
-        ("native_margin_1", "dock_42"): "rnamigos_margin_1",
-        ("native_margin_carlos", "dock_42"): "rnamigos_margin_carlos",
-        ("native_double", "dock_42"): "rnamigos_double",
-        # Which one is migos++ ?
         ("rnamigos_42", "rdock"): "combined_42",
-        ("rnamigos_bce", "rdock"): "combined_bce",
-        ("rnamigos_mixed", "rdock"): "combined_mixed",
-        ("rnamigos_margin", "rdock"): "combined_margin",
-        ("rnamigos_margin_carlos", "rdock"): "combined_margin_carlos",
-        ("rnamigos_double", "rdock"): "combined_double",
         ("native_42", "rdock"): "rdocknat_42",
-        ("native_bce", "rdock"): "rdocknat_bce",
-        ("native_mixed", "rdock"): "rdocknat_mixed",
-        ("native_margin", "rdock"): "rdocknat_margin",
-        ("native_margin_carlos", "rdock"): "rdocknat_margin_carlos",
     }
-
     SWAP = 0
     # TEST ONE INFERENCE
     # pocket_id = "TPP"
     # lig_name = "2GDI_Y_TPP_100"
     # model_dir = "results/trained_models/"
-    # model_path = "is_native/native_nopre_new_pdbchembl"
+    # model_path = "is_native/native_42"
     # full_model_path = os.path.join(model_dir, model_path)
     # model = get_model_from_dirpath(full_model_path)
     # one_robin(pocket_id, lig_name, model, use_rna_fm=False)
@@ -321,10 +282,10 @@ if __name__ == "__main__":
 
     res_dir = "outputs/robin" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     # GET ALL CSVs for the models and plot them
-    get_all_csvs(recompute=False, swap=SWAP)
     get_dfs_docking(swap=SWAP)
+    get_all_csvs(recompute=False, swap=SWAP)
     mix_all(res_dir=res_dir, pairs=PAIRS, recompute=True)
-    # get_merged_df(recompute=True, swap=SWAP)
+    get_merged_df(recompute=True, swap=SWAP)
     print_results(swap=SWAP)
 
     # COMPUTE PERTURBED VERSIONS
