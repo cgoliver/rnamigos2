@@ -121,7 +121,7 @@ PALETTE_DICT = setup_plot()
 class CustomScale(mscale.ScaleBase):
     name = 'custom'
 
-    def __init__(self, axis, offset=0.01, sup_lim=1, divider=1):
+    def __init__(self, axis, offset=0.01, sup_lim=0.94, divider=1):
         mscale.ScaleBase.__init__(self, axis=axis)
         self.offset = offset
         self.divider = divider

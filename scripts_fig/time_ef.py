@@ -23,10 +23,12 @@ def partial_virtual_screen(df, sort_up_to=0, score_column='rdock'):
     return enrich
 
 
-def build_auroc_df(out_csv='fig_script/time_auroc.csv', grouped=True, recompute=False):
+def build_auroc_df(out_csv='fig_script/time_auroc.csv', decoy='pdb_chembl', grouped=True, recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
-    big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_42_raw.csv')
+    big_df_raw = pd.read_csv(f'outputs/pockets/big_df{"_grouped" if grouped else ""}_42_raw.csv')
+    big_df_raw = big_df_raw.loc[big_df_raw['decoys'] == decoy]
+
     big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
 
     # Now iterate
@@ -69,7 +71,7 @@ def build_auroc_df(out_csv='fig_script/time_auroc.csv', grouped=True, recompute=
         # docknat+rdocknat
         pocket_df = pocket_df.sort_values(by='docknat', ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdocknat')
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='combined')
             res = {'sort_up_to': i,
                    'pocket': pocket,
                    'auroc': auroc,
@@ -194,7 +196,7 @@ def line_plot(df, mixed_model='combined', robin=False):
     plt.rc('grid', color='grey', alpha=0.2)
     plt.grid(True)
     ax = plt.gca()
-    # ax.set_yscale('custom')
+    ax.set_yscale('custom')
 
     times = np.linspace(0, 8.3, 20)
     # # Add sole mixed performance
@@ -213,9 +215,9 @@ def line_plot(df, mixed_model='combined', robin=False):
     if mixed_model == 'combined':
         mixed_means = [0.9848] * 20
     elif mixed_model == 'rdocknat':
-        mixed_means = [0.924] * 20
+        mixed_means = [0.896] * 20
     else:
-        mixed_means = [0.924] * 20
+        mixed_means = [0.850] * 20
         print('Unexpected model, dashed line is confused')
     if not robin:
         ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'],
@@ -233,14 +235,15 @@ def line_plot(df, mixed_model='combined', robin=False):
 
     # Possible plot: Set y_lim to 0.99 and CustomScale to: offset=0.03, sup_lim=1
     # This shows how fast we go from mixed to mixed+rdock performance
+    yticks = [0.5, 0.7, 0.8, 0.9, 0.925, 0.94]
     # yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
-    # plt.gca().set_yticks(yticks)
+    plt.gca().set_yticks(yticks)
     if not robin:
-        plt.ylim(0.4, 1)
+        plt.ylim(0.4, 0.94)
 
     plt.ylabel(r"AuROC")
     plt.xlabel(r"Time Limit (hours)")
-    plt.legend(loc='center left')
+    plt.legend(loc='lower right')
     plt.savefig("figs/efficiency_line.pdf", format="pdf", bbox_inches='tight')
     # plt.savefig("figs/efficiency_line_ylim.pdf", format="pdf", bbox_inches='tight')
     plt.show()
@@ -314,24 +317,24 @@ if __name__ == "__main__":
     # recompute = True
     build_auroc_df(out_csv=out_csv, recompute=recompute)
 
-    out_csv_robin = 'scripts_fig/time_auroc_robin.csv'
-    recompute = False
-    # recompute = True
-    build_auroc_df_robin(out_csv=out_csv_robin, recompute=recompute)
+    # out_csv_robin = 'scripts_fig/time_auroc_robin.csv'
+    # recompute = False
+    # # recompute = True
+    # build_auroc_df_robin(out_csv=out_csv_robin, recompute=recompute)
 
     # Then make plots
     df = pd.read_csv(out_csv, index_col=0)
-    # mixed_model = 'rdocknat'
-    mixed_model = 'docknat'
-    mixed_model = 'dock'
-    # line_plot(df, mixed_model=mixed_model)
+    mixed_model = 'rdocknat'
+    # mixed_model = 'docknat'
+    # mixed_model = 'dock'
+    line_plot(df, mixed_model=mixed_model)
     # vax_plot(df, mixed_model=mixed_model)
 
-    df = pd.read_csv(out_csv_robin, index_col=0)
+    # df = pd.read_csv(out_csv_robin, index_col=0)
     # mixed_model = 'dock_rnafm_3'
     # mixed_model = 'native_validation'
     # mixed_model = 'updated_rnamigos'
     # mixed_model = 'updated_rdocknat'
-    mixed_model = 'updated_combined'
-    line_plot(df, mixed_model=mixed_model, robin=True)
+    # mixed_model = 'updated_combined'
+    # line_plot(df, mixed_model=mixed_model, robin=True)
     # vax_plot(df, mixed_model=mixed_model)
