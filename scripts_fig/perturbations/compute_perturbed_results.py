@@ -212,7 +212,6 @@ def get_results_dfs(all_perturbed_pockets_path="figs/perturbations/perturbed",
             df = pd.read_csv(out_csv_path)[["pocket_id", "score", "frac"]]
             df = df.loc[df["frac"] == ef_frac]
 
-        mean_score = np.mean(df["score"].values)
         if compute_overlap:
             overlap_csv_path = out_dir / (base_name + "_overlap.csv")
             if not os.path.exists(overlap_csv_path):

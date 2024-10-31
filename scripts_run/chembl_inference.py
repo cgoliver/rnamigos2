@@ -257,43 +257,16 @@ if __name__ == "__main__":
     # SEEDS = [0, 1, 42]
 
     MODELS = {
-        # "dock_42": "dock/dock_42",
-        # "native_42": "is_native/native_rnafm_dout5_4",
-        # "native_bce": "is_native/native_42_gap",
-        # "native_bce0.02": "is_native/native_bce0.02",
-        # "native_bce0.02_sample": "is_native/native_bce0.02_groupsample",
-        # "native_sample_nofm": "is_native/native_bce0.02_groupsample_nornafm",
-        # "native_mixed": "is_native/native_w0.01_gap_nobn",
-        # "native_margin": "is_native/native_margin_only_gap_nobn",
-        # "native_margin_carlos": "is_native/native_rnafm_dout5_4_bugfix_alpha06real_marginonlytrue_rognan",
+        "dock_42": "dock/dock_42",
+        "native_42": "is_native/native_42",
     }
     RUNS = list(MODELS.keys())
 
     PAIRS = {
-        # ("rdock", "dock_42"): "dock_rdock",
-        # ("native_42", "dock_42"): "rnamigos_42",
-        # ("native_bce", "dock_42"): "rnamigos_bce",
-        # ("native_bce0.02", "dock_42"): "rnamigos_bce0.02",
-        # ("native_bce0.02_sample", "dock_42"): "rnamigos_bce0.02_sample",
-        # ("native_sample_nofm", "dock_42"): "rnamigos_sample_nofm",
-        # ("native_mixed", "dock_42"): "rnamigos_mixed",
-        # ("native_margin", "dock_42"): "rnamigos_margin",
-        # ("native_margin_carlos", "dock_42"): "rnamigos_margin_carlos",
-        # ("native_nonpocket", "dock_42"): "rnamigos_nonpocket",
-        # Which one is migos++ ?
-        # ("rnamigos_42", "rdock"): "combined_42",
-        # ("rnamigos_bce", "rdock"): "combined_bce",
-        # ("rnamigos_bce0.02", "rdock"): "combined_bce0.02",
-        # ("rnamigos_bce0.02_sample", "rdock"): "combined_bce0.02_sample",
-        # ("rnamigos_sample_nofm", "rdock"): "combined_sample_nofm",
-        # ("rnamigos_mixed", "rdock"): "combined_mixed",
-        # ("rnamigos_margin", "rdock"): "combined_margin",
-        # ("rnamigos_margin_carlos", "rdock"): "combined_margin_carlos",
-        # ("native_42", "rdock"): "rdocknat_42",
-        # ("native_bce", "rdock"): "rdocknat_bce",
-        # ("native_mixed", "rdock"): "rdocknat_mixed",
-        # ("native_margin", "rdock"): "rdocknat_margin",
-        # ("native_margin_carlos", "rdock"): "rdocknat_margin_carlos",
+        ("rdock", "dock_42"): "dock_rdock",
+        ("native_42", "dock_42"): "rnamigos_42",
+        ("rnamigos_42", "rdock"): "combined_42",
+        ("native_42", "rdock"): "rdocknat_42",
     }
 
     # Just print perfs compared to Rognan

@@ -28,11 +28,7 @@ def inference_raw(
     Run inference from python objects
     """
     # Get ready to loop through ligands
-    dataset = InferenceDataset(
-        smiles_list,
-        ligand_cache=ligand_cache,
-        use_ligand_cache=use_ligand_cache,
-    )
+    dataset = InferenceDataset(smiles_list, ligand_cache=ligand_cache, use_ligand_cache=use_ligand_cache)
     batch_size = 64
     loader_args = {
         "shuffle": False,
@@ -52,7 +48,7 @@ def inference_raw(
                 scores = model.predict_ligands(dgl_graph, ligands_graph)
             scores = list(scores[:, 0].numpy())
             results[model_name].extend(scores)
-        if not i % 10 and i > 0:
+        if not i % 50 and i > 0:
             print(f"Done {i * batch_size}/{len(dataset)} in {time.time() - t0}")
 
     results = {model_name: np.asarray(all_scores) for model_name, all_scores in results.items()}
@@ -83,7 +79,7 @@ def get_models(models_path=None, model=None):
         models_path = {model_name: os.path.join(script_dir, "..", model_path)
                        for model_name, model_path in models_path.items()}
     models = {model_name: get_model_from_dirpath(model_path)
-                  for model_name, model_path in models_path.items()}
+              for model_name, model_path in models_path.items()}
     return models
 
 

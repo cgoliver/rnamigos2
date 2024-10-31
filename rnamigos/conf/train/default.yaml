@@ -27,7 +27,7 @@ max_kernel: 20
 # learning
 loss: 'l2'
 num_epochs: 100
-learning_rate: 1e-3
+learning_rate: 1e-4
 pretrain_weight: 0.
 clf_lam: 1.0
 negative_pocket: 'none'
@@ -36,7 +36,7 @@ reconstruction_lam: 1.0
 early_stop: 10
 target: dock # dock or native_fp or is_native
 weight_decay: 0
-rognan_margin: 0.3
+rognan_margin: 0.6
 monitor_gap: false
 
 # Validation
