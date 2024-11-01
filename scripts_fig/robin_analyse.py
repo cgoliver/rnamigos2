@@ -95,7 +95,7 @@ def plot_perturbed(model="pre_fm", group=True):
     plt.show()
 
 
-def plot_distributions(score_to_use="native_validation", in_csv="outputs/robin/carlos_big_df_raw.csv"):
+def plot_distributions(score_to_use="native_validation", in_csv="outputs/robin/big_df_raw.csv"):
     merged = pd.read_csv(in_csv)
     colors = sns.color_palette(["#33ccff", "#00cccc", "#3366ff", "#9999ff"])
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
@@ -121,15 +121,15 @@ if __name__ == "__main__":
     SWAP = 1
     RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
 
-    plot_all()
+    # plot_all()
     # PLOT PERTURBED VERSIONS
-    # plot_perturbed(model="rnamigos++", group=True)
+    plot_perturbed(model="rnamigos_42", group=True)
 
-    # score_to_use = 'rdock'
-    # score_to_use = 'dock_42'
-    # score_to_use = 'native_42'
-    score_to_use = "rnamigos"
-    # score_to_use = "combined"
+    # score_to_use = "rdock"
+    # score_to_use = "dock_42"
+    # score_to_use = "native_42"
+    score_to_use = "rnamigos_42"
+    # score_to_use = "combined_42"
     # score_to_use = "rnamigos_nativetune_val"
     # score_to_use = "rnamigos_rognanpocket"
     plot_distributions(score_to_use=score_to_use)

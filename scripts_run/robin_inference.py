@@ -282,13 +282,15 @@ if __name__ == "__main__":
 
     res_dir = "outputs/robin" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     # GET ALL CSVs for the models and plot them
-    get_dfs_docking(swap=SWAP)
+    """
     get_all_csvs(recompute=False, swap=SWAP)
-    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=True)
-    get_merged_df(recompute=True, swap=SWAP)
+    get_dfs_docking(swap=SWAP)
+    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=False)
+    get_merged_df(recompute=False, swap=SWAP)
     print_results(swap=SWAP)
+    """
 
     # COMPUTE PERTURBED VERSIONS
-    # for swap in range(1, 4):
-    #     get_all_csvs(recompute=recompute, swap=swap)
-    #     mix_all(swap=swap)
+    for swap in range(1, 4):
+        get_all_csvs(recompute=True, swap=swap)
+        # mix_all(swap=swap)
