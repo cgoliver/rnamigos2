@@ -1,10 +1,12 @@
 import os
 
+from scipy import stats
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
 from rnamigos.utils.mixing_utils import normalize
+from rnamigos.utils.virtual_screen import enrichment_factor
 
 ROBIN_POCKETS = {
     "TPP": "2GDI_Y_TPP_100",
@@ -14,6 +16,43 @@ ROBIN_POCKETS = {
 }
 
 POCKET_PATH = "data/json_pockets_expanded"
+
+
+def ef_lines(swap=0):
+    df = pd.read_csv(f"{RES_DIR}/big_df_raw.csv")
+    scores = ["rdock", "dock_42", "native_42", "rnamigos_42", "combined_42"]
+    # scores = ["rdock", "dock_42", "native_42", "combined"]
+
+    pockets = list(df["pocket_id"].unique())
+    fracs = [0.01, 0.02, 0.05, 0.1, 0.2]
+
+    ef_df_rows = []
+    for score in scores:
+        for pocket in pockets:
+            for frac in fracs:
+                out = df.loc[df["pocket_id"] == pocket]
+                ef = enrichment_factor(out[score], out["is_active"], frac=frac)
+                ef_df_rows.append({"pocket_id": pocket, "score": score, "frac": frac, "ef": ef})
+                pass
+            pass
+        pass
+    pass
+
+    ef_df = pd.DataFrame(ef_df_rows)
+    custom_palette = sns.color_palette()
+    plt.rcParams["axes.grid"] = True
+    print(ef_df)
+    g = sns.FacetGrid(ef_df, col="pocket_id", hue="score", col_wrap=2, height=4)
+
+    # Map the data to the grid as a line plot
+    g.map(sns.lineplot, "frac", "ef")
+    g.add_legend()
+    g.set_axis_labels("Fraction", "Enrichment Factor (EF)")
+    g.set_titles("{col_name}")
+    plt.xscale("log")
+
+    plt.tight_layout()
+    plt.show()
 
 
 def plot_all():
@@ -112,24 +151,38 @@ def plot_distributions(score_to_use="native_validation", in_csv="outputs/robin/b
             linewidth=0,
             common_norm=False,
             ax=axes[i],
+            clip=(0, 1.0),
         )
+
+        t_stat, p_value = stats.ttest_ind(
+            merged_pocket.loc[merged_pocket["is_active"] == 1][score_to_use],
+            merged_pocket.loc[merged_pocket["is_active"] == 0][score_to_use],
+        )
+
+        # Print the results
+        print(f"T-statistic: {t_stat}")
+        print(f"P-value: {p_value}")
+        axes[i].set_xlim(0.5, 1.1)
+        axes[i].set_title(f"{pocket_id} (p={p_value:.2e})")
+
     plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
-    SWAP = 1
+    SWAP = 0
     RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
 
+    ef_lines()
     # plot_all()
     # PLOT PERTURBED VERSIONS
-    plot_perturbed(model="rnamigos_42", group=True)
+    # plot_perturbed(model="rnamigos_42", group=True)
 
     # score_to_use = "rdock"
     # score_to_use = "dock_42"
     # score_to_use = "native_42"
-    score_to_use = "rnamigos_42"
+    # score_to_use = "rnamigos_42"
     # score_to_use = "combined_42"
     # score_to_use = "rnamigos_nativetune_val"
     # score_to_use = "rnamigos_rognanpocket"
-    plot_distributions(score_to_use=score_to_use)
+    # plot_distributions(score_to_use=score_to_use, in_csv=f"{RES_DIR}/big_df_raw.csv")

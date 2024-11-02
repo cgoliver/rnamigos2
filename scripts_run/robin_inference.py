@@ -142,6 +142,7 @@ def get_all_csvs(recompute=False, swap=0):
         model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
         use_rnafm = cfg.model.use_rnafm if "use_rnafm" in cfg.model else False
         df_ef, df_raw = get_all_preds(model, use_rna_fm=use_rnafm, swap=swap)
+        print(f"dumping {out_csv}")
         df_ef.to_csv(out_csv, index=False)
         df_raw.to_csv(out_csv_raw, index=False)
 

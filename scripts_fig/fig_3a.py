@@ -98,6 +98,10 @@ def plot(df):
         order=order,
         palette=custom_palette_point,
     )
+    sns.despine()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig("figs/fig3a.pdf", format="pdf")
     plt.show()
     pass
 
