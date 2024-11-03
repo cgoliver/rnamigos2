@@ -46,7 +46,8 @@ def run_virtual_screen(model, dataloader, metric=get_auroc, lower_is_better=Fals
             if verbose:
                 logger.info(f"Done {i}/{len(dataloader)}")
         if (isinstance(ligands, torch.Tensor) and len(ligands) < 10) or (
-                isinstance(ligands, DGLGraph) and ligands.batch_size < 10):
+            isinstance(ligands, DGLGraph) and ligands.batch_size < 10
+        ):
             logger.warning(f"Skipping pocket{i}, not enough decoys")
             continue
         scores = model.predict_ligands(pocket_graph, ligands)[:, 0].numpy()
@@ -66,21 +67,29 @@ def run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode):
     raw_rows = list()
     for pocket_id, score_list, status_list, smiles_list in zip(pocket_names, scores, status, all_smiles):
         for score, status, smiles in zip(score_list, status_list, smiles_list):
-            raw_rows.append({"raw_score": score,
-                             "is_active": status,
-                             "pocket_id": pocket_id,
-                             "smiles": smiles,
-                             "decoys": decoy_mode})
+            raw_rows.append(
+                {
+                    "raw_score": score,
+                    "is_active": status,
+                    "pocket_id": pocket_id,
+                    "smiles": smiles,
+                    "decoys": decoy_mode,
+                }
+            )
     return pd.DataFrame(raw_rows)
 
 
 def run_results_to_auroc_df(aurocs, scores, pocket_names, decoy_mode):
     rows = list()
     for auroc, score, pocket_id in zip(aurocs, scores, pocket_names):
-        rows.append({"score": auroc,
-                     "metric": "EF" if decoy_mode == "robin" else "AuROC",
-                     "decoys": decoy_mode,
-                     "pocket_id": pocket_id})
+        rows.append(
+            {
+                "score": auroc,
+                "metric": "EF" if decoy_mode == "robin" else "AuROC",
+                "decoys": decoy_mode,
+                "pocket_id": pocket_id,
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -89,11 +98,9 @@ def get_results_dfs(model, dataloader, decoy_mode, cfg, verbose=False):
     metric = enrichment_factor if decoy_mode == "robin" else get_auroc
     if verbose:
         print(f"DOING: {cfg.name}, LOWER IS BETTER: {lower_is_better}")
-    aurocs, scores, status, pocket_names, all_smiles = run_virtual_screen(model,
-                                                                          dataloader,
-                                                                          metric=metric,
-                                                                          lower_is_better=lower_is_better,
-                                                                          verbose=verbose)
+    aurocs, scores, status, pocket_names, all_smiles = run_virtual_screen(
+        model, dataloader, metric=metric, lower_is_better=lower_is_better, verbose=verbose
+    )
     auroc_df = run_results_to_auroc_df(aurocs, scores, pocket_names, decoy_mode)
     raw_df = run_results_to_raw_df(scores, status, pocket_names, all_smiles, decoy_mode)
     if verbose:
@@ -108,13 +115,14 @@ def raw_df_to_aurocs(raw_df, score="raw_score"):
     :param score:
     :return:
     """
-    pockets = raw_df['pocket_id'].unique()
+    pockets = raw_df["pocket_id"].unique()
     all_aurocs = []
     for pi, pocket in enumerate(pockets):
-        pocket_df = raw_df.loc[raw_df['pocket_id'] == pocket]
-        auroc = get_auroc(pocket_df[score], pocket_df['is_active'])
+        pocket_df = raw_df.loc[raw_df["pocket_id"] == pocket]
+        auroc = get_auroc(pocket_df[score], pocket_df["is_active"])
         all_aurocs.append({"score": auroc, "pocket_id": pocket})
     df_auroc = pd.DataFrame(all_aurocs)
+    print(df_auroc)
     return df_auroc
 
 
@@ -126,7 +134,7 @@ def raw_df_to_mean_auroc(raw_df, score="raw_score"):
     :return:
     """
     df_auroc = raw_df_to_aurocs(raw_df, score)
-    return np.mean(df_auroc['score'].values)
+    return np.mean(df_auroc["score"].values)
 
 
 def raw_df_to_efs(raw_df, score="raw_score", fracs=(0.01, 0.02, 0.05)):

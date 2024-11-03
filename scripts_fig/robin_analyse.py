@@ -7,6 +7,7 @@ import seaborn as sns
 
 from rnamigos.utils.mixing_utils import normalize
 from rnamigos.utils.virtual_screen import enrichment_factor
+from rnamigos.utils.virtual_screen import raw_df_to_mean_auroc, raw_df_to_efs
 
 ROBIN_POCKETS = {
     "TPP": "2GDI_Y_TPP_100",
@@ -136,6 +137,7 @@ def plot_perturbed(model="pre_fm", group=True):
 
 def plot_distributions(score_to_use="native_validation", in_csv="outputs/robin/big_df_raw.csv"):
     merged = pd.read_csv(in_csv)
+
     colors = sns.color_palette(["#33ccff", "#00cccc", "#3366ff", "#9999ff"])
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
     for i, pocket_id in enumerate(merged["pocket_id"].unique()):
@@ -173,7 +175,7 @@ if __name__ == "__main__":
     SWAP = 0
     RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
 
-    ef_lines()
+    # ef_lines()
     # plot_all()
     # PLOT PERTURBED VERSIONS
     # plot_perturbed(model="rnamigos_42", group=True)
@@ -181,8 +183,19 @@ if __name__ == "__main__":
     # score_to_use = "rdock"
     # score_to_use = "dock_42"
     # score_to_use = "native_42"
-    # score_to_use = "rnamigos_42"
-    # score_to_use = "combined_42"
+    # score_to_use = "rnamigos_42" if SWAP == 0 else "rnamigos"
+    score_to_use = "combined_42" if SWAP == 0 else "combined"
     # score_to_use = "rnamigos_nativetune_val"
     # score_to_use = "rnamigos_rognanpocket"
-    # plot_distributions(score_to_use=score_to_use, in_csv=f"{RES_DIR}/big_df_raw.csv")
+    for swap in range(0, 4):
+        # score_to_use = "dock_42" if swap == 0 else "dock"
+        # score_to_use = "native_42"
+        score_to_use = "rnamigos_42" if swap == 0 else "rnamigos"
+        score_to_use = "rdock"
+        print(score_to_use)
+        print(f"SWAP : {swap}")
+        RES_DIR = "outputs/robin/" if swap == 0 else f"outputs/robin_swap_{swap}"
+        merged = pd.read_csv(f"{RES_DIR}/big_df_raw.csv")
+        auroc = raw_df_to_mean_auroc(merged, score=score_to_use)
+        print(auroc)
+        # plot_distributions(score_to_use=score_to_use, in_csv=f"{RES_DIR}/big_df_raw.csv")

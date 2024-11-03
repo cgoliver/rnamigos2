@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 
+from scipy import stats
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
@@ -176,6 +177,7 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
 
         # FOR MIGOS
         df = get_dfs_migos(model_output, pocket_name=pocket_name, swap=swap, normalize=normalize_migos)
+        print(df)
         # merged_migos["dock_nat"] = (normalize(merged_migos["is_active"]) + normalize(merged_migos["dock"])) / 2
         # print(merged_rdock)
 
@@ -206,7 +208,7 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
         df = df.sort_values(by="is_active")
         g = sns.kdeplot(
             data=df,
-            x="score",
+            x="raw_score",
             hue="is_active",
             ax=ax,
             # palette={'actives': colors[i], 'inactives': 'lightgrey'},
@@ -215,16 +217,16 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
             linewidth=0,
             common_norm=False,
         )
-        decoy_xx, decoy_yy = g.lines[0].get_data()
+        decoy_xx, decoy_yy = g.lines[1].get_data()
         ax.fill_between(decoy_xx, 0, decoy_yy, color="lightgrey", alpha=0.5)
         # ax.plot(decoy_xx, decoy_yy, color='white', alpha=0.9)
-        xx, yy = g.lines[1].get_data()
+        xx, yy = g.lines[0].get_data()
         # ax.fill_between(xx, 0, yy, color=colors[i], alpha=0.1)
         ax.plot(xx, yy, color=colors[i], alpha=1, linewidth=1.5)
         ax.set_xlim([0.3, 1])
 
         for _, frac in enumerate(fracs):
-            ef, thresh = enrichment_factor(scores=df["score"], is_active=df["is_active"], frac=frac)
+            ef, thresh = enrichment_factor(scores=df["raw_score"], is_active=df["is_active"], frac=frac)
             rows.append(
                 {
                     "pocket": pocket_to_id[pocket_name],
@@ -268,20 +270,24 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
 
             offset += 0.05
 
-        ef, thresh = enrichment_factor(scores=df["score"], is_active=df["is_active"], frac=default_frac)
+        ef, thresh = enrichment_factor(scores=df["raw_score"], is_active=df["is_active"], frac=default_frac)
         all_efs.append(ef)
         print(f"EF@{frac} : ", pocket_name, ef)
+        # GET AUROC
+        fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df["raw_score"])
+        auroc = metrics.auc(fpr, tpr)
+        t_stat, p_value = stats.ttest_ind(df["is_active"], df["raw_score"])
 
-        ax.set_title(pocket_name)
+        print(p_value)
+        all_aurocs.append(auroc)
+
+        ax.set_title(f"{pocket_name} AuROC: {auroc:.2f} \n p={p_value:.2e}")
         g.legend().remove()
         sns.despine()
+        plt.tight_layout()
         plt.savefig(f"figs/panel_3_{prefix}_{pocket_to_id[pocket_name]}.pdf", format="pdf")
         # plt.show()
 
-        # GET AUROC
-        fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df["score"])
-        auroc = metrics.auc(fpr, tpr)
-        all_aurocs.append(auroc)
         # print('AuROC : ', pocket_name, auroc)
         # print()
 
@@ -296,8 +302,6 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
     print(np.mean(all_efs))
     print(np.mean(all_aurocs))
     # names = ['smiles', 'dock', 'is_native', 'native_fp', 'merged']
-    plt.tight_layout()
-    plt.savefig("figs/fig_3a_{prefix}.pdf", format="pdf")
     # plt.show()
     return pd.DataFrame(rows)
 
@@ -321,9 +325,9 @@ def make_table(df):
 if __name__ == "__main__":
 
     dfs = []
-    for score in ["dock_nat", "is_native", "dock", "rDock", "RNAmigos2++"]:
-        dfs.append(make_fig(score, prefix=f"repro_{score}", normalize_migos=True))
-    for model in ["rnamigos", "rnamigos_rognanpocket", "dock_42", "rdock", "rnamigos++"]:
+    # for score in ["dock_nat", "is_native", "dock", "rDock", "RNAmigos2++"]:
+    #    dfs.append(make_fig(score, prefix=f"repro_{score}", normalize_migos=True))
+    for model in ["rnamigos_42", "rdock", "combined_42"]:
         df_path = Path("outputs/robin") / f"{model}_raw.csv"
-        dfs.append(make_fig(df_path, prefix=f"repro_{model}", normalize_migos=True))
+        dfs.append(make_fig(df_path, prefix=f"resubmit_{model}", normalize_migos=True))
     make_table(pd.concat(dfs))
