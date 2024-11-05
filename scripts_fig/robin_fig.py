@@ -321,8 +321,8 @@ def make_table(df):
 if __name__ == "__main__":
 
     dfs = []
-    # for score in ["dock_nat", "is_native", "dock", "rDock", "RNAmigos2++"]:
-    #    dfs.append(make_fig(score, prefix=f"repro_{score}", normalize_migos=True))
+    for score in ["dock_nat", "is_native", "dock", "rDock", "RNAmigos2++"]:
+        dfs.append(make_fig(score, prefix=f"repro_{score}", normalize_migos=True))
     for model in ["rnamigos", "rnamigos_rognanpocket", "dock_42", "rdock", "rnamigos++"]:
         df_path = Path("outputs/robin") / f"{model}_raw.csv"
         dfs.append(make_fig(df_path, prefix=f"repro_{model}", normalize_migos=True))

@@ -9,11 +9,10 @@ import seaborn as sns
 
 paths = {
     "RNAmigos1": "outputs/fp_split_grouped1_raw.csv",
-    "RNAmigos2": "outputs/docknat_grouped_0_raw.csv",
+    "RNAmigos2": "outputs/pockets/big_df_grouped_42_raw.csv",
     "RLDOCK": "outputs/rldock_docking_consolidate_all_terms.csv",
     "rDock": "outputs/rdock_raw.csv",
-    "dock6_old": "outputs/dock6_results.csv",
-    "dock6_all": "outputs/dock6_results_13_10_2024.csv",
+    "dock6": "outputs/dock6_results_13_10_2024.csv",
     "AnnapuRNA": "outputs/annapurna_results_consolidate.csv",
     "AutoDock-Vina": "outputs/vina_docking_consolidate.csv",
 }
@@ -25,13 +24,10 @@ score_to_use = {
     "AnnapuRNA": "score_RNA-Ligand",
     "AutoDock-Vina": "score",
     "rDock": "raw_score",
-    "dock6_old": "GRID_SCORE",
-    "dock6_all": "GRID_SCORE",
+    "dock6": "GRID_SCORE",
 }
 
-names_train, names_test, grouped_train, grouped_test = pickle.load(
-    open("data/train_test_75.p", "rb")
-)
+names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", "rb"))
 
 
 def merge_raw_dfs():
@@ -43,9 +39,7 @@ def merge_raw_dfs():
         if method in ["RNAmigos1", "RNAmigos2", "rDock"]:
             df = df.loc[df["decoys"] == "chembl"]
         if method == "RLDOCK":
-            df["raw_score"] = df["Total_Energy"] - (
-                df["Self_energy_of_ligand"] + df["Self_energy_of_receptor"]
-            )
+            df["raw_score"] = df["Total_Energy"] - (df["Self_energy_of_ligand"] + df["Self_energy_of_receptor"])
             df.loc[df["raw_score"] > 0, "raw_score"] = 0
         else:
             df["raw_score"] = df[score_to_use[method]]
@@ -53,9 +47,7 @@ def merge_raw_dfs():
         if method in ["RNAmigos2"]:
             df["normed_score"] = df.groupby(["pocket_id"])["raw_score"].rank(pct=True)
         else:
-            df["normed_score"] = df.groupby(["pocket_id"])["raw_score"].rank(
-                pct=True, ascending=False
-            )
+            df["normed_score"] = df.groupby(["pocket_id"])["raw_score"].rank(pct=True, ascending=False)
 
         df = df.loc[:, cols]
         df["method"] = method
@@ -72,25 +64,24 @@ def plot(df):
     print(df.groupby(["method"])["normed_score"].mean())
 
     custom_palette_bar = {
-        method: "#e9e9f8" if method.startswith("RNAmigos") else "#d3d3d3"
-        for method in df["method"].unique()
+        method: "#e9e9f8" if method.startswith("RNAmigos") else "#d3d3d3" for method in df["method"].unique()
     }
 
     custom_palette_point = {
-        method: "#b2b2ff" if method.startswith("RNAmigos") else "#a5a5a5"
-        for method in df["method"].unique()
+        method: "#b2b2ff" if method.startswith("RNAmigos") else "#a5a5a5" for method in df["method"].unique()
     }
 
     order = [
         "RLDOCK",
         "AutoDock-Vina",
+        "dock6",
         "AnnapuRNA",
         "rDock",
-        "dock6",
         "RNAmigos1",
         "RNAmigos2",
     ]
     print(df)
+    df = df.reset_index(drop=True)
     g = sns.barplot(
         df,
         x="method",
@@ -107,6 +98,10 @@ def plot(df):
         order=order,
         palette=custom_palette_point,
     )
+    sns.despine()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig("figs/fig3a.pdf", format="pdf")
     plt.show()
     pass
 

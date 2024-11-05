@@ -142,6 +142,7 @@ def get_all_csvs(recompute=False, swap=0):
         model, cfg = get_model_from_dirpath(full_model_path, return_cfg=True)
         use_rnafm = cfg.model.use_rnafm if "use_rnafm" in cfg.model else False
         df_ef, df_raw = get_all_preds(model, use_rna_fm=use_rnafm, swap=swap)
+        print(f"dumping {out_csv}")
         df_ef.to_csv(out_csv, index=False)
         df_raw.to_csv(out_csv_raw, index=False)
 
@@ -284,13 +285,15 @@ if __name__ == "__main__":
 
     res_dir = "outputs/robin" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     # GET ALL CSVs for the models and plot them
-    get_dfs_docking(swap=SWAP)
+    """
     get_all_csvs(recompute=False, swap=SWAP)
-    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=True)
-    get_merged_df(recompute=True, swap=SWAP)
+    get_dfs_docking(swap=SWAP)
+    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=False)
+    get_merged_df(recompute=False, swap=SWAP)
     print_results(swap=SWAP)
+    """
 
     # COMPUTE PERTURBED VERSIONS
-    # for swap in range(1, 4):
-    #     get_all_csvs(recompute=recompute, swap=swap)
-    #     mix_all(swap=swap)
+    for swap in range(1, 4):
+        get_all_csvs(recompute=True, swap=swap)
+        # mix_all(swap=swap)

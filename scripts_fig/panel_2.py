@@ -27,102 +27,108 @@ if __name__ == "__main__":
 from scripts_fig.plot_utils import group_df, get_rmscores, get_smooth_order, rotate_2D_coords, get_groups
 
 
-def dock_correlation():
+def dock_correlation(mode="pdbchembl"):
     """
     Docking vs rnamigos score correlation
     """
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", "rb"))
-    df_paths = {
-        "rnamigos": "outputs/chembl_resubmit/rnamigos_42_raw.csv",
-        "native": "outputs/chembl_resubmit/native_42_raw.csv",
-        "dock": "outputs/chembl_resubmit/dock_42_raw.csv",
-    }
-    migos_to_use = "dock"
+    # big_df = pd.read_csv("outputs/pockets/big_df_grouped_42_raw.csv")
+    df_path = "outputs/robin/big_df_raw.csv" if mode == "robin" else "outputs/pockets/big_df_grouped_42_raw.csv"
+    big_df = pd.read_csv(df_path)
+
     dock_to_use = "dock_pocket_norm"  # raw_score_y
 
-    dock_pred = pd.read_csv(df_paths[migos_to_use])
-    dock = pd.read_csv("outputs/chembl_resubmit/rdock_raw.csv")
+    if mode == "robin":
+        migos_scores = ["dock_42", "rnamigos_42", "native_42"]
+        score_to_name = {"rnamigos_42": "RNAmigos2.0", "native_42": "COMPAT", "dock_42": "AFF"}
+    else:
+        migos_scores = ["dock", "docknat", "native"]
+        score_to_name = {"docknat": "RNAmigos2.0", "native": "COMPAT", "dock": "AFF"}
+        big_df = big_df.loc[big_df["decoys"] == "pdb_chembl"]
 
-    # combine predicted scores from rnamigos and rDock scores
-    result = dock_pred.merge(dock, on=["pocket_id", "smiles"])
-    # keep only test pockets outputs
-    result = result.loc[result["pocket_id"].isin(grouped_test.keys())]
-    # normalize rDock scores
-    result["dock_pocket_norm"] = result.groupby("pocket_id")["raw_score_y"].transform(
-        lambda x: (x - x.min()) / (x.max() - x.min())
-    )
+    for migos in migos_scores:
+        # keep only test pockets outputs
+        if mode == "pdbchembl":
+            big_df = big_df.loc[big_df["pocket_id"].isin(grouped_test.keys())]
+        # normalize rDock scores
 
-    print(result.columns)
-    # pocket-wise norm of migos scores
-    result[migos_to_use] = result.groupby("pocket_id")["raw_score_x"].transform(
-        lambda x: (x - x.min()) / (x.max() - x.min())
-    )
+        big_df["dock_pocket_norm"] = big_df.groupby("pocket_id")["rdock"].transform(
+            lambda x: (x - x.min()) / (x.max() - x.min())
+        )
 
-    actives = result.loc[result["is_active_x"] == 1.0]
-    decoys = result.loc[result["is_active_x"] == 0.0]
-    g = sns.regplot(
-        data=result,
-        x=dock_to_use,
-        y=migos_to_use,
-        color=".3",
-        ci=99,
-        scatter_kws={"alpha": 0.3, "s": 2},
-        line_kws={"color": "red"},
-    )
-    sns.scatterplot(data=actives, x=dock_to_use, y=migos_to_use, color="blue", ax=g)
+        # Create a figure with a grid for the main plot and marginal plots (KDEs)
+        fig, ax = plt.subplots(figsize=(8, 6))
 
-    r, p = spearmanr(result[dock_to_use], result[migos_to_use])
-    plt.text(
-        x=np.min(result[dock_to_use]),
-        y=np.max(result[migos_to_use]) - 0.59,
-        s=f"$\\rho$ = {r:.2f}",
-        color="red",
-        fontweight="bold",
-    )
-    handles = [
-        matplotlib.lines.Line2D([], [], marker="o", color="blue", linestyle="none", markersize=10, label="Native"),
-        matplotlib.lines.Line2D([], [], marker="o", color="grey", linestyle="none", markersize=10, label="Decoy"),
-    ]
+        # pocket-wise norm of migos scores
+        big_df[migos] = big_df.groupby("pocket_id")[migos].transform(lambda x: (x - x.min()) / (x.max() - x.min()))
 
-    # plt.axvline(x=decoys[dock_to_use].mean(), color='grey', linestyle='--')
-    # plt.axvline(x=actives[dock_to_use].mean(), color='blue', linestyle='--')
+        actives = big_df.loc[big_df["is_active"] == 1.0]
+        decoys = big_df.loc[big_df["is_active"] == 0.0]
+        g = sns.regplot(
+            data=big_df,
+            x=dock_to_use,
+            y=migos,
+            color=".3",
+            ci=99,
+            scatter_kws={"alpha": 0.3, "s": 2},
+            line_kws={"color": "red"},
+            ax=ax,
+        )
+        sns.scatterplot(data=actives, x=dock_to_use, y=migos, color="blue", ax=ax)
 
-    """
+        r, p = spearmanr(big_df[dock_to_use], big_df[migos])
+        plt.text(
+            x=np.min(big_df[dock_to_use]),
+            y=np.max(big_df[migos]) - 0.59,
+            s=f"$\\rho$ = {r:.2f}",
+            color="red",
+            fontweight="bold",
+        )
 
-    plt.text(x=-.05, y=decoys[score_keys[migos_to_use]].mean() + 0.02,
-         s=f"$\\mu$ = {decoys[score_keys[migos_to_use]].mean():.2f}",
-         color='grey', fontweight='bold')
+        handles = [
+            matplotlib.lines.Line2D([], [], marker="o", color="blue", linestyle="none", markersize=10, label="Active"),
+            matplotlib.lines.Line2D([], [], marker="o", color="grey", linestyle="none", markersize=10, label="Decoy"),
+        ]
 
-    plt.text(x=-.05, y=actives[score_keys[migos_to_use]].mean() + 0.02,
-         s=f"$\\mu$ = {actives[score_keys[migos_to_use]].mean():.2f}",
-         color='blue', fontweight='bold')
+        # plt.axvline(x=decoys[dock_to_use].mean(), color='grey', linestyle='--')
+        # plt.axvline(x=actives[dock_to_use].mean(), color='blue', linestyle='--')
+
+        """
+
+        plt.text(x=-.05, y=decoys[score_keys[migos_to_use]].mean() + 0.02,
+             s=f"$\\mu$ = {decoys[score_keys[migos_to_use]].mean():.2f}",
+             color='grey', fontweight='bold')
+
+        plt.text(x=-.05, y=actives[score_keys[migos_to_use]].mean() + 0.02,
+             s=f"$\\mu$ = {actives[score_keys[migos_to_use]].mean():.2f}",
+             color='blue', fontweight='bold')
 
 
-    plt.text(x=actives[dock_to_use].mean(), y=0.10,
-         s=f"$\\mu$ = {actives[dock_to_use].mean():.2f}",
-         color='blue', fontweight='bold')
+        plt.text(x=actives[dock_to_use].mean(), y=0.10,
+             s=f"$\\mu$ = {actives[dock_to_use].mean():.2f}",
+             color='blue', fontweight='bold')
 
-    plt.text(x=decoys[dock_to_use].mean() + 0.02, y=0.10,
-         s=f"$\\mu$ = {decoys[dock_to_use].mean():.2f}",
-         color='grey', fontweight='bold')
+        plt.text(x=decoys[dock_to_use].mean() + 0.02, y=0.10,
+             s=f"$\\mu$ = {decoys[dock_to_use].mean():.2f}",
+             color='grey', fontweight='bold')
 
-    """
-    plt.axhline(y=decoys[migos_to_use].mean(), color="grey", linestyle="--")
-    plt.axhline(y=actives[migos_to_use].mean(), color="blue", linestyle="--")
+        """
+        plt.axhline(y=decoys[migos].mean(), color="grey", linestyle="--")
+        plt.axhline(y=actives[migos].mean(), color="blue", linestyle="--")
 
-    plt.ylim([0, 1.1])
+        plt.ylim([0, 1.1])
 
-    # plt.axhline(y=decoys['mixed'].mean(), color='grey', linestyle='--')
-    # plt.axhline(y=actives['mixed'].mean(), color='blue', linestyle='--')
+        # plt.axhline(y=decoys['mixed'].mean(), color='grey', linestyle='--')
+        # plt.axhline(y=actives['mixed'].mean(), color='blue', linestyle='--')
 
-    plt.legend(handles=handles, loc="lower right")
+        plt.legend(handles=handles, loc="lower right")
 
-    plt.xlabel("Normalized rDock")
-    plt.ylabel(migos_to_use)
-    plt.savefig(f"figs/dock_corr_{migos_to_use}.pdf", format="pdf")
-    plt.savefig(f"figs/dock_corr_{migos_to_use}.png", format="png")
-    plt.show()
-    pass
+        plt.xlabel("Normalized rDock")
+        plt.ylabel(score_to_name[migos])
+        # plt.savefig(f"figs/dock_corr_{migos}.pdf", format="pdf")
+        # plt.savefig(f"figs/dock_corr_{migos}.png", format="png")
+        plt.show()
+        pass
 
 
 def barcodes(grouped=True):
@@ -203,7 +209,7 @@ def train_sim_perf_plot(grouped=True):
     get_groups()
     rmscores = get_rmscores()
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", "rb"))
-    mixed_res = pd.read_csv(f"outputs/docknat_grouped_42.csv")
+    mixed_res = pd.read_csv(f"outputs/pockets/docknat_42.csv")
 
     fig, ax1 = plt.subplots()
 
@@ -648,7 +654,8 @@ def tsne(grouped=True):
 
 
 if __name__ == "__main__":
-    dock_correlation()
+    dock_correlation(mode="pockets")
     # sims()
     # barcodes()
     # tsne()
+    # train_sim_perf_plot()
