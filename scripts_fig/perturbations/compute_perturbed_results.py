@@ -109,9 +109,9 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     df_dock_aurocs, df_dock_raw, df_dock_ef = compute_efs_model(dock_model,
                                                                 dataloader=dataloader,
                                                                 lower_is_better=True)
-    df_dock_aurocs.to_csv(out_dir / (base_name + "_dock.csv"))
-    df_dock_raw.to_csv(out_dir / (base_name + "_dock_raw.csv"))
-    df_dock_ef.to_csv(out_dir / (base_name + "_dock_ef.csv"))
+    df_dock_aurocs.to_csv(out_dir / (base_name + f"_dock{'_chembl' if DECOYS == 'chembl' else ''}.csv"))
+    df_dock_raw.to_csv(out_dir / (base_name + f"_dock{'_chembl' if DECOYS == 'chembl' else ''}_raw.csv"))
+    df_dock_ef.to_csv(out_dir / (base_name + f"_dock{'_chembl' if DECOYS == 'chembl' else ''}_ef.csv"))
     # df_dock_raw = pd.read_csv(out_dir / (base_name + "_dock_raw.csv"))
 
     # Get native performance
@@ -122,9 +122,9 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     df_native_aurocs, df_native_raw, df_native_ef = compute_efs_model(native_model,
                                                                       dataloader=dataloader,
                                                                       lower_is_better=False)
-    df_native_aurocs.to_csv(out_dir / (base_name + "_native_sample.csv"))
-    df_native_raw.to_csv(out_dir / (base_name + "_native_sample_raw.csv"))
-    df_native_ef.to_csv(out_dir / (base_name + "_native_sample_ef.csv"))
+    df_native_aurocs.to_csv(out_dir / (base_name + f"_native{'_chembl' if DECOYS == 'chembl' else ''}_sample.csv"))
+    df_native_raw.to_csv(out_dir / (base_name + f"_native{'_chembl' if DECOYS == 'chembl' else ''}_sample_raw.csv"))
+    df_native_ef.to_csv(out_dir / (base_name + f"_native{'_chembl' if DECOYS == 'chembl' else ''}_sample_ef.csv"))
 
     # Now merge those two results to get a final mixed performance
     all_aurocs, mixed_df_aurocs, mixed_df_raw = mix_two_dfs(df_native_raw,
@@ -132,9 +132,9 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
                                                             score_1="raw_score",
                                                             outname_col="mixed")
     mixed_df_ef = raw_df_to_efs(mixed_df_raw, score='mixed')
-    mixed_df_aurocs.to_csv(out_dir / (base_name + "_mixed.csv"))
-    mixed_df_raw.to_csv(out_dir / (base_name + "_mixed_raw.csv"))
-    mixed_df_ef.to_csv(out_dir / (base_name + "_mixed_ef.csv"))
+    mixed_df_aurocs.to_csv(out_dir / (base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}.csv"))
+    mixed_df_raw.to_csv(out_dir / (base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}_raw.csv"))
+    mixed_df_ef.to_csv(out_dir / (base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}_ef.csv"))
     return np.mean(mixed_df_aurocs["score"].values)
 
 
@@ -200,7 +200,8 @@ def get_results_dfs(all_perturbed_pockets_path="figs/perturbations/perturbed",
             # out_csv_path = out_dir / (base_name + "_dock.csv")
             # out_csv_path = out_dir / (base_name + "_native_sample.csv")
             # out_csv_path = out_dir / (base_name + "_mixed.csv")
-            out_csv_path = out_dir / (base_name + f"_mixed{'_ef' if metric == 'ef' else ''}.csv")
+            out_csv_path = out_dir / (
+                    base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}{'_ef' if metric == 'ef' else ''}.csv")
         if recompute or not os.path.exists(out_csv_path):
             if ROBIN:
                 _ = get_perf_robin(pocket_path=perturbed_pocket_path)
@@ -295,11 +296,11 @@ def main_chembl():
     global ROBIN
     global DECOYS
     ROBIN = False
-    metric = "mar"
+    metric = "auroc"
     # metric = 'ef'
     # DECOYS = 'pdb'
     DECOYS = "chembl"
-    DECOYS = "pdb_chembl"
+    # DECOYS = "pdb_chembl"
     TEST_SYSTEMS = get_systems(
         target="is_native",
         rnamigos1_split=-2,
@@ -454,9 +455,7 @@ if __name__ == "__main__":
 
     ALL_POCKETS = [Path(f).stem for f in os.listdir("data/json_pockets_expanded")]
     ALL_POCKETS_GRAPHS = {
-        pocket_id: graph_io.load_json(
-            os.path.join("data/json_pockets_expanded", f"{pocket_id}.json")
-        )
+        pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
         for pocket_id in ALL_POCKETS
     }
 

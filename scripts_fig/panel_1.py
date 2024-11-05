@@ -28,26 +28,21 @@ def custom_diverging_palette(h_neg, h_pos, s_neg=75, s_pos=75, l_neg=50, l_pos=5
     return pal
 
 
-def barcodes(grouped=True):
-    # TEST SET
+def barcodes(transposed=False, decoy_mode = 'chembl'):
     name_runs = {
-        # r"\texttt{fp}": "fp_42.csv",
         "COMPAT": "native_42.csv",
         "AFF": "dock_42.csv",
         "rDock": "rdock.csv",
-        # r"\texttt{mixed}": "mixed_grouped_42.csv",
         "MIXED": "docknat_42.csv",
     }
+
     rows = []
     prev_pockets = None
     for csv_name in name_runs.values():
-        # print(m)
         df = pd.read_csv(f"outputs/pockets/{csv_name}")
-        if grouped:
-            df = group_df(df)
-        row = df[df['decoys'] == 'pdb_chembl'].sort_values(by='pocket_id')
+        df = group_df(df)
+        row = df[df['decoys'] == decoy_mode].sort_values(by='pocket_id')
         all_pockets = row['pocket_id'].values
-        print(csv_name)
         if prev_pockets is None:
             prev_pockets = all_pockets
         else:
@@ -55,20 +50,19 @@ def barcodes(grouped=True):
         rows.append(row['score'])
 
     # FIND SMOOTHER PERMUTED VERSION
-    smooth = True
-    # smooth = False
+    # smooth = True
+    smooth = False
     if smooth:
         order = get_smooth_order(prev_pockets)
         for i in range(len(rows)):
             new_row = rows[i].values[order]
             rows[i] = new_row
 
-    n_over = 25
+    n_over = 35
     # sns.heatmap(rows, cmap='binary_r')
     # cmap = sns.color_palette("vlag_r", as_cmap=True)
     # cmap = sns.diverging_palette(0, 245, s=100, l=50, as_cmap=True)
     # cmap = custom_diverging_palette(0, 245, s_neg=100, l_neg=50, s_pos=90, l_pos=80, as_cmap=True)
-    red_pal = sns.light_palette('#CF403E', reverse=True, n_colors=128 - n_over)
     # blue_pal = sns.light_palette('#5c67ff', n_colors=30)[:10] # too grey/violet
     # blue_pal = sns.light_palette('#9dabe1', n_colors=10) # a bit violet and also lot of color
     # blue_pal = sns.light_palette('#a5b0d9', n_colors=10) # close
@@ -76,94 +70,54 @@ def barcodes(grouped=True):
     # blue_pal = sns.light_palette('#ccd6ff', n_colors=10) # brighter less blue
     # blue_pal = sns.light_palette('#d6ecff', n_colors=10) # almost white
     # blue_pal = sns.light_palette('#ebf5ff', n_colors=10) # whiter
-    blue_pal = sns.light_palette('#fff', n_colors=n_over)  # white
     # blue_pal = sns.color_palette("light:b", n_colors=10) # hardcode blue
+    blue_pal = sns.light_palette('#fff', n_colors=n_over)  # white
+    red_pal = sns.light_palette('#CF403E', reverse=True, n_colors=128 - n_over)
     cmap = blend_palette(np.concatenate([red_pal, blue_pal]), 1, as_cmap=True)
 
+    if not transposed:
+        ax = sns.heatmap(rows, cmap=cmap)
+    else:
+        ax = sns.heatmap(np.array(rows).T, cmap=cmap)
+
     # Handle spine
-    ax = sns.heatmap(rows, cmap=cmap)
     for _, spine in ax.spines.items():
         spine.set_visible(True)
         spine.set_color('grey')
 
     # Handle ticks
-    xticks = np.arange(0, len(rows[0]), 10)
-    xticks_labels = xticks + 1
-    plt.xticks(xticks, xticks_labels, va="center")
-    plt.tick_params(axis='x', bottom=False, labelbottom=True)
-    plt.yticks(np.arange(len(name_runs)) + 0.5, [name for name in name_runs.keys()], rotation=0, va="center")
-    plt.tick_params(axis='y', left=False, right=False, labelleft=True)
+    if not transposed:
+        xticks = np.arange(0, len(rows[0]), 10)
+        xticks_labels = xticks + 1
+        plt.xticks(xticks, xticks_labels, va="center")
+        plt.tick_params(axis='x', bottom=False, labelbottom=True)
+        plt.yticks(np.arange(len(name_runs)) + 0.5, [name for name in name_runs.keys()], rotation=0, va="center")
+        plt.tick_params(axis='y', left=False, right=False, labelleft=True)
+    else:
+        plt.xticks(np.arange(len(name_runs)) + 0.5, [name for name in name_runs.keys()], rotation=0, va="center")
+        plt.tick_params(axis='x', bottom=False, labelbottom=True)
+        yticks = np.arange(0, len(rows[0]), 10)
+        yticks_labels = (yticks + 1)
+        # In heatmaps, id0 is at the top, it looks weird
+        yticks_positions = len(rows[0]) - yticks - 1
+        plt.yticks(yticks_positions, yticks_labels, va="center")
+        plt.tick_params(axis='y', left=False, labelleft=True)
 
-    # plotis is probably useless
-    # selected_pockets = set(pockets)
-    # test_index = np.array([name in selected_pockets for name in rmscores_labels])
-    # test_rmscores_labels = rmscores_labels[test_index]
-    # test_rmscores_values = rmscores_valu
-    plt.xlabel(r"Pocket")
-    plt.ylabel(r"Method")
-    plt.savefig("figs/barcode.pdf", bbox_inches='tight')
+    if not transposed:
+        plt.xlabel(r"Pocket")
+        plt.ylabel(r"Method")
+    else:
+        plt.xlabel(r"Method")
+        plt.ylabel(r"Pocket")
+
+    fig_name = f"figs/barcode{'_transposed' if transposed else ''}{'_chembl' if decoy_mode == 'chembl' else ''}.pdf"
+    plt.savefig(fig_name, bbox_inches='tight')
     plt.show()
-    pass
-
-
-def barcodes_transposed(grouped=True):
-    name_runs = {
-        # r"\texttt{fp}": "fp.csv",
-        r"\texttt{compat}": "native.csv",
-        r"\texttt{aff}": "dock.csv",
-        r"\texttt{rDock}": "rdock.csv",
-        # r"\texttt{mixed}": "mixed_grouped_42.csv",
-        r"\texttt{mixed}": "docknat_grouped_42.csv",
-    }
-    rows = []
-    prev_row = None
-    for csv_name in name_runs.values():
-        # print(m)
-        df = pd.read_csv(f"outputs/{csv_name}")
-        if grouped:
-            df = group_df(df)
-        row = df[df['decoys'] == 'chembl'].sort_values(by='pocket_id')
-        if prev_row is None:
-            prev_row = row['pocket_id'].values
-        else:
-            assert (prev_row == row['pocket_id'].values).all(), print(prev_row, row['pocket_id'].values)
-        rows.append(row['score'])
-    red_pal = sns.light_palette('#CF403E', reverse=True, n_colors=128 - 10)
-    blue_pal = sns.light_palette('#fff', n_colors=10)  # white
-    cmap = blend_palette(np.concatenate([red_pal, blue_pal]), 1, as_cmap=True)
-
-    # Handle spine
-    ax = sns.heatmap(np.array(rows).T, cmap=cmap)
-    for _, spine in ax.spines.items():
-        spine.set_visible(True)
-        spine.set_color('grey')
-
-    # Handle ticks
-    plt.xticks(np.arange(len(name_runs)) + 0.5, [name for name in name_runs.keys()], rotation=0, va="center")
-    plt.tick_params(axis='x', bottom=False, labelbottom=True)
-
-    yticks = np.arange(0, len(rows[0]), 10)
-    yticks_labels = (yticks + 1)
-    # In heatmaps, id0 is at the top, it looks weird
-    yticks_positions = len(rows[0]) - yticks - 1
-    plt.yticks(yticks_positions, yticks_labels, va="center")
-    plt.tick_params(axis='y', left=False, labelleft=True)
-
-    # plot
-    plt.xlabel(r"Method")
-    plt.ylabel(r"Pocket id")
-    plt.savefig("figs/barcode_transposed.pdf", bbox_inches='tight')
-    plt.show()
-
-
-""" VIOLINS """
-
-
-def violins():
-    pass
 
 
 if __name__ == "__main__":
-    grouped = True
-    barcodes(grouped=grouped)
-    # barcodes_transposed(grouped=grouped)
+    transposed = False
+    # transposed = True
+    # decoy_mode = 'pdb_chembl'
+    decoy_mode = 'chembl'
+    barcodes(transposed=transposed, decoy_mode=decoy_mode)
