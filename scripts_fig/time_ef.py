@@ -4,10 +4,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn import metrics
-import pickle
-import random
 
-from plot_utils import PALETTE_DICT, CustomScale, group_df
+from plot_utils import PALETTE_DICT, CustomScale
 
 
 def partial_virtual_screen(df, sort_up_to=0, score_column='rdock'):
@@ -23,10 +21,10 @@ def partial_virtual_screen(df, sort_up_to=0, score_column='rdock'):
     return enrich
 
 
-def build_auroc_df(out_csv='fig_script/time_auroc.csv', decoy='pdb_chembl', grouped=True, recompute=False):
+def build_auroc_df(out_csv='fig_script/time_auroc.csv', decoy='pdb_chembl', recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
-    big_df_raw = pd.read_csv(f'outputs/pockets/big_df{"_grouped" if grouped else ""}_42_raw.csv')
+    big_df_raw = pd.read_csv('outputs/pockets/big_df_42_raw.csv')
     big_df_raw = big_df_raw.loc[big_df_raw['decoys'] == decoy]
 
     big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
@@ -178,9 +176,10 @@ def plot_mean_std(ax, times, means, stds, label, color):
     ax.fill_between(times, means_low, means_high, alpha=0.2, color=color)
 
 
-def line_plot(df, mixed_model='combined', robin=False):
+def line_plot(df, mixed_model='combined', robin=False, decoy_mode='pdb_chembl'):
     # Get results
-    names = [r'\texttt{rDock}', f'{mixed_model}']
+    # names = [r'\texttt{rDock}', f'{mixed_model}']
+    names = [r'\texttt{rDock}', r'\texttt{RNAmigos++}']
     palette = [PALETTE_DICT['rdock'], PALETTE_DICT['mixed+rdock']]
     model_res = []
     # assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
@@ -196,30 +195,13 @@ def line_plot(df, mixed_model='combined', robin=False):
     plt.rc('grid', color='grey', alpha=0.2)
     plt.grid(True)
     ax = plt.gca()
-    ax.set_yscale('custom')
 
     times = np.linspace(0, 8.3, 20)
-    # # Add sole mixed performance
-    # CHEMBL results
-    # if mixed_model == 'combined':
-    #     mixed_means = [0.9898] * 20
-    # elif mixed_model == 'combined_docknat':
-    #     mixed_means = [0.9848] * 20
-    # elif mixed_model == 'combined_nat':
-    #     mixed_means = [0.9848] * 20
-    # else:
-    #     raise ValueError
-
-    # PDB CHEMBL results
-    # Add sole mixed performance
-    if mixed_model == 'combined':
-        mixed_means = [0.9848] * 20
-    elif mixed_model == 'rdocknat':
-        mixed_means = [0.896] * 20
-    else:
-        mixed_means = [0.850] * 20
-        print('Unexpected model, dashed line is confused')
     if not robin:
+        if decoy_mode == 'pdb_chembl':
+            mixed_means = [0.896] * 20
+        else:
+            mixed_means = [0.954] * 20
         ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'],
                 linestyle='--')
 
@@ -235,23 +217,25 @@ def line_plot(df, mixed_model='combined', robin=False):
 
     # Possible plot: Set y_lim to 0.99 and CustomScale to: offset=0.03, sup_lim=1
     # This shows how fast we go from mixed to mixed+rdock performance
-    yticks = [0.5, 0.7, 0.8, 0.9, 0.925, 0.94]
-    # yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
-    plt.gca().set_yticks(yticks)
-    if not robin:
+    ax.set_yscale('custom')
+    if decoy_mode == "pdb_chembl":
+        yticks = [0.5, 0.7, 0.8, 0.85, 0.9, 0.92, 0.94]
         plt.ylim(0.4, 0.94)
+    else:
+        yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
+        plt.ylim(0.45, 1.0)
+    plt.gca().set_yticks(yticks)
 
     plt.ylabel(r"AuROC")
     plt.xlabel(r"Time Limit (hours)")
     plt.legend(loc='lower right')
-    plt.savefig("figs/efficiency_line.pdf", format="pdf", bbox_inches='tight')
-    # plt.savefig("figs/efficiency_line_ylim.pdf", format="pdf", bbox_inches='tight')
+    fig_name = f"figs/efficiency_line{"_chembl" if decoy_mode == "chembl" else ""}.pdf"
+    plt.savefig(fig_name, format="pdf", bbox_inches='tight')
     plt.show()
-    pass
 
 
-def vax_plot(df, mixed_model='combined'):
-    ref = df.loc[df['model'] == 'rdock'].groupby(['pocket', 'seed']).apply(lambda group: np.trapz(group['ef']))
+def vax_plot(df, mixed_model='combined', decoy_mode='pdb_chembl'):
+    ref = df.loc[df['model'] == 'rdock'].groupby(['pocket', 'seed']).apply(lambda group: np.trapz(group['auroc']))
     ref_mean = ref.groupby('pocket').mean().reset_index()
     ref_std = ref.groupby('pocket').std().reset_index()
     ref_aucs = {p: {'mean': m, 'std': st} for p, m, st in zip(ref_mean['pocket'], ref_mean[0], ref_std[0])}
@@ -287,7 +271,6 @@ def vax_plot(df, mixed_model='combined'):
     # ax.axvline(x=np.median(efficiency_df['efficiency']), color='grey', linestyle='--')
 
     # Plot point and thick line for standard deviation
-
     # sns.pointplot(x='efficiency', y='pdbid', data=plot_df, dodge=True, markers='_', scale=0.5, color='black', ax=ax, orient='h')  # Adjust orient='h' for horizontal orientation
 
     # for i, group_name in enumerate(plot_df['pdbid'].unique()):
@@ -305,17 +288,21 @@ def vax_plot(df, mixed_model='combined'):
     ax.set_xlim([-20, 100])
     ax.set_yticks([])
     ax.grid(True)
-    plt.savefig("figs/efficiency_vax.pdf", format="pdf", bbox_inches='tight')
+    fig_name = f"figs/efficiency_vax{"_chembl" if decoy_mode == "chembl" else ""}.pdf"
+    plt.savefig(fig_name, bbox_inches='tight')
     plt.show()
     pass
 
 
 if __name__ == "__main__":
     # Build the time df for making the figures
-    out_csv = 'scripts_fig/time_auroc.csv'
     recompute = False
     # recompute = True
-    build_auroc_df(out_csv=out_csv, recompute=recompute)
+    decoy_mode = 'chembl'
+    # decoy_mode = 'pdb_chembl'
+    # FOR A NICE PLOT, one should also choose the right scale in plot_utils
+    out_csv = f'scripts_fig/time_auroc{"_chembl" if decoy_mode == "chembl" else ""}.csv'
+    build_auroc_df(out_csv=out_csv, recompute=recompute, decoy=decoy_mode)
 
     # out_csv_robin = 'scripts_fig/time_auroc_robin.csv'
     # recompute = False
@@ -327,8 +314,8 @@ if __name__ == "__main__":
     mixed_model = 'rdocknat'
     # mixed_model = 'docknat'
     # mixed_model = 'dock'
-    line_plot(df, mixed_model=mixed_model)
-    # vax_plot(df, mixed_model=mixed_model)
+    line_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)
+    vax_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)
 
     # df = pd.read_csv(out_csv_robin, index_col=0)
     # mixed_model = 'dock_rnafm_3'
