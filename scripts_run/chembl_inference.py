@@ -120,13 +120,15 @@ def get_perf_model(models, res_dir, decoy_modes=("pdb", "chembl", "pdb_chembl"),
 
         # Just printing the results
         # We need this special case for rdock
+        decoy = None
         if "decoys" in df_aurocs.columns:
-            df_aurocs = df_aurocs.loc[df_aurocs["decoys"] == decoy_modes[-1]]
-            df_aurocs_rognan = df_aurocs_rognan.loc[df_aurocs_rognan["decoys"] == decoy_modes[-1]]
+            decoy = decoy_modes[-1]
+            df_aurocs = df_aurocs.loc[df_aurocs["decoys"] == decoy]
+            df_aurocs_rognan = df_aurocs_rognan.loc[df_aurocs_rognan["decoys"] == decoy]
         test_auroc = np.mean(df_aurocs["score"].values)
         test_auroc_rognan = np.mean(df_aurocs_rognan["score"].values)
         gap_score = 2 * test_auroc - test_auroc_rognan
-        print(f"{model_name}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
+        print(f"{model_name}, {decoy}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
 
 
 def mix_all_chembl(pairs, res_dir, recompute=False):
@@ -258,8 +260,8 @@ def get_table_mixing():
 
 
 if __name__ == "__main__":
-    # DECOY = "pdb_chembl"
-    DECOY = 'chembl'
+    DECOY = "pdb_chembl"
+    # DECOY = 'chembl'
     GROUPED = True
     # SEEDS = [42]
     SEEDS = [0, 1, 42]

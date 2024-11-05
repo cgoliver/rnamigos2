@@ -58,7 +58,7 @@ def barcodes(transposed=False, decoy_mode = 'chembl'):
             new_row = rows[i].values[order]
             rows[i] = new_row
 
-    n_over = 35
+    n_over = 15
     # sns.heatmap(rows, cmap='binary_r')
     # cmap = sns.color_palette("vlag_r", as_cmap=True)
     # cmap = sns.diverging_palette(0, 245, s=100, l=50, as_cmap=True)

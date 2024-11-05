@@ -360,21 +360,28 @@ def main_chembl():
     # PLOT
     # plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple',metric=metric,
     #          label='soft 1')  # Plot soft perturbed
+    # colors = sns.dark_palette("#69d", n_colors=5, reverse=True)
+    # colors_2 = sns.light_palette("firebrick", n_colors=5, reverse=True)
+
     colors = sns.light_palette("royalblue", n_colors=5, reverse=True)
+    colors_2 = sns.light_palette("seagreen", n_colors=5, reverse=True)
     plot_list_partial = partial(plot_list, metric=metric, fractions=fractions,
                                 df_ref=DF_UNPERTURBED, plot_delta=False,
                                 filter_good=False, good_pockets=GOOD_POCKETS)
     plot_list_partial_color = partial(plot_list_partial, colors=colors)
+    end_plot_partial = partial(end_plot, fractions=fractions)
 
     # Actually plot
-    plot_list_partial_color(dfs=dfs_random, label="Random strategy")
-    end_plot()
-    plot_list_partial_color(dfs=dfs_hard, label="Hard strategy")
-    end_plot()
-    plot_list_partial(dfs_rognan_like, colors=["grey"], label="Rognan like")
-    plot_list_partial(dfs_rognan_true, colors=["black"], label="Rognan true")
-    plot_list_partial_color(dfs=dfs_soft, label="Soft strategy")
-    end_plot()
+    plot_list_partial(dfs=dfs_random, title="Random strategy", colors=colors_2)
+    fig_name = f"figs/perturbs_random{'_chembl' if DECOYS == 'chembl' else ''}.pdf"
+    end_plot_partial(colors=colors_2, fig_name=fig_name)
+    plot_list_partial(dfs=dfs_hard, title="Hard strategy", colors=colors_2)
+    fig_name = f"figs/perturbs_hard{'_chembl' if DECOYS == 'chembl' else ''}.pdf"
+    end_plot_partial(colors=colors_2, fig_name=fig_name)
+    # plot_list_partial(dfs_rognan_like, colors=["grey"], label="Rognan like")
+    # plot_list_partial(dfs_rognan_true, colors=["black"], label="Rognan true")
+    # plot_list_partial_color(dfs=dfs_soft, label="Soft strategy")
+    # end_plot_partial()
 
     # Compute plots with overlap
     # With soft strategy

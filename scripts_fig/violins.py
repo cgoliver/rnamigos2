@@ -46,7 +46,7 @@ big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
 rognan_dfs = [pd.read_csv(f"outputs/pockets/{f.replace('.csv', '_rognan.csv')}") for f in runs]
 rognan_dfs = [df.assign(name=names[i]) for i, df in enumerate(rognan_dfs)]
 rognan_dfs = pd.concat(rognan_dfs)
-rognan_dfs = rognan_dfs.loc[rognan_dfs ['decoys'] == decoy_mode].sort_values(by='score')
+rognan_dfs = rognan_dfs.loc[rognan_dfs['decoys'] == decoy_mode].sort_values(by='score')
 rognan_means = rognan_dfs.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 
 # This is to assess mean difference incurred by different groupings
@@ -174,12 +174,14 @@ sns.stripplot(x="name",
               y="score",
               order=names,
               jitter=0,
-              size=8,
+              size=10,
               palette=main_palette,
               marker="*",
-              edgecolor='black',
+              edgecolor='firebrick',
+              # edgecolor='black',
               linewidth=1.5,
               data=rognan_means)
+
 
 plt.ylim(lower - 0.02, 1.001)
 plt.xlabel("")
@@ -187,6 +189,6 @@ plt.ylabel("AuROC")
 plt.grid(True, which='both', axis='y')
 # Add vline to separate mixed from docking.
 plt.vlines(len(runs) - 2.5, 0.45, 1, colors='grey', linestyles=(0, (5, 10)))
-fig_name = f"figs/violins{'_chembl' if decoy_mode=='chembl' else ''}.pdf"
+fig_name = f"figs/violins{'_chembl' if decoy_mode == 'chembl' else ''}.pdf"
 plt.savefig(fig_name, bbox_inches='tight')
 plt.show()
