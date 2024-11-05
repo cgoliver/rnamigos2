@@ -143,8 +143,8 @@ def mix_all_chembl(pairs, res_dir, recompute=False):
         print(f"{outname}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
 
 
-def compute_mix_csvs():
-    def merge_csvs(to_mix, grouped=True):
+def compute_mix_csvs(recompute=False):
+    def merge_csvs(to_mix):
         """
         Aggregate rdock, native and dock results add mixing strategies
         """
@@ -154,8 +154,7 @@ def compute_mix_csvs():
             raw_dfs = [pd.read_csv(f"outputs/pockets/{r}_raw.csv") for r in to_mix]
             raw_dfs = [df.loc[df["decoys"] == decoy] for df in raw_dfs]
             raw_dfs = [df[["pocket_id", "smiles", "is_active", "raw_score"]] for df in raw_dfs]
-            if grouped:
-                raw_dfs = [group_df(df) for df in raw_dfs]
+            raw_dfs = [group_df(df) for df in raw_dfs]
 
             for df in raw_dfs:
                 df["smiles"] = df["smiles"].str.strip()
@@ -198,27 +197,31 @@ def compute_mix_csvs():
 
     for seed in SEEDS:
         for rognan in [True, False]:
-            # Combine the learnt methods and dump results
-            TO_MIX = [f'rdock{"_rognan" if rognan else ""}',
-                      f'dock_{seed}{"_rognan" if rognan else ""}',
-                      f'native_{seed}{"_rognan" if rognan else ""}']
-            big_df_raw = merge_csvs(to_mix=TO_MIX, grouped=GROUPED)
-            out_path_raw = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{seed}{"_rognan" if rognan else ""}_raw.csv'
-            big_df_raw.to_csv(out_path_raw)
+            out_path_raw = f'outputs/pockets/big_df_{seed}{"_rognan" if rognan else ""}_raw.csv'
+            if not os.path.exists(out_path_raw) or recompute:
+                # Combine the learnt methods and dump results
+                TO_MIX = [f'rdock{"_rognan" if rognan else ""}',
+                          f'dock_{seed}{"_rognan" if rognan else ""}',
+                          f'native_{seed}{"_rognan" if rognan else ""}']
+                big_df_raw = merge_csvs(to_mix=TO_MIX)
+                big_df_raw.to_csv(out_path_raw)
 
-            # Dump aurocs dataframes for newly combined methods
-            for method in ["docknat", "rdocknat", "combined"]:
-                outpath = f"outputs/pockets/{method}_{seed}{"_rognan" if rognan else ""}.csv"
-                unmix(big_df_raw, score=method, outpath=outpath)
+                # Dump aurocs dataframes for newly combined methods
+                for method in ["docknat", "rdocknat", "combined"]:
+                    outpath = f"outputs/pockets/{method}_{seed}{"_rognan" if rognan else ""}.csv"
+                    unmix(big_df_raw, score=method, outpath=outpath)
 
 
 def compute_all_self_mix():
     for i in range(len(SEEDS)):
         to_compare = i, (i + 1) % len(SEEDS)
-        out_path_raw_1 = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{SEEDS[to_compare[0]]}_raw.csv'
+        out_path_raw_1 = f'outputs/pockets/big_df_{SEEDS[to_compare[0]]}_raw.csv'
         big_df_raw_1 = pd.read_csv(out_path_raw_1)
-        out_path_raw_2 = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{SEEDS[to_compare[1]]}_raw.csv'
+        big_df_raw_1 = big_df_raw_1[big_df_raw_1["decoys"] == DECOY]
+
+        out_path_raw_2 = f'outputs/pockets/big_df_{SEEDS[to_compare[1]]}_raw.csv'
         big_df_raw_2 = pd.read_csv(out_path_raw_2)
+        big_df_raw_2 = big_df_raw_2[big_df_raw_2["decoys"] == DECOY]
         for score in ["native", "dock"]:
             all_aurocs, _, _ = mix_two_dfs(big_df_raw_1, big_df_raw_2, score)
             print(f"Self-mixing with {score}:", np.mean(all_aurocs))
@@ -245,17 +248,17 @@ def get_one_mixing_table(raw_df):
         print(f"{k:<20}:{v:.4f}")
 
 
-def get_table_mixing(decoy):
+def get_table_mixing():
     for seed in SEEDS:
-        out_path_raw = f'outputs/pockets/big_df{"_grouped" if GROUPED else ""}_{seed}_raw.csv'
+        out_path_raw = f'outputs/pockets/big_df_{seed}_raw.csv'
         big_df_raw = pd.read_csv(out_path_raw)
-        big_df_raw = big_df_raw[big_df_raw["decoys"] == decoy]
+        big_df_raw = big_df_raw[big_df_raw["decoys"] == DECOY]
         get_one_mixing_table(big_df_raw)
 
 
 if __name__ == "__main__":
-    DECOY = "pdb_chembl"
-    # DECOY = 'chembl'
+    # DECOY = "pdb_chembl"
+    DECOY = 'chembl'
     GROUPED = True
     # SEEDS = [42]
     SEEDS = [0, 1, 42]
@@ -263,6 +266,7 @@ if __name__ == "__main__":
     MODELS = {
         "dock_42": "dock/dock_42",
         "native_42": "is_native/native_42",
+        # "native_nornafm": "is_native/native_bce0.02_groupsample_nornafm",
         "dock_0": "dock/dock_0",
         "native_0": "is_native/native_0",
         "dock_1": "dock/dock_1",
@@ -272,7 +276,8 @@ if __name__ == "__main__":
 
     PAIRS = {
         ("rdock", "dock_42"): "dock_rdock",
-        ("native_42", "dock_42"): "rnamigos_42",
+        ("native_42", "dock_42"): "docknat_42",
+        # ("native_nornafm", "dock_42"): "docknat_nornafm_42",
         ("rnamigos_42", "rdock"): "combined_42",
         ("native_42", "rdock"): "rdocknat_42",
     }
@@ -287,10 +292,10 @@ if __name__ == "__main__":
     get_perf_model(models=MODELS, res_dir="outputs/pockets", reps_only=GROUPED, recompute=False)
 
     # PARSE INFERENCE CSVS AND MIX THEM
-    compute_mix_csvs()
+    compute_mix_csvs(recompute=False)
 
     # To compare to ensembling the same method with different seeds
     compute_all_self_mix()
 
     # Get table with all mixing
-    get_table_mixing(decoy=DECOY)
+    get_table_mixing()

@@ -262,10 +262,12 @@ if __name__ == "__main__":
     MODELS = {
         "dock_42": "dock/dock_42",
         "native_42": "is_native/native_42",
+        "native_nornafm": "is_native/native_bce0.02_groupsample_nornafm",
     }
     PAIRS = {
         ("rdock", "dock_42"): "dock_rdock",
         ("native_42", "dock_42"): "rnamigos_42",
+        ("native_nornafm", "dock_42"): "rnamigos_42_nornafm",
         ("rnamigos_42", "rdock"): "combined_42",
         ("native_42", "rdock"): "rdocknat_42",
     }
