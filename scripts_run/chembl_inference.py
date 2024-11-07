@@ -270,35 +270,35 @@ if __name__ == "__main__":
         "dock_42": "dock/dock_42",
         "native_42": "is_native/native_42",
         # "native_nornafm": "is_native/native_bce0.02_groupsample_nornafm",
-        "dock_0": "dock/dock_0",
-        "native_0": "is_native/native_0",
-        "dock_1": "dock/dock_1",
-        "native_1": "is_native/native_1",
+        # "dock_0": "dock/dock_0",
+        # "native_0": "is_native/native_0",
+        # "dock_1": "dock/dock_1",
+        # "native_1": "is_native/native_1",
     }
     RUNS = list(MODELS.keys())
 
     PAIRS = {
-        ("rdock", "dock_42"): "dock_rdock",
+        # ("rdock", "dock_42"): "dock_rdock",
         ("native_42", "dock_42"): "docknat_42",
         # ("native_nornafm", "dock_42"): "docknat_nornafm_42",
         ("rnamigos_42", "rdock"): "combined_42",
-        ("native_42", "rdock"): "rdocknat_42",
+        # ("native_42", "rdock"): "rdocknat_42",
     }
 
     # Just print perfs compared to Rognan, make inference on just one decoy
-    # res_dir = "outputs/pockets_quick_chembl" if DECOY == 'chembl' else "outputs/pockets_quick"
-    # get_perf_model(models={'rdock': 'rdock'}, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=False)
-    # get_perf_model(models=MODELS, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=False)
-    # mix_all_chembl(pairs=PAIRS, res_dir=res_dir, recompute=False)
+    res_dir = "outputs/pockets_quick_chembl" if DECOY == 'chembl' else "outputs/pockets_quick"
+    get_perf_model(models={'rdock': 'rdock'}, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=False)
+    get_perf_model(models=MODELS, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=True)
+    mix_all_chembl(pairs=PAIRS, res_dir=res_dir, recompute=False)
 
     # GET INFERENCE CSVS
-    get_perf_model(models=MODELS, res_dir="outputs/pockets", reps_only=GROUPED, recompute=False)
+    # get_perf_model(models=MODELS, res_dir="outputs/pockets", reps_only=GROUPED, recompute=False)
 
     # PARSE INFERENCE CSVS AND MIX THEM
-    compute_mix_csvs(recompute=False)
+    # compute_mix_csvs(recompute=False)
 
     # To compare to ensembling the same method with different seeds
-    compute_all_self_mix()
+    # compute_all_self_mix()
 
     # Get table with all mixing
-    get_table_mixing()
+    # get_table_mixing()

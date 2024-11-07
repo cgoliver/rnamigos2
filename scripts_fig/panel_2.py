@@ -12,6 +12,8 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import pickle
+
+import seaborn
 from rdkit import Chem, DataStructs
 from rdkit.Chem import MACCSkeys
 from scipy.spatial.distance import squareform, cdist
@@ -131,77 +133,6 @@ def dock_correlation(mode="pdbchembl"):
         pass
 
 
-def barcodes(grouped=True):
-    # TEST SET
-    name_runs = {
-        r"COMP": "native_42.csv",
-        r"AFF": "dock_42.csv",
-        r"rDock": "rdock.csv",
-        r"MIXED": "mixed_grouped_42.csv",
-    }
-    rows = []
-    prev_pockets = None
-    for csv_name in name_runs.values():
-        # print(m)
-        df = pd.read_csv(f"outputs/{csv_name}")
-        if grouped:
-            df = group_df(df)
-        row = df[df["decoys"] == "chembl"].sort_values(by="pocket_id")
-        all_pockets = row["pocket_id"].values
-        if prev_pockets is None:
-            prev_pockets = all_pockets
-        else:
-            assert (prev_pockets == all_pockets).all(), print(prev_pockets, all_pockets)
-        rows.append(row["score"])
-
-    # FIND SMOOTHER PERMUTED VERSION
-    order = get_smooth_order(prev_pockets)
-    for i in range(len(rows)):
-        new_row = rows[i].values[order]
-        rows[i] = new_row
-
-    # sns.heatmap(rows, cmap='binary_r')
-    # cmap = sns.color_palette("vlag_r", as_cmap=True)
-    # cmap = sns.diverging_palette(0, 245, s=100, l=50, as_cmap=True)
-    # cmap = custom_diverging_palette(0, 245, s_neg=100, l_neg=50, s_pos=90, l_pos=80, as_cmap=True)
-    red_pal = sns.light_palette("#CF403E", reverse=True, n_colors=128 - 10)
-    # blue_pal = sns.light_palette('#5c67ff', n_colors=30)[:10] # too grey/violet
-    # blue_pal = sns.light_palette('#9dabe1', n_colors=10) # a bit violet and also lot of color
-    # blue_pal = sns.light_palette('#a5b0d9', n_colors=10) # close
-    # blue_pal = sns.light_palette('#7689d5', n_colors=10) # nice blue but a bit dense
-    # blue_pal = sns.light_palette('#ccd6ff', n_colors=10) # brighter less blue
-    # blue_pal = sns.light_palette('#d6ecff', n_colors=10) # almost white
-    # blue_pal = sns.light_palette('#ebf5ff', n_colors=10) # whiter
-    blue_pal = sns.light_palette("#fff", n_colors=10)  # white
-    # blue_pal = sns.color_palette("light:b", n_colors=10) # hardcode blue
-    cmap = blend_palette(np.concatenate([red_pal, blue_pal]), 1, as_cmap=True)
-
-    # Handle spine
-    ax = sns.heatmap(rows, cmap=cmap)
-    for _, spine in ax.spines.items():
-        spine.set_visible(True)
-        spine.set_color("grey")
-
-    # Handle ticks
-    xticks = np.arange(0, len(rows[0]), 10)
-    xticks_labels = xticks + 1
-    plt.xticks(xticks, xticks_labels, va="center")
-    plt.tick_params(axis="x", bottom=False, labelbottom=True)
-    plt.yticks(np.arange(len(name_runs)) + 0.5, [name for name in name_runs.keys()], rotation=0, va="center")
-    plt.tick_params(axis="y", left=False, right=False, labelleft=True)
-
-    # plotis is probably useless
-    # selected_pockets = set(pockets)
-    # test_index = np.array([name in selected_pockets for name in rmscores_labels])
-    # test_rmscores_labels = rmscores_labels[test_index]
-    # test_rmscores_values = rmscores_valu
-    plt.xlabel(r"Pocket")
-    plt.ylabel(r"Method")
-    plt.savefig("figs/barcode.pdf", bbox_inches="tight")
-    plt.show()
-    pass
-
-
 def train_sim_perf_plot(grouped=True):
     """
     Make the scatter plot of performance as a function of similarity to train set
@@ -270,7 +201,8 @@ def get_predictions_pocket(pocket, scores, ref_ligs=None, percentile=0.01):
 
 
 def compute_pred_distances(
-    big_df_raw, out_name="outputs/pred_mixed_overlap_vincent.csv", percentile=0.01, recompute=False, plot_facet=False
+        big_df_raw, out_name="outputs/pred_mixed_overlap_vincent.csv", percentile=0.01, recompute=False,
+        plot_facet=False
 ):
     """
     Compute the pairwise distance between all pockets
@@ -361,13 +293,13 @@ def sims(grouped=True):
     # plt.rcParams['figure.figsize'] = (10, 5)
 
     # Get raw values
-    big_df_raw = pd.read_csv(f'outputs/big_df{"_grouped" if grouped else ""}_42_raw.csv')
+    big_df_raw = pd.read_csv(f'outputs/pockets/big_df_42_raw.csv')
     big_df_raw = big_df_raw[["pocket_id", "smiles", "is_active", "docknat"]]
     big_df_raw = big_df_raw.sort_values(by=["pocket_id", "smiles", "is_active"])
 
     test_pockets = sorted(big_df_raw["pocket_id"].unique())
-    for p in test_pockets:
-        print(p)
+    # for p in test_pockets:
+    #     print(p)
     pocket_pairs = list(itertools.combinations(test_pockets, 2))
 
     # Get smooth ordering
@@ -379,7 +311,6 @@ def sims(grouped=True):
         order = np.arange(len(test_pockets))
 
     # HEATMAPS
-
     # COMPUTE PDIST based on overlap of predictions
     out_name = "outputs/pred_mixed_overlap_vincent.csv"
     compute_pred_distances(big_df_raw=big_df_raw, out_name=out_name, percentile=0.1, recompute=False)
@@ -415,6 +346,44 @@ def sims(grouped=True):
     square_rms = squareform(rms)
     square_rms = square_rms[order][:, order]
 
+    # def toto():
+    #     # 1 build a distance matrix between test pockets centroids
+    #     # Careful, this is not the same as test_pocket that uses the random sample defined as group_df()
+    #     # This is defined in plot_utils.py get_groups()
+    #     _, _, _, grouped_test = pickle.load(open("data/train_test_75.p", "rb"))
+    #     test_pockets_toto = list(sorted(grouped_test.keys()))
+    #     pocket_pairs = list(itertools.combinations(test_pockets_toto, 2))
+    #     rms = [rmscores.loc[p1, p2] for p1, p2 in pocket_pairs]
+    #     square_rms = squareform(rms)
+    #     test_rms = pd.DataFrame(square_rms)
+    #     test_rms.columns = test_pockets_toto
+    #     test_rms.index = test_pockets_toto
+    #
+    #     # Then find the corresponding index for robin pockets
+    #     ROBIN_POCKETS = {
+    #         "TPP": "2GDI_Y_TPP_100",
+    #         "ZTP": "5BTP_A_AMZ_106",
+    #         "SAM_ll": "2QWY_B_SAM_300",
+    #         "PreQ1": "3FU2_A_PRF_101",
+    #     }
+    #     reverse_grouped = {pdb: cluster for cluster, pdbs in grouped_test.items() for pdb in pdbs}
+    #     robin_groups = {pocket: reverse_grouped[pocket] for pocket in ROBIN_POCKETS.values()}
+    #
+    #     # Finally compute scores
+    #     all_scores = []
+    #     for pocket, pocket_centroid in robin_groups.items():
+    #         scores = test_rms.loc[pocket_centroid].values
+    #         all_scores.append(pd.DataFrame({'scores': scores,
+    #                                         'pocket': [pocket for _ in scores]}))
+    #         a = 1
+    #     all_dists = pd.concat(all_scores, axis=0)
+    #     sns.kdeplot(data=all_dists,
+    #                  x="scores",
+    #                  hue="pocket",
+    #                  )
+    #     plt.show()
+    # toto()
+
     # plt.scatter(rms, corrs, alpha=0.7)
     # plt.xlabel("Pocket RM score")
     # plt.ylabel("Prediction Similarity")
@@ -424,7 +393,7 @@ def sims(grouped=True):
     # plt.show()
 
     ax = double_heatmap(corr1=square_corrs, corr2=square_rms, kwargs2={"vmax": 0.7, "vmin": 0.2})
-    plt.savefig("figs/rmscores_preds.pdf")
+    plt.savefig("figs/heatmap_rmscores_preds.pdf")
     plt.show()
 
     # COMPARE: jaccard vs fp sim of natives
@@ -438,7 +407,7 @@ def sims(grouped=True):
     square_tani = square_tani[order][:, order]
     palette_lig = sns.light_palette("yellowgreen", as_cmap=True)
     ax = double_heatmap(corr1=square_corrs, corr2=square_tani, kwargs2={"cmap": palette_lig})
-    plt.savefig("figs/tanimotos_preds.pdf")
+    plt.savefig("figs/heatmap_tanimotos_preds.pdf")
     plt.show()
 
     ax = double_heatmap(
@@ -447,7 +416,7 @@ def sims(grouped=True):
         kwargs1={"cmap": palette_lig},
         kwargs2={"cmap": sns.light_palette("royalblue"), "vmax": 0.7, "vmin": 0.2},
     )
-    plt.savefig("figs/rmscores_ligands.pdf")
+    plt.savefig("figs/heatmap_rmscores_ligands.pdf")
     plt.show()
 
     # plt.scatter(rms, corrs, alpha=0.7)
@@ -654,8 +623,7 @@ def tsne(grouped=True):
 
 
 if __name__ == "__main__":
-    dock_correlation(mode="pockets")
-    # sims()
-    # barcodes()
+    # dock_correlation(mode="pockets")
+    sims()
     # tsne()
     # train_sim_perf_plot()
