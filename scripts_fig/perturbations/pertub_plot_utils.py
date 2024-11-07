@@ -95,13 +95,13 @@ def end_plot(fractions, colors, fig_name=None):
 
     # Create handles with circles
     split_title = True
-    handles = [Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=10, label=i)
+    handles = [Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=10, label=i+1)
                for i, color in enumerate(colors[:4])]
     if not split_title:
         handles = [Line2D([0], [0], linestyle='None', label=r"Fraction $r$", markersize=0)] + handles
 
     if split_title:
-        plt.legend(handles=handles, loc="lower center", ncols=len(handles), title=r"Expansion radius $r$",
+        plt.legend(handles=handles, loc="lower center", ncols=len(handles), title=r"Number of hops $h$",
                    handletextpad=-0.5)
     else:
         plt.legend(handles=handles, loc="lower center", ncols=len(handles), handletextpad=0., columnspacing=0.1)
@@ -113,13 +113,15 @@ def end_plot(fractions, colors, fig_name=None):
     #            label=r'Original pockets', color=PALETTE_DICT['mixed'], linestyle='--')
     plt.hlines(y=95.4, xmin=min(fractions), xmax=max(fractions), linestyle="--",
                linewidth=2, color=PALETTE_DICT['mixed'])
+    t = r"\texttt{RNAmigos}"
+    plt.text(1.1, 94.5, t, color=PALETTE_DICT['mixed'], usetex=True, fontsize=20)
 
     plt.xlabel(r"Fraction of pocket")
     plt.ylabel(r"AuROC")
     plt.gca().set_xticks(ticks=fractions)
     plt.gca().set_yticks(ticks=[88 + 2 * i for i in range(4)] + [95.4])
-    plt.ylim(87, 96)
     sns.despine(left=False, bottom=False)
+    plt.ylim(87, 96)
     if fig_name is not None:
         plt.savefig(fig_name, bbox_inches='tight')
     plt.show()
