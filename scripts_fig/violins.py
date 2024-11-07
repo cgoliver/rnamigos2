@@ -45,9 +45,11 @@ big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
 # Get Rognan
 rognan_dfs = [pd.read_csv(f"outputs/pockets/{f.replace('.csv', '_rognan.csv')}") for f in runs]
 rognan_dfs = [df.assign(name=names[i]) for i, df in enumerate(rognan_dfs)]
+rognan_dfs = [group_df(df) for df in rognan_dfs]
 rognan_dfs = pd.concat(rognan_dfs)
 rognan_dfs = rognan_dfs.loc[rognan_dfs['decoys'] == decoy_mode].sort_values(by='score')
 rognan_means = rognan_dfs.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+print(rognan_means)
 
 # This is to assess mean difference incurred by different groupings
 # means_ungrouped = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
@@ -181,7 +183,6 @@ sns.stripplot(x="name",
               # edgecolor='black',
               linewidth=1.5,
               data=rognan_means)
-
 
 plt.ylim(lower - 0.02, 1.001)
 plt.xlabel("")
