@@ -27,7 +27,7 @@ if __name__ == "__main__":
 from scripts_fig.plot_utils import group_df, get_rmscores, get_smooth_order, rotate_2D_coords, get_groups
 
 
-def dock_correlation(mode="pdbchembl"):
+def dock_correlation(mode="pockets"):
     """
     Docking vs rnamigos score correlation
     """
@@ -35,6 +35,7 @@ def dock_correlation(mode="pdbchembl"):
     # big_df = pd.read_csv("outputs/pockets/big_df_grouped_42_raw.csv")
     df_path = "outputs/robin/big_df_raw.csv" if mode == "robin" else "outputs/pockets/big_df_grouped_42_raw.csv"
     big_df = pd.read_csv(df_path)
+    big_df = big_df.loc[big_df["decoys"] == "chembl"]
 
     dock_to_use = "dock_pocket_norm"  # raw_score_y
 
@@ -48,7 +49,7 @@ def dock_correlation(mode="pdbchembl"):
 
     for migos in migos_scores:
         # keep only test pockets outputs
-        if mode == "pdbchembl":
+        if mode == "pockets":
             big_df = big_df.loc[big_df["pocket_id"].isin(grouped_test.keys())]
         # normalize rDock scores
 
@@ -125,8 +126,8 @@ def dock_correlation(mode="pdbchembl"):
 
         plt.xlabel("Normalized rDock")
         plt.ylabel(score_to_name[migos])
-        # plt.savefig(f"figs/dock_corr_{migos}.pdf", format="pdf")
-        # plt.savefig(f"figs/dock_corr_{migos}.png", format="png")
+        plt.savefig(f"figs/dock_corr_{migos}.pdf", format="pdf")
+        plt.savefig(f"figs/dock_corr_{migos}.png", format="png")
         plt.show()
         pass
 
@@ -210,6 +211,7 @@ def train_sim_perf_plot(grouped=True):
     rmscores = get_rmscores()
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", "rb"))
     mixed_res = pd.read_csv(f"outputs/pockets/docknat_42.csv")
+    mixed_res = mixed_res.loc[mixed_res["decoys"] == "chembl"]
 
     fig, ax1 = plt.subplots()
 

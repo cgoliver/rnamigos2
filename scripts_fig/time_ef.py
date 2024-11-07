@@ -9,30 +9,38 @@ import random
 
 from plot_utils import PALETTE_DICT, CustomScale, group_df
 
+import matplotlib as mpl
 
-def partial_virtual_screen(df, sort_up_to=0, score_column='rdock'):
+# Set font to Arial or Helvetica, which are commonly used in Nature journals
+mpl.rcParams["font.family"] = "sans-serif"
+mpl.rcParams["font.sans-serif"] = ["Arial", "Helvetica", "DejaVu Sans"]  # Use Arial or fallback options
+mpl.rcParams["mathtext.fontset"] = "stixsans"  # Sans-serif font for math
+
+
+def partial_virtual_screen(df, sort_up_to=0, score_column="rdock"):
     df = df.reset_index(drop=True)
     sort_up_to = int(sort_up_to)
     if sort_up_to > 0:
         # Get the first values, sort them and reassign them back to the original DataFrame
         df[:sort_up_to] = df[:sort_up_to].sort_values(score_column, ascending=False).values
-    fpr, tpr, thresholds = metrics.roc_curve(df['is_active'],
-                                             1 - np.linspace(0, 1, num=len(df)),
-                                             drop_intermediate=True)
+    fpr, tpr, thresholds = metrics.roc_curve(
+        df["is_active"], 1 - np.linspace(0, 1, num=len(df)), drop_intermediate=True
+    )
     enrich = metrics.auc(fpr, tpr)
     return enrich
 
 
-def build_auroc_df(out_csv='fig_script/time_auroc.csv', decoy='pdb_chembl', grouped=True, recompute=False):
+def build_auroc_df(out_csv="fig_script/time_auroc.csv", decoy="pdb_chembl", grouped=True, recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
     big_df_raw = pd.read_csv(f'outputs/pockets/big_df{"_grouped" if grouped else ""}_42_raw.csv')
-    big_df_raw = big_df_raw.loc[big_df_raw['decoys'] == decoy]
+    big_df_raw = big_df_raw.loc[big_df_raw["decoys"] == decoy]
+    print(big_df_raw.columns)
 
-    big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
+    big_df_raw = big_df_raw.sort_values(by=["pocket_id", "smiles"])
 
     # Now iterate
-    pockets = big_df_raw['pocket_id'].unique()
+    pockets = big_df_raw["pocket_id"].unique()
     df_aurocs_rows = []
     nsteps = 20
     nshuffles = 10
@@ -41,115 +49,99 @@ def build_auroc_df(out_csv='fig_script/time_auroc.csv', decoy='pdb_chembl', grou
         #     continue
         if not pi % 20:
             print(f"Doing pocket {pi}/{len(pockets)}")
-        pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
+        pocket_df = big_df_raw.loc[big_df_raw["pocket_id"] == pocket]
 
         # RDOCK alone
         for n in range(nshuffles):
             # Shuffle
             pocket_df = pocket_df.sample(frac=1, random_state=n)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                aurocs = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
-                res = {'sort_up_to': i,
-                       'pocket': pocket,
-                       'auroc': aurocs,
-                       'model': 'rdock',
-                       'seed': n}
+                aurocs = partial_virtual_screen(pocket_df, sort_up_to, score_column="rdock")
+                res = {"sort_up_to": i, "pocket": pocket, "auroc": aurocs, "model": "rdock", "seed": n}
                 df_aurocs_rows.append(res)
 
         # Presort
-        for sort_col in ['dock', 'native', 'docknat']:
+        for sort_col in ["dock", "native", "docknat"]:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                aurocs = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
-                res = {'sort_up_to': i,
-                       'pocket': pocket,
-                       'auroc': aurocs,
-                       'model': sort_col,
-                       'seed': 0}
+                aurocs = partial_virtual_screen(pocket_df, sort_up_to, score_column="rdock")
+                res = {"sort_up_to": i, "pocket": pocket, "auroc": aurocs, "model": sort_col, "seed": 0}
                 df_aurocs_rows.append(res)
 
         # docknat+rdocknat
-        pocket_df = pocket_df.sort_values(by='docknat', ascending=False)
+        pocket_df = pocket_df.sort_values(by="docknat", ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='combined')
-            res = {'sort_up_to': i,
-                   'pocket': pocket,
-                   'auroc': auroc,
-                   'model': "rdocknat",
-                   'seed': 0}
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="combined")
+            res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": "rdocknat", "seed": 0}
             df_aurocs_rows.append(res)
     df = pd.DataFrame(df_aurocs_rows)
     df.to_csv(out_csv)
     return df
 
 
-def build_auroc_df_robin(out_csv='fig_script/time_auroc_robin.csv', recompute=False):
+def build_auroc_df_robin(out_csv="fig_script/time_auroc_robin.csv", recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
-    big_df_raw = pd.read_csv(f'outputs/robin/big_df_raw.csv')
-    big_df_raw = big_df_raw.sort_values(by=['pocket_id', 'smiles'])
+    big_df_raw = pd.read_csv(f"outputs/robin/big_df_raw.csv")
+    big_df_raw = big_df_raw.sort_values(by=["pocket_id", "smiles"])
 
     # Now iterate
-    pockets = big_df_raw['pocket_id'].unique()
+    pockets = big_df_raw["pocket_id"].unique()
     df_auroc_rows = []
     nsteps = 20
     nshuffles = 10
     for pi, pocket in enumerate(pockets):
-        print(f'Doing pocket {pi + 1}/{len(pockets)}')
-        pocket_df = big_df_raw.loc[big_df_raw['pocket_id'] == pocket]
+        print(f"Doing pocket {pi + 1}/{len(pockets)}")
+        pocket_df = big_df_raw.loc[big_df_raw["pocket_id"] == pocket]
 
         # RDOCK alone
         for n in range(nshuffles):
             # Shuffle
             pocket_df = pocket_df.sample(frac=1, random_state=n)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
-                res = {'sort_up_to': i,
-                       'pocket': pocket,
-                       'auroc': auroc,
-                       'model': 'rdock',
-                       'seed': n}
+                auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="rdock")
+                res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": "rdock", "seed": n}
                 df_auroc_rows.append(res)
 
         # Presort
-        for sort_col in ['dock_rnafm_3', 'native_validation', 'updated_rnamigos']:
+        for sort_col in ["rnamigos_42", "dock_42", "native_42"]:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-                auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='rdock')
-                res = {'sort_up_to': i,
-                       'pocket': pocket,
-                       'auroc': auroc,
-                       'model': sort_col,
-                       'seed': 0}
+                auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="rdock")
+                res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": sort_col, "seed": 0}
                 df_auroc_rows.append(res)
 
-        pocket_df = pocket_df.sort_values(by='updated_rnamigos', ascending=False)
+        # docknat+rdocknat
+        pocket_df = pocket_df.sort_values(by="rnamigos_42", ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_rdocknat')
-            res = {'sort_up_to': i,
-                   'pocket': pocket,
-                   'auroc': auroc,
-                   'model': "updated_rdocknat",
-                   'seed': 0}
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="combined_42")
+            res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": "combined", "seed": 0}
             df_auroc_rows.append(res)
 
-        pocket_df = pocket_df.sort_values(by='updated_rnamigos', ascending=False)
+        """
+        pocket_df = pocket_df.sort_values(by="updated_rnamigos", ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column='updated_combined')
-            res = {'sort_up_to': i,
-                   'pocket': pocket,
-                   'auroc': auroc,
-                   'model': "updated_combined",
-                   'seed': 0}
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="updated_rdocknat")
+            res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": "updated_rdocknat", "seed": 0}
             df_auroc_rows.append(res)
+
+        pocket_df = pocket_df.sort_values(by="updated_rnamigos", ascending=False)
+        for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="updated_combined")
+            res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": "updated_combined", "seed": 0}
+            df_auroc_rows.append(res)
+        """
 
     df = pd.DataFrame(df_auroc_rows)
     df.to_csv(out_csv)
     return df
 
 
-def get_means_stds(df, model):
-    model_df = df[df['model'] == model]
+def get_means_stds(df, model, pocket_id=None):
+    if pocket_id is None:
+        model_df = df[df["model"] == model]
+    else:
+        model_df = df.loc[(df["model"] == model) & (df["pocket"] == pocket_id)]
 
     # byhand
     # all_means = list()
@@ -161,11 +153,11 @@ def get_means_stds(df, model):
     #     all_means.append(mean)
     #     all_stds.append(std)
 
-    model_df_gb = model_df.groupby(['sort_up_to'], as_index=False)
-    model_df_gb = model_df.groupby(['sort_up_to'])
-    model_df_means = model_df_gb[['auroc']].mean().values.squeeze()
-    model_df_stds = model_df_gb[['auroc']].std().values.squeeze()
-    n_pockets = len(model_df['pocket'].unique())
+    model_df_gb = model_df.groupby(["sort_up_to"], as_index=False)
+    model_df_gb = model_df.groupby(["sort_up_to"])
+    model_df_means = model_df_gb[["auroc"]].mean().values.squeeze()
+    model_df_stds = model_df_gb[["auroc"]].std().values.squeeze()
+    n_pockets = len(model_df["pocket"].unique())
     model_df_stds = model_df_stds / np.sqrt(n_pockets)
     # model_df_stds = np.square(model_df_gb.std()[['auroc']].values.squeeze())
     return model_df_means, model_df_stds
@@ -178,25 +170,107 @@ def plot_mean_std(ax, times, means, stds, label, color):
     ax.fill_between(times, means_low, means_high, alpha=0.2, color=color)
 
 
-def line_plot(df, mixed_model='combined', robin=False):
+def line_plot_per_pocket(df, mixed_model="combined", robin=False):
     # Get results
-    names = [r'\texttt{rDock}', f'{mixed_model}']
-    palette = [PALETTE_DICT['rdock'], PALETTE_DICT['mixed+rdock']]
+    names = [r"\texttt{rDock}", f"{mixed_model}"]
+    palette = [PALETTE_DICT["rdock"], PALETTE_DICT["mixed+rdock"]]
+    # assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
+    all_models = ["rdock", mixed_model]
+
+    for pocket in df["pocket"].unique():
+        model_res = []
+        for model in all_models:
+            means, stds = get_means_stds(df, model, pocket_id=pocket)
+            model_res.append((means, stds))
+
+        # Set plot hparams
+        plt.rcParams.update({"font.size": 16})
+        # plt.rcParams["text.usetex"] = True
+        # plt.rc("grid", color="grey", alpha=0.2)
+        # plt.grid(True)
+        ax = plt.gca()
+        ax.set_yscale("custom")
+
+        times = np.linspace(0, 200, 20)
+        # # Add sole mixed performance
+        # CHEMBL results
+        # if mixed_model == 'combined':
+        #     mixed_means = [0.9898] * 20
+        # elif mixed_model == 'combined_docknat':
+        #     mixed_means = [0.9848] * 20
+        # elif mixed_model == 'combined_nat':
+        #     mixed_means = [0.9848] * 20
+        # else:
+        #     raise ValueError
+
+        # PDB CHEMBL results
+        # Add sole mixed performance
+        if mixed_model == "combined":
+            mixed_means = [0.9848] * 20
+        elif mixed_model == "rdocknat":
+            mixed_means = [0.896] * 20
+        else:
+            mixed_means = [0.850] * 20
+            print("Unexpected model, dashed line is confused")
+        if not robin:
+            ax.plot(
+                times,
+                mixed_means,
+                label=r"\texttt{RNAmigos2}",
+                linewidth=2,
+                color=PALETTE_DICT["mixed"],
+                linestyle="--",
+            )
+
+        for (means, stds), name, color in zip(model_res, names, palette):
+            plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
+
+        # Manage ticks
+        # xticks = [0, x_cross, 2, 4, 6, 8]
+        # xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
+        # xticks = [0, 2, 4, 6, 8]
+        # xticks_labels = ["0", "2", "4", "6", "8"]
+        # plt.gca().set_xticks(ticks=xticks, labels=xticks_labels)
+
+        # Possible plot: Set y_lim to 0.99 and CustomScale to: offset=0.03, sup_lim=1
+        # This shows how fast we go from mixed to mixed+rdock performance
+        yticks = [0.5, 0.7, 0.8, 0.9, 0.925, 0.94]
+        # yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
+        # plt.gca().set_yticks(yticks)
+        if not robin:
+            plt.ylim(0.4, 0.94)
+
+        plt.ylabel(r"AuROC")
+        plt.xlabel(r"Time Limit (CPU hours)")
+        plt.legend(loc="lower right")
+        plt.title(pocket)
+        sns.despine()
+        plt.savefig(f"figs/efficiency_line_{pocket}.pdf", format="pdf", bbox_inches="tight")
+        # plt.savefig("figs/efficiency_line_ylim.pdf", format="pdf", bbox_inches='tight')
+        plt.show()
+        pass
+
+
+def line_plot(df, mixed_model="combined", robin=False):
+    print(df)
+    # Get results
+    names = [r"\texttt{rDock}", f"{mixed_model}"]
+    palette = [PALETTE_DICT["rdock"], PALETTE_DICT["mixed+rdock"]]
     model_res = []
     # assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
-    all_models = ['rdock', mixed_model]
+    all_models = ["rdock", mixed_model]
 
     for model in all_models:
         means, stds = get_means_stds(df, model)
         model_res.append((means, stds))
 
     # Set plot hparams
-    plt.rcParams.update({'font.size': 16})
-    plt.rcParams['text.usetex'] = True
-    plt.rc('grid', color='grey', alpha=0.2)
+    plt.rcParams.update({"font.size": 16})
+    plt.rcParams["text.usetex"] = True
+    plt.rc("grid", color="grey", alpha=0.2)
     plt.grid(True)
     ax = plt.gca()
-    ax.set_yscale('custom')
+    ax.set_yscale("custom")
 
     times = np.linspace(0, 8.3, 20)
     # # Add sole mixed performance
@@ -212,16 +286,17 @@ def line_plot(df, mixed_model='combined', robin=False):
 
     # PDB CHEMBL results
     # Add sole mixed performance
-    if mixed_model == 'combined':
+    if mixed_model == "combined":
         mixed_means = [0.9848] * 20
-    elif mixed_model == 'rdocknat':
+    elif mixed_model == "rdocknat":
         mixed_means = [0.896] * 20
     else:
         mixed_means = [0.850] * 20
-        print('Unexpected model, dashed line is confused')
+        print("Unexpected model, dashed line is confused")
     if not robin:
-        ax.plot(times, mixed_means, label=r'\texttt{RNAmigos2}', linewidth=2, color=PALETTE_DICT['mixed'],
-                linestyle='--')
+        ax.plot(
+            times, mixed_means, label=r"\texttt{RNAmigos2}", linewidth=2, color=PALETTE_DICT["mixed"], linestyle="--"
+        )
 
     for (means, stds), name, color in zip(model_res, names, palette):
         plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
@@ -229,59 +304,67 @@ def line_plot(df, mixed_model='combined', robin=False):
     # Manage ticks
     # xticks = [0, x_cross, 2, 4, 6, 8]
     # xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
-    xticks = [0, 2, 4, 6, 8]
-    xticks_labels = ["0", "2", "4", "6", "8"]
-    plt.gca().set_xticks(ticks=xticks, labels=xticks_labels)
+    # xticks = [0, 2, 4, 6, 8]
+    # xticks_labels = ["0", "2", "4", "6", "8"]
+    # plt.gca().set_xticks(ticks=xticks, labels=xticks_labels)
 
     # Possible plot: Set y_lim to 0.99 and CustomScale to: offset=0.03, sup_lim=1
     # This shows how fast we go from mixed to mixed+rdock performance
     yticks = [0.5, 0.7, 0.8, 0.9, 0.925, 0.94]
     # yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
-    plt.gca().set_yticks(yticks)
+    # plt.gca().set_yticks(yticks)
     if not robin:
         plt.ylim(0.4, 0.94)
 
     plt.ylabel(r"AuROC")
     plt.xlabel(r"Time Limit (hours)")
-    plt.legend(loc='lower right')
-    plt.savefig("figs/efficiency_line.pdf", format="pdf", bbox_inches='tight')
+    plt.legend(loc="lower right")
+    plt.savefig("figs/efficiency_line.pdf", format="pdf", bbox_inches="tight")
     # plt.savefig("figs/efficiency_line_ylim.pdf", format="pdf", bbox_inches='tight')
     plt.show()
     pass
 
 
-def vax_plot(df, mixed_model='combined'):
-    ref = df.loc[df['model'] == 'rdock'].groupby(['pocket', 'seed']).apply(lambda group: np.trapz(group['ef']))
-    ref_mean = ref.groupby('pocket').mean().reset_index()
-    ref_std = ref.groupby('pocket').std().reset_index()
-    ref_aucs = {p: {'mean': m, 'std': st} for p, m, st in zip(ref_mean['pocket'], ref_mean[0], ref_std[0])}
-    efficiency_df = df.groupby(['pocket', 'model', 'seed']).apply(
-        lambda group: np.trapz(group['auroc']) / ref_aucs[group.name[0]]['mean']).reset_index().rename(
-        columns={0: 'efficiency'})
+def vax_plot(df, mixed_model="combined"):
+    ref = df.loc[df["model"] == "rdock"].groupby(["pocket", "seed"]).apply(lambda group: np.trapz(group["auroc"]))
+    ref_mean = ref.groupby("pocket").mean().reset_index()
+    ref_std = ref.groupby("pocket").std().reset_index()
+    ref_aucs = {p: {"mean": m, "std": st} for p, m, st in zip(ref_mean["pocket"], ref_mean[0], ref_std[0])}
+    efficiency_df = (
+        df.groupby(["pocket", "model", "seed"])
+        .apply(lambda group: np.trapz(group["auroc"]) / ref_aucs[group.name[0]]["mean"])
+        .reset_index()
+        .rename(columns={0: "efficiency"})
+    )
     # efficiency_df_agg = efficiency_df.groupby(['model', 'pocket']).mean().reset_index().rename(columns={0: 'efficiency_mean'})
     # efficiency_df_agg['efficiency_std'] = efficiency_df.groupby(['model', 'pocket']).std().reset_index().rename(columns={0: 'efficiency_std'})['efficiency_std']
-    efficiency_df['pdbid'] = efficiency_df['pocket'].apply(lambda x: x.split("_")[0])
-    efficiency_df['ligand'] = efficiency_df['pocket'].apply(lambda x: x.split("_")[2])
+    efficiency_df["pdbid"] = efficiency_df["pocket"].apply(lambda x: x.split("_")[0])
+    efficiency_df["ligand"] = efficiency_df["pocket"].apply(lambda x: x.split("_")[2])
 
-    efficiency_df['efficiency'] = efficiency_df['efficiency'] - 1.0
-    efficiency_df['efficiency'] *= 100
+    efficiency_df["efficiency"] = efficiency_df["efficiency"] - 1.0
+    efficiency_df["efficiency"] *= 100
 
-    plt.rcParams.update({'font.size': 16})
-    plt.rcParams['text.usetex'] = True
-    plt.rc('grid', color='grey', alpha=0.2)
+    plt.rcParams.update({"font.size": 16})
+    plt.rcParams["text.usetex"] = True
+    plt.rc("grid", color="grey", alpha=0.2)
 
     # strategy = 'RNAmigos2.0'
-    plot_df = efficiency_df.loc[efficiency_df['model'] == mixed_model]
-    plot_df = plot_df.sort_values(by='efficiency', ascending=False).reset_index()
+    plot_df = efficiency_df.loc[efficiency_df["model"] == mixed_model]
+    plot_df = plot_df.sort_values(by="efficiency", ascending=False).reset_index()
 
     # sns.set(style="whitegrid")  # Optional: Set the style of the plot
-    ax = sns.pointplot(data=plot_df, y='pdbid', x='efficiency', linestyle='none',
-                       errorbar='sd', color=PALETTE_DICT['mixed+rdock'],
-                       linewidth=1.4,
-                       # alpha=0.9,
-                       # scale=0.5,
-                       )
-    ax.axvline(x=0.0, color='red', linestyle='--', label="No effect", linewidth=2)
+    ax = sns.pointplot(
+        data=plot_df,
+        y="pdbid",
+        x="efficiency",
+        linestyle="none",
+        errorbar="sd",
+        color=PALETTE_DICT["mixed+rdock"],
+        linewidth=1.4,
+        # alpha=0.9,
+        # scale=0.5,
+    )
+    ax.axvline(x=0.0, color="red", linestyle="--", label="No effect", linewidth=2)
     ax.legend(loc="lower right")
     # sns.despine()
     # ax.axvline(x=np.median(efficiency_df['efficiency']), color='grey', linestyle='--')
@@ -298,36 +381,39 @@ def vax_plot(df, mixed_model='combined'):
 
     # Set plot title and labels
     for path in ax.collections:
-        path.set(color='steelblue', zorder=10)
+        path.set(color="steelblue", zorder=10)
     # ax.set_title(f"{strategy}")
     ax.set_ylabel(r"Pocket")
     ax.set_xlabel(r"Efficiency Gain (\%)")
     ax.set_xlim([-20, 100])
+    ax.set_xlim([-20, 50])
     ax.set_yticks([])
     ax.grid(True)
-    plt.savefig("figs/efficiency_vax.pdf", format="pdf", bbox_inches='tight')
+    plt.savefig("figs/efficiency_vax.pdf", format="pdf", bbox_inches="tight")
     plt.show()
     pass
 
 
 if __name__ == "__main__":
     # Build the time df for making the figures
-    out_csv = 'scripts_fig/time_auroc.csv'
+    out_csv = "scripts_fig/time_auroc.csv"
     recompute = False
     # recompute = True
-    build_auroc_df(out_csv=out_csv, recompute=recompute)
+    # build_auroc_df(out_csv=out_csv, recompute=recompute)
 
-    # out_csv_robin = 'scripts_fig/time_auroc_robin.csv'
+    out_csv_robin = "scripts_fig/time_auroc_robin.csv"
     # recompute = False
-    # # recompute = True
-    # build_auroc_df_robin(out_csv=out_csv_robin, recompute=recompute)
+    recompute = True
+    build_auroc_df_robin(out_csv=out_csv_robin, recompute=recompute)
 
     # Then make plots
-    df = pd.read_csv(out_csv, index_col=0)
-    mixed_model = 'rdocknat'
+    df = pd.read_csv(out_csv_robin, index_col=0)
+    # mixed_model = "rnamigos_42"
+    mixed_model = "combined"
     # mixed_model = 'docknat'
     # mixed_model = 'dock'
-    line_plot(df, mixed_model=mixed_model)
+    # line_plot(df, mixed_model=mixed_model, robin=True)
+    line_plot_per_pocket(df, mixed_model=mixed_model, robin=True)
     # vax_plot(df, mixed_model=mixed_model)
 
     # df = pd.read_csv(out_csv_robin, index_col=0)

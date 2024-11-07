@@ -263,11 +263,14 @@ if __name__ == "__main__":
     MODELS = {
         "dock_42": "dock/dock_42",
         "native_42": "is_native/native_42",
+        "native_bce0.02": "is_native/native_bce0.02",
     }
     PAIRS = {
         ("rdock", "dock_42"): "dock_rdock",
         ("native_42", "dock_42"): "rnamigos_42",
+        ("native_bce0.02", "dock_42"): "rnamigos_bce0.02",
         ("rnamigos_42", "rdock"): "combined_42",
+        ("rnamigos_bce0.02", "rdock"): "combined_bce0.02",
         ("native_42", "rdock"): "rdocknat_42",
     }
     SWAP = 0
@@ -283,13 +286,11 @@ if __name__ == "__main__":
 
     res_dir = "outputs/robin" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
     # GET ALL CSVs for the models and plot them
-    """
-    get_all_csvs(recompute=False, swap=SWAP)
+    get_all_csvs(recompute=True, swap=SWAP)
     get_dfs_docking(swap=SWAP)
-    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=False)
-    get_merged_df(recompute=False, swap=SWAP)
+    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=True)
+    get_merged_df(recompute=True, swap=SWAP)
     print_results(swap=SWAP)
-    """
 
     # COMPUTE PERTURBED VERSIONS
     for swap in range(1, 4):

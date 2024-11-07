@@ -20,6 +20,13 @@ if __name__ == "__main__":
 from scripts_fig.plot_utils import PALETTE_DICT, group_df
 from rnamigos.utils.virtual_screen import get_auroc
 
+import matplotlib as mpl
+
+# Set font to Arial or Helvetica, which are commonly used in Nature journals
+mpl.rcParams["font.family"] = "sans-serif"
+mpl.rcParams["font.sans-serif"] = ["Arial", "Helvetica", "DejaVu Sans"]  # Use Arial or fallback options
+mpl.rcParams["mathtext.fontset"] = "stixsans"  # Sans-serif font for math
+
 
 def enrichment_factor(scores, is_active, frac=0.01):
     """
@@ -121,11 +128,13 @@ def get_dfs_docking(ligand_name):
     return merged
 
 
-def get_dfs_migos(df_path, pocket_name, swap=False, normalize=False):
+def get_dfs_migos(df_path, pocket_name, swap=False, normalize=False, top_pct=None):
     df = pd.read_csv(df_path)
     df = df.loc[df["pocket_id"] == pocket_name]
+    if top_pct:
+        thresh = df["raw_score"].quantile(top_pct)
+        df = df.loc[df["raw_score"] > thresh]
     return df
-    pass
 
 
 def get_dfs_migos_(pocket_name, swap=False, swap_on="merged", normalize=False):
@@ -217,13 +226,17 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
             linewidth=0,
             common_norm=False,
         )
-        decoy_xx, decoy_yy = g.lines[1].get_data()
-        ax.fill_between(decoy_xx, 0, decoy_yy, color="lightgrey", alpha=0.5)
-        # ax.plot(decoy_xx, decoy_yy, color='white', alpha=0.9)
         xx, yy = g.lines[0].get_data()
+        decoy_xx, decoy_yy = g.lines[1].get_data()
         # ax.fill_between(xx, 0, yy, color=colors[i], alpha=0.1)
         ax.plot(xx, yy, color=colors[i], alpha=1, linewidth=1.5)
-        ax.set_xlim([0.3, 1])
+        thresh = df["raw_score"].quantile(0.8)
+        ax.set_xlim([thresh, 1])
+
+        fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df["raw_score"])
+        auroc = metrics.auc(fpr, tpr)
+        t_stat, p_value = stats.ttest_ind(df[df["is_active"] == 1]["raw_score"], df[df["is_active"] == 0]["raw_score"])
+        print(p_value)
 
         for _, frac in enumerate(fracs):
             ef, thresh = enrichment_factor(scores=df["raw_score"], is_active=df["is_active"], frac=frac)
@@ -233,6 +246,8 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
                     "ef": ef,
                     "thresh": f"{frac * 100:.0f}",
                     "score": Path(model_output).stem,
+                    "auroc": auroc,
+                    "p_value": p_value,
                 }
             )
 
@@ -246,7 +261,7 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
                     0,
                     y_tail,
                     color=colors[i],
-                    alpha=0.25,
+                    alpha=0.15,
                 )
 
             else:
@@ -270,19 +285,21 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
 
             offset += 0.05
 
+        ax.fill_between(decoy_xx, 0, decoy_yy, color="lightgrey", alpha=0.8)
+        # ax.plot(decoy_xx, decoy_yy, color='white', alpha=0.9)
         ef, thresh = enrichment_factor(scores=df["raw_score"], is_active=df["is_active"], frac=default_frac)
         all_efs.append(ef)
         print(f"EF@{frac} : ", pocket_name, ef)
         # GET AUROC
-        fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df["raw_score"])
-        auroc = metrics.auc(fpr, tpr)
-        t_stat, p_value = stats.ttest_ind(df["is_active"], df["raw_score"])
 
         print(p_value)
         all_aurocs.append(auroc)
 
         ax.set_title(f"{pocket_name} AuROC: {auroc:.2f} \n p={p_value:.2e}")
         g.legend().remove()
+        xticks = ax.get_xticks()
+        # ax.set_xticks(xticks)
+        # ax.set_xticklabels(np.linspace(80, 100, len(xticks)))
         sns.despine()
         plt.tight_layout()
         plt.savefig(f"figs/panel_3_{prefix}_{pocket_to_id[pocket_name]}.pdf", format="pdf")
@@ -322,12 +339,27 @@ def make_table(df):
     pass
 
 
+def make_table_auroc(df):
+    df = df.rename(columns={"auroc": "AuROC"})
+    df = df.replace("dock_nat", "RNAmigos2")
+    df = df.replace("is_native", "Compat")
+    df = df.replace("dock", "Aff")
+    table = pd.pivot_table(
+        df,
+        values=["AuROC"],
+        index=["pocket", "score"],
+    )
+    print(table.to_latex(float_format="{:.2f}".format))
+    pass
+
+
 if __name__ == "__main__":
 
     dfs = []
     # for score in ["dock_nat", "is_native", "dock", "rDock", "RNAmigos2++"]:
     #    dfs.append(make_fig(score, prefix=f"repro_{score}", normalize_migos=True))
-    for model in ["rnamigos_42", "rdock", "combined_42"]:
+    for model in ["rnamigos_42", "rdock"]:
         df_path = Path("outputs/robin") / f"{model}_raw.csv"
         dfs.append(make_fig(df_path, prefix=f"resubmit_{model}", normalize_migos=True))
     make_table(pd.concat(dfs))
+    make_table_auroc(pd.concat(dfs))

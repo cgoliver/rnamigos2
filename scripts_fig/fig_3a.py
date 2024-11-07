@@ -60,8 +60,7 @@ def merge_raw_dfs():
 def plot(df):
     df = df.loc[df["pocket_id"].isin(grouped_test)]
     df = df.loc[df["is_active"] > 0]
-
-    print(df.groupby(["method"])["normed_score"].mean())
+    df = df.loc[df["decoys"] == "pdb_chembl"]
 
     custom_palette_bar = {
         method: "#e9e9f8" if method.startswith("RNAmigos") else "#d3d3d3" for method in df["method"].unique()
