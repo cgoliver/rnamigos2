@@ -172,24 +172,24 @@ def compute_mix_csvs(recompute=False):
             big_df_raw = big_df_raw.merge(raw_dfs[0], on=["pocket_id", "smiles", "is_active"], how="inner")
             big_df_raw = big_df_raw[["pocket_id", "smiles", "is_active", "rdock", "dock", "native"]]
 
-            _, _, raw_df_docknat = mix_two_scores(
-                big_df_raw, score1="dock", score2="native", outname_col="docknat", add_decoy=False
-            )
+            def smaller_merge(df, score1, score2, outname):
+                return mix_two_scores(df,
+                                      score1=score1,
+                                      score2=score2,
+                                      outname_col=outname,
+                                      use_max=True,
+                                      add_decoy=False)[2]
+
+            raw_df_docknat = smaller_merge(big_df_raw, "dock", "native", "docknat")
             big_df_raw = big_df_raw.merge(raw_df_docknat, on=["pocket_id", "smiles", "is_active"], how="outer")
 
-            _, _, raw_df_rdocknat = mix_two_scores(
-                big_df_raw, score1="rdock", score2="native", outname_col="rdocknat", add_decoy=False
-            )
+            raw_df_rdocknat = smaller_merge(big_df_raw, "rdock", "native", "rdocknat")
             big_df_raw = big_df_raw.merge(raw_df_rdocknat, on=["pocket_id", "smiles", "is_active"], how="outer")
 
-            _, _, raw_df_combined = mix_two_scores(
-                big_df_raw, score1="docknat", score2="rdock", outname_col="combined", add_decoy=False
-            )
+            raw_df_combined = smaller_merge(big_df_raw, "docknat", "rdock", "combined")
             big_df_raw = big_df_raw.merge(raw_df_combined, on=["pocket_id", "smiles", "is_active"], how="outer")
 
-            _, _, raw_df_rdockdock = mix_two_scores(
-                big_df_raw, score1="dock", score2="rdock", outname_col="rdockdock", add_decoy=False
-            )
+            raw_df_rdockdock = smaller_merge(big_df_raw,"dock","rdock","rdockdock")
             big_df_raw = big_df_raw.merge(raw_df_rdockdock, on=["pocket_id", "smiles", "is_active"], how="outer")
 
             dumb_decoy = [decoy for _ in range(len(big_df_raw))]
@@ -211,7 +211,7 @@ def compute_mix_csvs(recompute=False):
 
                 # Dump aurocs dataframes for newly combined methods
                 for method in ["docknat", "rdocknat", "combined"]:
-                    outpath = f"outputs/pockets/{method}_{seed}{"_rognan" if rognan else ""}.csv"
+                    outpath = f"outputs/pockets/{method}_{seed}{'_rognan' if rognan else ''}.csv"
                     unmix(big_df_raw, score=method, outpath=outpath)
 
 
@@ -260,11 +260,11 @@ def get_table_mixing():
 
 
 if __name__ == "__main__":
-    DECOY = "pdb_chembl"
-    # DECOY = 'chembl'
+    # DECOY = "pdb_chembl"
+    DECOY = 'chembl'
     GROUPED = True
-    # SEEDS = [42]
-    SEEDS = [0, 1, 42]
+    SEEDS = [42]
+    # SEEDS = [0, 1, 42]
 
     MODELS = {
         "dock_42": "dock/dock_42",
@@ -282,20 +282,24 @@ if __name__ == "__main__":
         ("native_42", "dock_42"): "docknat_42",
         # ("native_nornafm", "dock_42"): "docknat_nornafm_42",
         ("rnamigos_42", "rdock"): "combined_42",
-        # ("native_42", "rdock"): "rdocknat_42",
+        # ("native_42", "dock_42"): "docknat_42",
     }
 
     # Just print perfs compared to Rognan, make inference on just one decoy
-    res_dir = "outputs/pockets_quick_chembl" if DECOY == 'chembl' else "outputs/pockets_quick"
-    get_perf_model(models={'rdock': 'rdock'}, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=False)
-    get_perf_model(models=MODELS, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=True)
-    mix_all_chembl(pairs=PAIRS, res_dir=res_dir, recompute=False)
+    # res_dir = "outputs/pockets_quick_chembl" if DECOY == 'chembl' else "outputs/pockets_quick"
+    # get_perf_model(models={'rdock': 'rdock'}, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=False)
+    # get_perf_model(models=MODELS, res_dir=res_dir, decoy_modes=(DECOY,), reps_only=GROUPED, recompute=True)
+    # mix_all_chembl(pairs=PAIRS, res_dir=res_dir, recompute=False)
 
     # GET INFERENCE CSVS
-    # get_perf_model(models=MODELS, res_dir="outputs/pockets", reps_only=GROUPED, recompute=False)
+    decoys = ("pdb", "chembl", "pdb_chembl") if DECOY != 'chembl' else ("pdb", "pdb_chembl", "chembl")
+    get_perf_model(models=MODELS, res_dir="outputs/pockets",
+                   decoy_modes=decoys,
+                   reps_only=GROUPED,
+                   recompute=False)
 
     # PARSE INFERENCE CSVS AND MIX THEM
-    # compute_mix_csvs(recompute=False)
+    compute_mix_csvs(recompute=True)
 
     # To compare to ensembling the same method with different seeds
     # compute_all_self_mix()

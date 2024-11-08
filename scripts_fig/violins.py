@@ -18,6 +18,7 @@ name_runs = {
     r"rDock": "rdock.csv",
     r"MIXED": "docknat_42.csv",
     r"MIXED+rDock": "combined_42.csv",
+    # r"COMPAT+rDock": "rdocknat_42.csv",
 }
 
 main_palette = [
@@ -26,7 +27,9 @@ main_palette = [
     PALETTE_DICT['dock'],
     PALETTE_DICT['rdock'],
     PALETTE_DICT['mixed'],
-    PALETTE_DICT['mixed+rdock']]
+    PALETTE_DICT['mixed+rdock'],
+    PALETTE_DICT['mixed+rdock'],
+]
 # violin_palette = PALETTE + PALETTE
 names = list(name_runs.keys())
 runs = list(name_runs.values())

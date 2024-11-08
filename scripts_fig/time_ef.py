@@ -322,25 +322,18 @@ def line_plot(df, mixed_model="combined", robin=False, decoy_mode="pdb_chembl"):
         ax.set_yscale("custom")
     if decoy_mode == "pdb_chembl":
         yticks = [0.5, 0.7, 0.8, 0.85, 0.9, 0.92, 0.94]
-    plt.legend(loc="lower right")
-    plt.savefig("figs/efficiency_line.pdf", format="pdf", bbox_inches="tight")
-    # plt.savefig("figs/efficiency_line_ylim.pdf", format="pdf", bbox_inches='tight')
+        plt.ylim(0.4, 0.94)
+    else:
+        yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
+        plt.ylim(0.45, 1.0)
+    plt.gca().set_yticks(yticks)
+
+    plt.ylabel(r"AuROC")
+    plt.xlabel(r"Time Limit (hours)")
     plt.legend(loc="lower right")
     fig_name = f"figs/efficiency_line{'_chembl' if decoy_mode == 'chembl' else ''}.pdf"
     plt.savefig(fig_name, format="pdf", bbox_inches="tight")
-
-
-def vax_plot(df, mixed_model="combined"):
-    ref = df.loc[df["model"] == "rdock"].groupby(["pocket", "seed"]).apply(lambda group: np.trapz(group["auroc"]))
-    ref_mean = ref.groupby("pocket").mean().reset_index()
-    ref_std = ref.groupby("pocket").std().reset_index()
-    ref_aucs = {p: {"mean": m, "std": st} for p, m, st in zip(ref_mean["pocket"], ref_mean[0], ref_std[0])}
-    efficiency_df = (
-        df.groupby(["pocket", "model", "seed"])
-        .apply(lambda group: np.trapz(group["auroc"]) / ref_aucs[group.name[0]]["mean"])
-        .reset_index()
-        .rename(columns={0: "efficiency"})
-    )
+    plt.show()
 
 
 def vax_plot(df, mixed_model="combined", decoy_mode="pdb_chembl"):
@@ -414,8 +407,8 @@ def vax_plot(df, mixed_model="combined", decoy_mode="pdb_chembl"):
 
 if __name__ == "__main__":
     # Build the time df for making the figures
+    # recompute = False
     recompute = False
-    # recompute = True
     decoy_mode = "chembl"
     # decoy_mode = 'pdb_chembl'
     # FOR A NICE PLOT, one should also choose the right scale in plot_utils
