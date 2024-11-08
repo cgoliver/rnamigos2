@@ -130,7 +130,8 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     all_aurocs, mixed_df_aurocs, mixed_df_raw = mix_two_dfs(df_native_raw,
                                                             df_dock_raw,
                                                             score_1="raw_score",
-                                                            outname_col="mixed")
+                                                            outname_col="mixed",
+                                                            use_max=True)
     mixed_df_ef = raw_df_to_efs(mixed_df_raw, score='mixed')
     mixed_df_aurocs.to_csv(out_dir / (base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}.csv"))
     mixed_df_raw.to_csv(out_dir / (base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}_raw.csv"))
@@ -351,11 +352,11 @@ def main_chembl():
     dfs_hard = get_hard(recompute=recompute, use_cached_pockets=use_cached_pockets)
 
     # Get dfs soft
-    dfs_soft = get_soft(recompute=recompute, use_cached_pockets=use_cached_pockets)
+    # dfs_soft = get_soft(recompute=recompute, use_cached_pockets=use_cached_pockets)
 
     # Rognan like and true
-    dfs_rognan_like = get_rognan_like(recompute=recompute, use_cached_pockets=use_cached_pockets)
-    dfs_rognan_true = get_rognan_true(recompute=recompute, use_cached_pockets=use_cached_pockets)
+    # dfs_rognan_like = get_rognan_like(recompute=recompute, use_cached_pockets=use_cached_pockets)
+    # dfs_rognan_true = get_rognan_true(recompute=recompute, use_cached_pockets=use_cached_pockets)
 
     # PLOT
     # plot_one(df_soft_1, plot_delta=False, filter_good=False, fractions=fractions, color='purple',metric=metric,
@@ -364,20 +365,20 @@ def main_chembl():
     # colors_2 = sns.light_palette("firebrick", n_colors=5, reverse=True)
 
     # colors = sns.light_palette("royalblue", n_colors=5, reverse=True)
-    # colors_2 = sns.light_palette("seagreen", n_colors=5, reverse=True)
-    # plot_list_partial = partial(plot_list, metric=metric, fractions=fractions,
-    #                             df_ref=DF_UNPERTURBED, plot_delta=False,
-    #                             filter_good=False, good_pockets=GOOD_POCKETS)
+    colors_2 = sns.light_palette("seagreen", n_colors=5, reverse=True)
+    plot_list_partial = partial(plot_list, metric=metric, fractions=fractions,
+                                df_ref=DF_UNPERTURBED, plot_delta=False,
+                                filter_good=False, good_pockets=GOOD_POCKETS)
     # plot_list_partial_color = partial(plot_list_partial, colors=colors)
-    # end_plot_partial = partial(end_plot, fractions=fractions)
+    end_plot_partial = partial(end_plot, fractions=fractions)
 
     # Actually plot
-    # plot_list_partial(dfs=dfs_random, title="Noised pockets", colors=colors_2)
-    # fig_name = f"figs/perturbs_random{'_chembl' if DECOYS == 'chembl' else ''}.pdf"
-    # end_plot_partial(colors=colors_2, fig_name=fig_name)
-    # plot_list_partial(dfs=dfs_hard, title="Shifted pockets", colors=colors_2)
-    # fig_name = f"figs/perturbs_hard{'_chembl' if DECOYS == 'chembl' else ''}.pdf"
-    # end_plot_partial(colors=colors_2, fig_name=fig_name)
+    plot_list_partial(dfs=dfs_random, title="Noised pockets", colors=colors_2)
+    fig_name = f"figs/perturbs_random{'_chembl' if DECOYS == 'chembl' else ''}.pdf"
+    end_plot_partial(colors=colors_2, fig_name=fig_name)
+    plot_list_partial(dfs=dfs_hard, title="Shifted pockets", colors=colors_2)
+    fig_name = f"figs/perturbs_hard{'_chembl' if DECOYS == 'chembl' else ''}.pdf"
+    end_plot_partial(colors=colors_2, fig_name=fig_name)
     # plot_list_partial(dfs_rognan_like, colors=["grey"], label="Rognan like")
     # plot_list_partial(dfs_rognan_true, colors=["black"], label="Rognan true")
     # plot_list_partial_color(dfs=dfs_soft, label="Soft strategy")

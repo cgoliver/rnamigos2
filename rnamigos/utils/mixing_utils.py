@@ -85,7 +85,7 @@ def get_mix_score(df, score1='dock', score2='native'):
     return np.mean(all_aurocs)
 
 
-def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mixed'):
+def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mixed', use_max=False):
     """
     Instead of mixing one df on two scores, we have two dfs with one score...
     """
@@ -100,7 +100,8 @@ def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mi
                                                                score_1,
                                                                renamed_score,
                                                                outname=outname,
-                                                               outname_col=outname_col)
+                                                               outname_col=outname_col,
+                                                               use_max=use_max)
     return all_aurocs, mixed_df_aurocs, mixed_df_raw
 
 

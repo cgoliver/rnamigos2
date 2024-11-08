@@ -229,7 +229,7 @@ def line_plot(df, mixed_model='combined', robin=False, decoy_mode='pdb_chembl'):
     plt.ylabel(r"AuROC")
     plt.xlabel(r"Time Limit (hours)")
     plt.legend(loc='lower right')
-    fig_name = f"figs/efficiency_line{"_chembl" if decoy_mode == "chembl" else ""}.pdf"
+    fig_name = f"figs/efficiency_line{'_chembl' if decoy_mode == 'chembl' else ''}.pdf"
     plt.savefig(fig_name, format="pdf", bbox_inches='tight')
     plt.show()
 
@@ -288,7 +288,7 @@ def vax_plot(df, mixed_model='combined', decoy_mode='pdb_chembl'):
     ax.set_xlim([-20, 100])
     ax.set_yticks([])
     ax.grid(True)
-    fig_name = f"figs/efficiency_vax{"_chembl" if decoy_mode == "chembl" else ""}.pdf"
+    fig_name = f"figs/efficiency_vax{'_chembl' if decoy_mode == 'chembl' else ''}.pdf"
     plt.savefig(fig_name, bbox_inches='tight')
     plt.show()
     pass
@@ -296,8 +296,8 @@ def vax_plot(df, mixed_model='combined', decoy_mode='pdb_chembl'):
 
 if __name__ == "__main__":
     # Build the time df for making the figures
+    # recompute = False
     recompute = False
-    # recompute = True
     decoy_mode = 'chembl'
     # decoy_mode = 'pdb_chembl'
     # FOR A NICE PLOT, one should also choose the right scale in plot_utils
