@@ -77,9 +77,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     # Others don't and have a ~ bad perf, giving an edge to hard_3.
     if len(missing_pockets) > 0:
         print("missing_pockets : ", missing_pockets)
-        test_systems = TEST_SYSTEMS[
-            ~TEST_SYSTEMS["PDB_ID_POCKET"].isin(missing_pockets)
-        ]
+        test_systems = TEST_SYSTEMS[~TEST_SYSTEMS["PDB_ID_POCKET"].isin(missing_pockets)]
     else:
         test_systems = TEST_SYSTEMS
     ligand_cache = f'data/ligands/{"robin_" if ROBIN else ""}lig_graphs.p'
@@ -106,9 +104,7 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     # Get dock performance
     dock_model_path = "results/trained_models/dock/dock_42"
     dock_model = get_model_from_dirpath(dock_model_path)
-    df_dock_aurocs, df_dock_raw, df_dock_ef = compute_efs_model(dock_model,
-                                                                dataloader=dataloader,
-                                                                lower_is_better=True)
+    df_dock_aurocs, df_dock_raw, df_dock_ef = compute_efs_model(dock_model, dataloader=dataloader, lower_is_better=True)
     df_dock_aurocs.to_csv(out_dir / (base_name + f"_dock{'_chembl' if DECOYS == 'chembl' else ''}.csv"))
     df_dock_raw.to_csv(out_dir / (base_name + f"_dock{'_chembl' if DECOYS == 'chembl' else ''}_raw.csv"))
     df_dock_ef.to_csv(out_dir / (base_name + f"_dock{'_chembl' if DECOYS == 'chembl' else ''}_ef.csv"))
@@ -119,20 +115,18 @@ def get_perf(pocket_path, base_name=None, out_dir=None):
     # native_model_path = "results/trained_models/is_native/native_bce0.02"
     native_model_path = "results/trained_models/is_native/native_bce0.02_groupsample"
     native_model = get_model_from_dirpath(native_model_path)
-    df_native_aurocs, df_native_raw, df_native_ef = compute_efs_model(native_model,
-                                                                      dataloader=dataloader,
-                                                                      lower_is_better=False)
+    df_native_aurocs, df_native_raw, df_native_ef = compute_efs_model(
+        native_model, dataloader=dataloader, lower_is_better=False
+    )
     df_native_aurocs.to_csv(out_dir / (base_name + f"_native{'_chembl' if DECOYS == 'chembl' else ''}_sample.csv"))
     df_native_raw.to_csv(out_dir / (base_name + f"_native{'_chembl' if DECOYS == 'chembl' else ''}_sample_raw.csv"))
     df_native_ef.to_csv(out_dir / (base_name + f"_native{'_chembl' if DECOYS == 'chembl' else ''}_sample_ef.csv"))
 
     # Now merge those two results to get a final mixed performance
-    all_aurocs, mixed_df_aurocs, mixed_df_raw = mix_two_dfs(df_native_raw,
-                                                            df_dock_raw,
-                                                            score_1="raw_score",
-                                                            outname_col="mixed",
-                                                            use_max=True)
-    mixed_df_ef = raw_df_to_efs(mixed_df_raw, score='mixed')
+    all_aurocs, mixed_df_aurocs, mixed_df_raw = mix_two_dfs(
+        df_native_raw, df_dock_raw, score_1="raw_score", outname_col="mixed", use_max=True
+    )
+    mixed_df_ef = raw_df_to_efs(mixed_df_raw, score="mixed")
     mixed_df_aurocs.to_csv(out_dir / (base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}.csv"))
     mixed_df_raw.to_csv(out_dir / (base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}_raw.csv"))
     mixed_df_ef.to_csv(out_dir / (base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}_ef.csv"))
@@ -149,7 +143,7 @@ def do_robin(ligand_name, pocket_path, use_rnafm=False):
     final_df = robin_inference_raw(ligand_name, dgl_pocket_graph)
     pocket_id = Path(pocket_path).stem
     final_df["pocket_id"] = pocket_id
-    ef_df = raw_df_to_efs(final_df, score='mixed_score')
+    ef_df = raw_df_to_efs(final_df, score="mixed_score")
     return ef_df, final_df
 
 
@@ -162,8 +156,8 @@ def get_perf_robin(pocket_path, base_name=None, out_dir=None):
     ef_dfs = []
     raw_dfs = []
     for ef_df, raw in Parallel(n_jobs=4)(
-            delayed(do_robin)(ligand_name, os.path.join(pocket_path, pocket))
-            for ligand_name, pocket in ROBIN_POCKETS.items()
+        delayed(do_robin)(ligand_name, os.path.join(pocket_path, pocket))
+        for ligand_name, pocket in ROBIN_POCKETS.items()
     ):
         ef_dfs.append(ef_df)
         raw_dfs.append(raw)
@@ -174,13 +168,15 @@ def get_perf_robin(pocket_path, base_name=None, out_dir=None):
     return np.mean(df_score["score"].values)
 
 
-def get_results_dfs(all_perturbed_pockets_path="figs/perturbations/perturbed",
-                    out_df="figs/perturbations/perturbed/aggregated.csv",
-                    recompute=True,
-                    fractions=None,
-                    compute_overlap=False,
-                    metric="ef",
-                    ef_frac=0.02):
+def get_results_dfs(
+    all_perturbed_pockets_path="figs/perturbations/perturbed",
+    out_df="figs/perturbations/perturbed/aggregated.csv",
+    recompute=True,
+    fractions=None,
+    compute_overlap=False,
+    metric="ef",
+    ef_frac=0.02,
+):
     list_of_results = []
     todo = list(sorted([x for x in os.listdir(all_perturbed_pockets_path) if not x.endswith(".csv")]))
 
@@ -202,7 +198,8 @@ def get_results_dfs(all_perturbed_pockets_path="figs/perturbations/perturbed",
             # out_csv_path = out_dir / (base_name + "_native_sample.csv")
             # out_csv_path = out_dir / (base_name + "_mixed.csv")
             out_csv_path = out_dir / (
-                    base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}{'_ef' if metric == 'ef' else ''}.csv")
+                base_name + f"_mixed{'_chembl' if DECOYS == 'chembl' else ''}{'_ef' if metric == 'ef' else ''}.csv"
+            )
         if recompute or not os.path.exists(out_csv_path):
             if ROBIN:
                 _ = get_perf_robin(pocket_path=perturbed_pocket_path)
@@ -237,24 +234,26 @@ def get_results_dfs(all_perturbed_pockets_path="figs/perturbations/perturbed",
     return df
 
 
-def get_all_perturbations_factory(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
-                                  max_replicates=10,
-                                  mode='hard',
-                                  final_bfs=(4,),
-                                  perturb_bfs=(1,),
-                                  recompute=True,
-                                  use_cached_pockets=True,
-                                  compute_overlap=False,
-                                  metric="mar",
-                                  ef_frac=0.02):
+def get_all_perturbations_factory(
+    fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
+    max_replicates=10,
+    mode="hard",
+    final_bfs=(4,),
+    perturb_bfs=(1,),
+    recompute=True,
+    use_cached_pockets=True,
+    compute_overlap=False,
+    metric="mar",
+    ef_frac=0.02,
+):
     dfs = []
     for final_bf in final_bfs:
         for perturb_bf in perturb_bfs:
             setup_name = f'{mode}{"_robin" if ROBIN else ""}_p{perturb_bf}_f{final_bf}'
-            out_path = f'figs/perturbations/perturbed_{setup_name}'
+            out_path = f"figs/perturbations/perturbed_{setup_name}"
             os.makedirs(out_path, exist_ok=True)
-            out_path = f'figs/perturbations/perturbed_{setup_name}'
-            out_df = f'figs/perturbations/aggregated_{setup_name}.csv'
+            out_path = f"figs/perturbations/perturbed_{setup_name}"
+            out_df = f"figs/perturbations/aggregated_{setup_name}.csv"
             if not use_cached_pockets:
                 get_perturbed_pockets(
                     out_path=out_path,
@@ -264,7 +263,7 @@ def get_all_perturbations_factory(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
                     fractions=fractions,
                     max_replicates=max_replicates,
                     recompute=recompute,
-                    all_pockets=ALL_POCKETS
+                    all_pockets=ALL_POCKETS,
                 )
             df = get_results_dfs(
                 all_perturbed_pockets_path=out_path,
@@ -281,11 +280,11 @@ def get_all_perturbations_factory(fractions=(0.7, 0.85, 1.0, 1.15, 1.3),
 
 def instantiate_functions(fractions, metric):
     smaller_factory = partial(get_all_perturbations_factory, fractions=fractions, metric=metric)
-    get_random = partial(smaller_factory, final_bfs=(4,), perturb_bfs=(1, 2, 3, 4), mode='random')
-    get_hard = partial(smaller_factory, final_bfs=(4,), perturb_bfs=(1, 2, 3, 4), mode='hard')
-    get_soft = partial(smaller_factory, final_bfs=(1, 2, 3, 4), perturb_bfs=(2,), mode='soft')
-    get_rognan_like = partial(smaller_factory, perturb_bfs=(2,), mode='rognan_like')
-    get_rognan_true = partial(smaller_factory, mode='rognan_true')
+    get_random = partial(smaller_factory, final_bfs=(4,), perturb_bfs=(1, 2, 3, 4), mode="random")
+    get_hard = partial(smaller_factory, final_bfs=(4,), perturb_bfs=(1, 2, 3, 4), mode="hard")
+    get_soft = partial(smaller_factory, final_bfs=(1, 2, 3, 4), perturb_bfs=(2,), mode="soft")
+    get_rognan_like = partial(smaller_factory, perturb_bfs=(2,), mode="rognan_like")
+    get_rognan_true = partial(smaller_factory, mode="rognan_true")
     return get_random, get_hard, get_soft, get_rognan_like, get_rognan_true
 
 
@@ -310,11 +309,14 @@ def main_chembl():
         return_test=True,
     )
     ALL_POCKETS = set(TEST_SYSTEMS["PDB_ID_POCKET"].unique())
-    ALL_POCKETS_GRAPHS = {pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
-                          for pocket_id in ALL_POCKETS}
+    ALL_POCKETS_GRAPHS = {
+        pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
+        for pocket_id in ALL_POCKETS
+    }
     # # Check that inference works, we should get 0.9848
     os.makedirs("figs/perturbations/unperturbed", exist_ok=True)
-    unpert_df = f"figs/perturbations/unperturbed/json_pockets_expanded_mixed{'_ef' if metric == 'ef' else ''}.csv"
+    # unpert_df = f"figs/perturbations/unperturbed/json_pockets_expanded_mixed{'_ef' if metric == 'ef' else ''}.csv"
+    unpert_df = f"figs/perturbations/unperturbed/json_pockets_expanded_mixed{'_chembl' if DECOYS == 'chembl' else ''}{'_ef' if metric == 'ef' else ''}.csv"
     if not os.path.exists(unpert_df):
         get_perf(pocket_path="data/json_pockets_expanded", out_dir="figs/perturbations/unperturbed")
     DF_UNPERTURBED = pd.read_csv(unpert_df, index_col=False)
@@ -343,8 +345,9 @@ def main_chembl():
     use_cached_pockets = False
     recompute = False
 
-    get_random, get_hard, get_soft, get_rognan_like, get_rognan_true = instantiate_functions(fractions=fractions,
-                                                                                             metric=metric)
+    get_random, get_hard, get_soft, get_rognan_like, get_rognan_true = instantiate_functions(
+        fractions=fractions, metric=metric
+    )
     # Now compute perturbed scores using the random BFS approach
     dfs_random = get_random(recompute=recompute, use_cached_pockets=use_cached_pockets)
 
@@ -366,9 +369,15 @@ def main_chembl():
 
     # colors = sns.light_palette("royalblue", n_colors=5, reverse=True)
     colors_2 = sns.light_palette("seagreen", n_colors=5, reverse=True)
-    plot_list_partial = partial(plot_list, metric=metric, fractions=fractions,
-                                df_ref=DF_UNPERTURBED, plot_delta=False,
-                                filter_good=False, good_pockets=GOOD_POCKETS)
+    plot_list_partial = partial(
+        plot_list,
+        metric=metric,
+        fractions=fractions,
+        df_ref=DF_UNPERTURBED,
+        plot_delta=False,
+        filter_good=False,
+        good_pockets=GOOD_POCKETS,
+    )
     # plot_list_partial_color = partial(plot_list_partial, colors=colors)
     end_plot_partial = partial(end_plot, fractions=fractions)
 
@@ -420,12 +429,15 @@ def main_robin():
     TEST_SYSTEMS = pd.DataFrame({"PDB_ID_POCKET": list(ROBIN_POCKETS.values())})
     ALL_POCKETS = set(ROBIN_POCKETS.values())
     ROBIN = True
-    ALL_POCKETS_GRAPHS = {pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
-                          for pocket_id in ALL_POCKETS}
+    ALL_POCKETS_GRAPHS = {
+        pocket_id: graph_io.load_json(os.path.join("data/json_pockets_expanded", f"{pocket_id}.json"))
+        for pocket_id in ALL_POCKETS
+    }
     os.makedirs("figs/perturbations/unperturbed_robin", exist_ok=True)
     get_perf_robin(pocket_path="data/json_pockets_expanded", out_dir="figs/perturbations/unperturbed_robin")
-    DF_UNPERTURBED = pd.read_csv("figs/perturbations/unperturbed_robin/json_pockets_expanded_mixed.csv",
-                                 index_col=False)
+    DF_UNPERTURBED = pd.read_csv(
+        "figs/perturbations/unperturbed_robin/json_pockets_expanded_mixed.csv", index_col=False
+    )
 
     # fractions = (0.1, 0.7, 0.85, 1.0, 1.15, 1.3, 5)
     fractions = (0.7, 0.85, 1.0, 1.15, 1.3)
@@ -434,8 +446,9 @@ def main_robin():
     use_cached_pockets = False
     recompute = False
     metric = "ef"
-    df_soft_1 = get_all_perturbations_factory(fractions=fractions, metric=metric, final_bfs=(1,), perturb_bfs=(2,),
-                                              mode='soft')
+    df_soft_1 = get_all_perturbations_factory(
+        fractions=fractions, metric=metric, final_bfs=(1,), perturb_bfs=(2,), mode="soft"
+    )
     plot_one(
         df_soft_1,
         plot_delta=False,
@@ -458,8 +471,8 @@ if __name__ == "__main__":
         "collate_fn": lambda x: x[0],
     }
     TEST_SYSTEMS, ALL_POCKETS, ALL_POCKETS_GRAPHS, DF_UNPERTURBED, ROBIN, DECOYS = [
-                                                                                       None,
-                                                                                   ] * 6
+        None,
+    ] * 6
 
     ALL_POCKETS = [Path(f).stem for f in os.listdir("data/json_pockets_expanded")]
     ALL_POCKETS_GRAPHS = {
