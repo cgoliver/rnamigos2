@@ -21,16 +21,24 @@ def normalize(scores):
     return out_scores
 
 
-def add_mixed_score(df, score1='dock', score2='native', out_col='mixed'):
+def add_mixed_score(df, score1='dock', score2='native', out_col='mixed', use_max=False):
     scores_1 = df[score1].values
     scores_2 = df[score2].values
-    normalized_scores_1 = normalize(scores_1)
-    normalized_scores_2 = normalize(scores_2)
-    df[out_col] = (0.5 * normalized_scores_1 + 0.5 * normalized_scores_2)
+    if use_max:
+        import scipy
+        ranks_1 = scipy.stats.rankdata(scores_1, method='max')
+        ranks_2 = scipy.stats.rankdata(scores_2, method='max')
+        out_ranks = np.maximum(ranks_1, ranks_2)
+        df[out_col] = out_ranks
+    else:
+        normalized_scores_1 = normalize(scores_1)
+        normalized_scores_2 = normalize(scores_2)
+        df[out_col] = (0.5 * normalized_scores_1 + 0.5 * normalized_scores_2)
     return df
 
 
-def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col='mixed', add_decoy=True):
+def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col='mixed', add_decoy=True,
+                   use_max=False):
     """
     Mix two scores, and return raw, aurocs and mean aurocs. Optionally dump the dataframes.
     """
@@ -42,7 +50,7 @@ def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col
         pocket_df = df.loc[df['pocket_id'] == p]
         # Add temp_name in case one of the input is mixed. This could probably be removed
         pocket_df = pocket_df.reset_index(drop=True)
-        pocket_df = add_mixed_score(pocket_df, score1, score2, out_col='temp_name')
+        pocket_df = add_mixed_score(pocket_df, score1, score2, out_col='temp_name', use_max=use_max)
 
         # Then compute aurocs and add to all results
         fpr, tpr, thresholds = metrics.roc_curve(pocket_df['is_active'],
