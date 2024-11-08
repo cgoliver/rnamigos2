@@ -32,16 +32,24 @@ names = list(name_runs.keys())
 runs = list(name_runs.values())
 
 # decoy_mode = 'pdb'
-# decoy_mode = 'chembl'
-decoy_mode = 'pdb_chembl'
+decoy_mode = 'chembl'
+# decoy_mode = 'pdb_chembl'
 grouped = True
 
 # Parse ef data for the runs and gather them in a big database
 dfs = [pd.read_csv(f"outputs/pockets/{f}") for f in runs]
 dfs = [df.assign(name=names[i]) for i, df in enumerate(dfs)]
-
 big_df = pd.concat(dfs)
 big_df = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by='score')
+
+# Get Rognan
+rognan_dfs = [pd.read_csv(f"outputs/pockets/{f.replace('.csv', '_rognan.csv')}") for f in runs]
+rognan_dfs = [df.assign(name=names[i]) for i, df in enumerate(rognan_dfs)]
+rognan_dfs = [group_df(df) for df in rognan_dfs]
+rognan_dfs = pd.concat(rognan_dfs)
+rognan_dfs = rognan_dfs.loc[rognan_dfs['decoys'] == decoy_mode].sort_values(by='score')
+rognan_means = rognan_dfs.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
+print(rognan_means)
 
 # This is to assess mean difference incurred by different groupings
 # means_ungrouped = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
@@ -67,14 +75,13 @@ if grouped:
 # Compute pvalue for rev2
 from scipy import stats
 
-mixed_big = big_df[big_df['name'] == 'MIXED']['score'].values
+mixed_big = big_df[big_df['name'] == 'MIXED+rDock']['score'].values
 rdock_big = big_df[big_df['name'] == 'rDock']['score'].values
 # res = stats.ttest_ind(mixed_big, rdock_big)
 res = stats.ttest_rel(mixed_big, rdock_big)
 res_wil = stats.wilcoxon(mixed_big, rdock_big)
 print(res, res_wil)
 
-means = big_df.groupby(by=['name', 'decoys'])['score'].mean().reset_index()
 # For a detailed score per pocket
 # table = big_df.loc[big_df['decoys'] == decoy_mode].sort_values(by=['pocket_id', 'name'])
 # print(table.to_latex(index=False, columns=['pocket_id', 'name', 'score']))
@@ -92,14 +99,13 @@ means = means.sort_values(['name_rank'], ascending=[True])
 print(means.to_latex(index=False, columns=['name', 'Mean Active Rank'], float_format="%.2f"))
 # sys.exit()
 
-
-# plt.gca().set_yscale('custom')
-# yticks = np.arange(0.6, 1)
-lower = 0.5
-yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
-# lower = 0.
-# yticks = [0.4, 0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
-# plt.gca().set_yticks(yticks)
+if decoy_mode == 'chembl':
+    plt.gca().set_yscale('custom')
+    lower = 0.45
+    # yticks = np.arange(0.6, 1)
+    # yticks = [0.6, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
+    yticks = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1]
+    plt.gca().set_yticks(yticks)
 
 # ADD WHISKERS
 sns.boxplot(x="name",
@@ -165,12 +171,25 @@ sns.stripplot(x="name",
               linewidth=1.5,
               data=means)
 
+# ADD ROGNAN MEANS
+sns.stripplot(x="name",
+              y="score",
+              order=names,
+              jitter=0,
+              size=10,
+              palette=main_palette,
+              marker="*",
+              edgecolor='firebrick',
+              # edgecolor='black',
+              linewidth=1.5,
+              data=rognan_means)
+
 plt.ylim(lower - 0.02, 1.001)
 plt.xlabel("")
 plt.ylabel("AuROC")
 plt.grid(True, which='both', axis='y')
 # Add vline to separate mixed from docking.
-plt.vlines(len(runs) - 2.5, 0.65, 1, colors='grey', linestyles=(0, (5, 10)))
-# plt.savefig("../outputs/violins.pdf", bbox_inches='tight')
-plt.savefig("figs/violins_mixed.pdf", bbox_inches='tight')
+plt.vlines(len(runs) - 2.5, 0.45, 1, colors='grey', linestyles=(0, (5, 10)))
+fig_name = f"figs/violins{'_chembl' if decoy_mode == 'chembl' else ''}.pdf"
+plt.savefig(fig_name, bbox_inches='tight')
 plt.show()

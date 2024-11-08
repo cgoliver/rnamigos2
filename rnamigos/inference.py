@@ -69,6 +69,8 @@ def get_models(models_path=None, model=None):
     # Load models
     script_dir = os.path.dirname(__file__)
     if model is not None:
+        if isinstance(model, dict):
+            return model
         return {"raw_score": model}
 
     if models_path is None:

@@ -4,10 +4,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn import metrics
-import pickle
-import random
 
-from plot_utils import PALETTE_DICT, CustomScale, group_df
+from plot_utils import PALETTE_DICT, CustomScale
 
 import matplotlib as mpl
 
@@ -30,12 +28,11 @@ def partial_virtual_screen(df, sort_up_to=0, score_column="rdock"):
     return enrich
 
 
-def build_auroc_df(out_csv="fig_script/time_auroc.csv", decoy="pdb_chembl", grouped=True, recompute=False):
+def build_auroc_df(out_csv="fig_script/time_auroc.csv", decoy="pdb_chembl", recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
-    big_df_raw = pd.read_csv(f'outputs/pockets/big_df{"_grouped" if grouped else ""}_42_raw.csv')
+    big_df_raw = pd.read_csv("outputs/pockets/big_df_grouped_42_raw.csv")
     big_df_raw = big_df_raw.loc[big_df_raw["decoys"] == decoy]
-    print(big_df_raw.columns)
 
     big_df_raw = big_df_raw.sort_values(by=["pocket_id", "smiles"])
 
@@ -82,17 +79,29 @@ def build_auroc_df(out_csv="fig_script/time_auroc.csv", decoy="pdb_chembl", grou
 def build_auroc_df_robin(out_csv="fig_script/time_auroc_robin.csv", recompute=False):
     if not recompute and os.path.exists(out_csv):
         return
-    big_df_raw = pd.read_csv(f"outputs/robin/big_df_raw.csv")
-    big_df_raw = big_df_raw.sort_values(by=["pocket_id", "smiles"])
+    big_df = pd.read_csv(f"outputs/robin/big_df_raw.csv")
+    big_df = big_df.sort_values(by=["pocket_id", "smiles"])
+
+    big_df["rank_native"] = big_df.groupby("pocket_id")["native_42"].rank(ascending=True, pct=True)
+    big_df["rank_dock"] = big_df.groupby("pocket_id")["dock_42"].rank(ascending=True, pct=True)
+
+    def maxmin(column):
+        return (column - column.min()) / (column.max() - column.min())
+
+    big_df["scaled_native"] = big_df.groupby("pocket_id")["native_42"].transform(maxmin)
+    big_df["scaled_dock"] = big_df.groupby("pocket_id")["dock_42"].transform(maxmin)
+
+    big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
+    big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
 
     # Now iterate
-    pockets = big_df_raw["pocket_id"].unique()
+    pockets = big_df["pocket_id"].unique()
     df_auroc_rows = []
     nsteps = 20
     nshuffles = 10
     for pi, pocket in enumerate(pockets):
         print(f"Doing pocket {pi + 1}/{len(pockets)}")
-        pocket_df = big_df_raw.loc[big_df_raw["pocket_id"] == pocket]
+        pocket_df = big_df.loc[big_df["pocket_id"] == pocket]
 
         # RDOCK alone
         for n in range(nshuffles):
@@ -104,7 +113,7 @@ def build_auroc_df_robin(out_csv="fig_script/time_auroc_robin.csv", recompute=Fa
                 df_auroc_rows.append(res)
 
         # Presort
-        for sort_col in ["rnamigos_42", "dock_42", "native_42"]:
+        for sort_col in ["rnamigos_42", "dock_42", "native_42", "maxmerge_42"]:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
                 auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="rdock")
@@ -112,7 +121,7 @@ def build_auroc_df_robin(out_csv="fig_script/time_auroc_robin.csv", recompute=Fa
                 df_auroc_rows.append(res)
 
         # docknat+rdocknat
-        pocket_df = pocket_df.sort_values(by="rnamigos_42", ascending=False)
+        pocket_df = pocket_df.sort_values(by="maxmerge_42", ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
             auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="combined_42")
             res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": "combined", "seed": 0}
@@ -256,15 +265,14 @@ def line_plot(df, mixed_model="combined", robin=False):
     # Get results
     names = [r"\texttt{rDock}", f"{mixed_model}"]
     palette = [PALETTE_DICT["rdock"], PALETTE_DICT["mixed+rdock"]]
-    model_res = []
-    # assert mixed_model in {'combined', 'combined_docknat', 'combined_nat'}
-    all_models = ["rdock", mixed_model]
 
-    for model in all_models:
-        means, stds = get_means_stds(df, model)
-        model_res.append((means, stds))
 
-    # Set plot hparams
+def line_plot(df, mixed_model="combined", robin=False, decoy_mode="pdb_chembl"):
+    # Get results
+    # names = [r'\texttt{rDock}', f'{mixed_model}']
+    names = [r"\texttt{rDock}", r"\texttt{RNAmigos++}"]
+    palette = [PALETTE_DICT["rdock"], PALETTE_DICT["mixed+rdock"]]
+
     plt.rcParams.update({"font.size": 16})
     plt.rcParams["text.usetex"] = True
     plt.rc("grid", color="grey", alpha=0.2)
@@ -298,34 +306,44 @@ def line_plot(df, mixed_model="combined", robin=False):
             times, mixed_means, label=r"\texttt{RNAmigos2}", linewidth=2, color=PALETTE_DICT["mixed"], linestyle="--"
         )
 
-    for (means, stds), name, color in zip(model_res, names, palette):
-        plot_mean_std(ax=ax, times=times, means=means, stds=stds, label=name, color=color)
-
-    # Manage ticks
-    # xticks = [0, x_cross, 2, 4, 6, 8]
-    # xticks_labels = ["0", x_cross, "2", "4", "6", "8"]
-    # xticks = [0, 2, 4, 6, 8]
-    # xticks_labels = ["0", "2", "4", "6", "8"]
-    # plt.gca().set_xticks(ticks=xticks, labels=xticks_labels)
-
-    # Possible plot: Set y_lim to 0.99 and CustomScale to: offset=0.03, sup_lim=1
-    # This shows how fast we go from mixed to mixed+rdock performance
+    times = np.linspace(0, 8.3, 20)
+    if not robin:
+        if decoy_mode == "pdb_chembl":
+            mixed_means = [0.896] * 20
+        else:
+            mixed_means = [0.954] * 20
+        ax.plot(
+            times, mixed_means, label=r"\texttt{RNAmigos2}", linewidth=2, color=PALETTE_DICT["mixed"], linestyle="--"
+        )
     yticks = [0.5, 0.7, 0.8, 0.9, 0.925, 0.94]
     # yticks = [0.5, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99, 1]
     # plt.gca().set_yticks(yticks)
     if not robin:
-        plt.ylim(0.4, 0.94)
-
-    plt.ylabel(r"AuROC")
-    plt.xlabel(r"Time Limit (hours)")
+        ax.set_yscale("custom")
+    if decoy_mode == "pdb_chembl":
+        yticks = [0.5, 0.7, 0.8, 0.85, 0.9, 0.92, 0.94]
     plt.legend(loc="lower right")
     plt.savefig("figs/efficiency_line.pdf", format="pdf", bbox_inches="tight")
     # plt.savefig("figs/efficiency_line_ylim.pdf", format="pdf", bbox_inches='tight')
-    plt.show()
-    pass
+    plt.legend(loc="lower right")
+    fig_name = f"figs/efficiency_line{'_chembl' if decoy_mode == 'chembl' else ''}.pdf"
+    plt.savefig(fig_name, format="pdf", bbox_inches="tight")
 
 
 def vax_plot(df, mixed_model="combined"):
+    ref = df.loc[df["model"] == "rdock"].groupby(["pocket", "seed"]).apply(lambda group: np.trapz(group["auroc"]))
+    ref_mean = ref.groupby("pocket").mean().reset_index()
+    ref_std = ref.groupby("pocket").std().reset_index()
+    ref_aucs = {p: {"mean": m, "std": st} for p, m, st in zip(ref_mean["pocket"], ref_mean[0], ref_std[0])}
+    efficiency_df = (
+        df.groupby(["pocket", "model", "seed"])
+        .apply(lambda group: np.trapz(group["auroc"]) / ref_aucs[group.name[0]]["mean"])
+        .reset_index()
+        .rename(columns={0: "efficiency"})
+    )
+
+
+def vax_plot(df, mixed_model="combined", decoy_mode="pdb_chembl"):
     ref = df.loc[df["model"] == "rdock"].groupby(["pocket", "seed"]).apply(lambda group: np.trapz(group["auroc"]))
     ref_mean = ref.groupby("pocket").mean().reset_index()
     ref_std = ref.groupby("pocket").std().reset_index()
@@ -370,7 +388,6 @@ def vax_plot(df, mixed_model="combined"):
     # ax.axvline(x=np.median(efficiency_df['efficiency']), color='grey', linestyle='--')
 
     # Plot point and thick line for standard deviation
-
     # sns.pointplot(x='efficiency', y='pdbid', data=plot_df, dodge=True, markers='_', scale=0.5, color='black', ax=ax, orient='h')  # Adjust orient='h' for horizontal orientation
 
     # for i, group_name in enumerate(plot_df['pdbid'].unique()):
@@ -389,17 +406,21 @@ def vax_plot(df, mixed_model="combined"):
     ax.set_xlim([-20, 50])
     ax.set_yticks([])
     ax.grid(True)
-    plt.savefig("figs/efficiency_vax.pdf", format="pdf", bbox_inches="tight")
+    fig_name = f"figs/efficiency_vax{'_chembl' if decoy_mode == 'chembl' else ''}.pdf"
+    plt.savefig(fig_name, bbox_inches="tight")
     plt.show()
     pass
 
 
 if __name__ == "__main__":
     # Build the time df for making the figures
-    out_csv = "scripts_fig/time_auroc.csv"
     recompute = False
     # recompute = True
-    # build_auroc_df(out_csv=out_csv, recompute=recompute)
+    decoy_mode = "chembl"
+    # decoy_mode = 'pdb_chembl'
+    # FOR A NICE PLOT, one should also choose the right scale in plot_utils
+    # out_csv = f'scripts_fig/time_auroc{"_chembl" if decoy_mode == "chembl" else ""}.csv'
+    # build_auroc_df(out_csv=out_csv, recompute=recompute, decoy=decoy_mode)
 
     out_csv_robin = "scripts_fig/time_auroc_robin.csv"
     # recompute = False
@@ -409,12 +430,12 @@ if __name__ == "__main__":
     # Then make plots
     df = pd.read_csv(out_csv_robin, index_col=0)
     # mixed_model = "rnamigos_42"
-    mixed_model = "combined"
+    mixed_model = "maxmerge_42"
     # mixed_model = 'docknat'
     # mixed_model = 'dock'
-    # line_plot(df, mixed_model=mixed_model, robin=True)
+    # line_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)
     line_plot_per_pocket(df, mixed_model=mixed_model, robin=True)
-    # vax_plot(df, mixed_model=mixed_model)
+    # vax_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)
 
     # df = pd.read_csv(out_csv_robin, index_col=0)
     # mixed_model = 'dock_rnafm_3'

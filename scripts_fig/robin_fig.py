@@ -163,7 +163,7 @@ def get_dfs_migos_(pocket_name, swap=False, swap_on="merged", normalize=False):
     return df
 
 
-def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig"):
+def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="robin_fig"):
     # fig, axs = plt.subplots(1, 4, figsize=(18, 5))
     # plt.gca().set_yscale('custom')
 
@@ -172,21 +172,17 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
 
     rows = []
 
-    def normalize(x):
-        return (x - x.min()) / (x.max() - x.min())
-
     for i, (pocket_name, ligand_name) in enumerate(zip(pocket_names, ligand_names)):
         # ax = axs[i]
         fig, ax = plt.subplots(figsize=(6, 6))
         # ax.set_xscale('custom')
+        df = big_df.loc[big_df["pocket_id"] == pocket_name]
 
         # FOR DOCKING
         # merged_rdock = get_dfs_docking(ligand_name=ligand_name)
         # score_to_use = 'docking_score'
 
         # FOR MIGOS
-        df = get_dfs_migos(model_output, pocket_name=pocket_name, swap=swap, normalize=normalize_migos)
-        print(df)
         # merged_migos["dock_nat"] = (normalize(merged_migos["is_active"]) + normalize(merged_migos["dock"])) / 2
         # print(merged_rdock)
 
@@ -217,7 +213,7 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
         df = df.sort_values(by="is_active")
         g = sns.kdeplot(
             data=df,
-            x="raw_score",
+            x=score_to_use,
             hue="is_active",
             ax=ax,
             # palette={'actives': colors[i], 'inactives': 'lightgrey'},
@@ -230,22 +226,24 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
         decoy_xx, decoy_yy = g.lines[1].get_data()
         # ax.fill_between(xx, 0, yy, color=colors[i], alpha=0.1)
         ax.plot(xx, yy, color=colors[i], alpha=1, linewidth=1.5)
-        thresh = df["raw_score"].quantile(0.8)
+        thresh = df[score_to_use].quantile(0.8)
         ax.set_xlim([thresh, 1])
 
-        fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df["raw_score"])
+        fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df[score_to_use])
         auroc = metrics.auc(fpr, tpr)
-        t_stat, p_value = stats.ttest_ind(df[df["is_active"] == 1]["raw_score"], df[df["is_active"] == 0]["raw_score"])
+        t_stat, p_value = stats.ttest_ind(
+            df[df["is_active"] == 1][score_to_use], df[df["is_active"] == 0][score_to_use]
+        )
         print(p_value)
 
         for _, frac in enumerate(fracs):
-            ef, thresh = enrichment_factor(scores=df["raw_score"], is_active=df["is_active"], frac=frac)
+            ef, thresh = enrichment_factor(scores=df[score_to_use], is_active=df["is_active"], frac=frac)
             rows.append(
                 {
                     "pocket": pocket_to_id[pocket_name],
                     "ef": ef,
                     "thresh": f"{frac * 100:.0f}",
-                    "score": Path(model_output).stem,
+                    "score": score_to_use,
                     "auroc": auroc,
                     "p_value": p_value,
                 }
@@ -287,7 +285,7 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
 
         ax.fill_between(decoy_xx, 0, decoy_yy, color="lightgrey", alpha=0.8)
         # ax.plot(decoy_xx, decoy_yy, color='white', alpha=0.9)
-        ef, thresh = enrichment_factor(scores=df["raw_score"], is_active=df["is_active"], frac=default_frac)
+        ef, thresh = enrichment_factor(scores=df[score_to_use], is_active=df["is_active"], frac=default_frac)
         all_efs.append(ef)
         print(f"EF@{frac} : ", pocket_name, ef)
         # GET AUROC
@@ -325,9 +323,13 @@ def make_fig(model_output, swap=False, normalize_migos=True, prefix="robin_fig")
 
 def make_table(df):
     df = df.rename(columns={"ef": "Enrichment Factor", "thresh": "cutoff (%)"})
-    df = df.replace("dock_nat", "RNAmigos2")
-    df = df.replace("is_native", "Compat")
-    df = df.replace("dock", "Aff")
+    df = df.replace("rnamigos_42", "RNAmigos2")
+    df = df.replace("native_42", "Compat")
+    df = df.replace("dock_42", "Aff")
+    df = df.replace("rdock", "rDock")
+    df = df.replace("maxmerge_42", "RNAmigos-merge")
+    df = df.replace("combined_42_raw", "RNAmigos++")
+
     table = pd.pivot_table(
         df,
         values=["Enrichment Factor"],
@@ -340,10 +342,14 @@ def make_table(df):
 
 
 def make_table_auroc(df):
+    print(df)
     df = df.rename(columns={"auroc": "AuROC"})
-    df = df.replace("dock_nat", "RNAmigos2")
-    df = df.replace("is_native", "Compat")
-    df = df.replace("dock", "Aff")
+    df = df.replace("rnamigos_42", "RNAmigos2")
+    df = df.replace("native_42", "Compat")
+    df = df.replace("dock_42", "Aff")
+    df = df.replace("rdock", "rDock")
+    df = df.replace("maxmerge_42", "RNAmigos-merge")
+    df = df.replace("combined_42", "RNAmigos++")
     table = pd.pivot_table(
         df,
         values=["AuROC"],
@@ -355,11 +361,43 @@ def make_table_auroc(df):
 
 if __name__ == "__main__":
 
+    # add merging score
+    big_df = pd.read_csv("outputs/robin/big_df_raw.csv")
+    big_df["rank_native"] = big_df.groupby("pocket_id")["native_42"].rank(ascending=True, pct=True)
+    big_df["rank_dock"] = big_df.groupby("pocket_id")["dock_42"].rank(ascending=True, pct=True)
+
+    def maxmin(column):
+        return (column - column.min()) / (column.max() - column.min())
+
+    big_df["scaled_native"] = big_df.groupby("pocket_id")["native_42"].transform(maxmin)
+    big_df["scaled_dock"] = big_df.groupby("pocket_id")["dock_42"].transform(maxmin)
+
+    big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
+    big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
+
+    # big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
+    # big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
+
+    """
+    for pocket in pocket_names:
+        df = big_df.loc[big_df["pocket_id"] == pocket]
+        print(df["maxmerge_42"].min(), df["maxmerge_42"].max())
+        sns.kdeplot(
+            data=df,
+            x="maxmerge_42",
+            hue="is_active",
+            # palette={'actives': colors[i], 'inactives': 'lightgrey'},
+            fill=True,
+            alpha=0.9,
+            common_norm=False,
+        )
+        plt.show()
+    big_df.to_csv("big_df_merge.csv")
+    """
+
     dfs = []
-    # for score in ["dock_nat", "is_native", "dock", "rDock", "RNAmigos2++"]:
-    #    dfs.append(make_fig(score, prefix=f"repro_{score}", normalize_migos=True))
-    for model in ["rnamigos_42", "rdock"]:
-        df_path = Path("outputs/robin") / f"{model}_raw.csv"
-        dfs.append(make_fig(df_path, prefix=f"resubmit_{model}", normalize_migos=True))
+
+    for score_to_use in ["rnamigos_42", "rdock", "native_42", "dock_42", "combined_42", "maxmerge_42"]:
+        dfs.append(make_fig(big_df, score_to_use, prefix=f"resubmit_{score_to_use}", normalize_migos=True))
     make_table(pd.concat(dfs))
     make_table_auroc(pd.concat(dfs))

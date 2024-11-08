@@ -1,5 +1,9 @@
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
+import seaborn as sns
+
+from scripts_fig.plot_utils import PALETTE_DICT
 
 
 def add_delta(df, df_ref):
@@ -79,22 +83,47 @@ def plot_one(
     plt.fill_between(fractions, means_low, means_high, alpha=0.2, color=color)
 
 
-def plot_list(dfs, fractions, colors="blue", label="default_label", **kwargs):
+def plot_list(dfs, fractions, colors="blue", title="default_label", **kwargs):
     for i, df in enumerate(dfs):
-        plot_one(df, fractions, color=colors[i], label=f"{label}: {i}", **kwargs)
+        plot_one(df, fractions, color=colors[i], label=rf"${i}$", **kwargs)
+        # plot_one(df, fractions, color=colors[i], label=rf"$r={i}$", **kwargs)
+    plt.title(title)
 
 
-def end_plot():
+def end_plot(fractions, colors, fig_name=None):
+
+
+    # Create handles with circles
+    split_title = True
+    handles = [Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=10, label=i+1)
+               for i, color in enumerate(colors[:4])]
+    if not split_title:
+        handles = [Line2D([0], [0], linestyle='None', label=r"Fraction $r$", markersize=0)] + handles
+
+    if split_title:
+        plt.legend(handles=handles, loc="lower center", ncols=len(handles), title=r"Number of hops $h$",
+                   handletextpad=-0.5)
+    else:
+        plt.legend(handles=handles, loc="lower center", ncols=len(handles), handletextpad=0., columnspacing=0.1)
+    # plt.legend(loc="lower center", ncols=4, title=r"$r$")
+
+
     # End of the plot + pretty plot
-    # plt.hlines(y=0.934, xmin=min(fractions), xmax=max(fractions),  # dock
-    # plt.hlines(y=0.951, xmin=min(fractions), xmax=max(fractions),  # native
     # plt.hlines(y=0.984845, xmin=min(fractions), xmax=max(fractions),
     #            label=r'Original pockets', color=PALETTE_DICT['mixed'], linestyle='--')
-    # plt.hlines(y=0.9593, xmin=min(fractions), xmax=max(fractions),
-    #            label=r'rDock', color=PALETTE_DICT['rdock'], linestyle='--')
-    plt.legend(loc="lower right")
-    plt.ylabel(r"mean AuROC over pockets")
-    plt.xlabel(r"Fraction of nodes sampled")
+    plt.hlines(y=95.4, xmin=min(fractions), xmax=max(fractions), linestyle="--",
+               linewidth=2, color=PALETTE_DICT['mixed'])
+    t = r"\texttt{RNAmigos}"
+    plt.text(1.1, 94.5, t, color=PALETTE_DICT['mixed'], usetex=True, fontsize=20)
+
+    plt.xlabel(r"Fraction of pocket")
+    plt.ylabel(r"AuROC")
+    plt.gca().set_xticks(ticks=fractions)
+    plt.gca().set_yticks(ticks=[88 + 2 * i for i in range(4)] + [95.4])
+    sns.despine(left=False, bottom=False)
+    plt.ylim(87, 96)
+    if fig_name is not None:
+        plt.savefig(fig_name, bbox_inches='tight')
     plt.show()
 
 
