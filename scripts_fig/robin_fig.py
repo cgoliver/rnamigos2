@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 
+import torch
 from scipy import stats
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -10,6 +11,10 @@ import pandas as pd
 import random
 import seaborn as sns
 from sklearn import metrics
+
+from rdkit import Chem, DataStructs
+from rdkit.Chem import QED
+from rdkit.Chem import MACCSkeys
 
 from rnaglib.drawing import rna_draw
 from rnaglib.utils import load_json
@@ -26,6 +31,74 @@ import matplotlib as mpl
 mpl.rcParams["font.family"] = "sans-serif"
 mpl.rcParams["font.sans-serif"] = ["Arial", "Helvetica", "DejaVu Sans"]  # Use Arial or fallback options
 mpl.rcParams["mathtext.fontset"] = "stixsans"  # Sans-serif font for math
+
+
+def smiles_to_mol(smiles_list):
+    mols = [Chem.MolFromSmiles(s) for s in smiles_list]
+    clean_mols = []
+    for mol, sm in zip(mols, smiles_list):
+        if mol is None:
+            continue
+        clean_mols.append(mol)
+    return clean_mols
+
+
+def smiles_to_fp(smiles_list):
+    mols = [Chem.MolFromSmiles(s) for s in smiles_list]
+    clean_mols = []
+    clean_smiles = []
+    for mol, sm in zip(mols, smiles_list):
+        if mol is None:
+            continue
+        clean_mols.append(mol)
+        clean_smiles.append(sm)
+
+    fps = np.array([MACCSkeys.GenMACCSKeys(m) for m in clean_mols])
+    return fps
+
+
+def average_agg_tanimoto(stock_vecs, gen_vecs, batch_size=5000, agg="max", device="cpu", p=1):
+    """
+    For each molecule in gen_vecs finds closest molecule in stock_vecs.
+    Returns average tanimoto score for between these molecules
+
+    Parameters:
+        stock_vecs: numpy array <n_vectors x dim>
+        gen_vecs: numpy array <n_vectors' x dim>
+        agg: max or mean
+        p: power for averaging: (mean x^p)^(1/p)
+    """
+    assert agg in ["max", "mean"], "Can aggregate only max or mean"
+    agg_tanimoto = np.zeros(len(gen_vecs))
+    total = np.zeros(len(gen_vecs))
+    for j in range(0, stock_vecs.shape[0], batch_size):
+        x_stock = torch.tensor(stock_vecs[j : j + batch_size]).to(device).float()
+        for i in range(0, gen_vecs.shape[0], batch_size):
+            y_gen = torch.tensor(gen_vecs[i : i + batch_size]).to(device).float()
+            y_gen = y_gen.transpose(0, 1)
+            tp = torch.mm(x_stock, y_gen)
+            jac = (tp / (x_stock.sum(1, keepdim=True) + y_gen.sum(0, keepdim=True) - tp)).cpu().numpy()
+            jac[np.isnan(jac)] = 1
+            if p != 1:
+                jac = jac**p
+            if agg == "max":
+                agg_tanimoto[i : i + y_gen.shape[1]] = np.maximum(agg_tanimoto[i : i + y_gen.shape[1]], jac.max(0))
+            elif agg == "mean":
+                agg_tanimoto[i : i + y_gen.shape[1]] += jac.sum(0)
+                total[i : i + y_gen.shape[1]] += jac.shape[0]
+    if agg == "mean":
+        agg_tanimoto /= total
+    if p != 1:
+        agg_tanimoto = (agg_tanimoto) ** (1 / p)
+    return np.mean(agg_tanimoto)
+
+
+def internal_diversity(fps, n_jobs=1, device="cpu", fp_type="morgan", p=1):
+    """
+    Computes internal diversity as:
+    1/|A|^2 sum_{x, y in AxA} (1-tanimoto(x, y))
+    """
+    return 1 - (average_agg_tanimoto(fps, fps, agg="mean", device=device, p=p)).mean()
 
 
 def enrichment_factor(scores, is_active, frac=0.01):
@@ -236,18 +309,14 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
         )
         print(p_value)
 
+        thresh_select = df[score_to_use].quantile(0.98)
+        selected_fps = smiles_to_fp(df.loc[df[score_to_use] > thresh_select]["smiles"])
+        diversity = internal_diversity(selected_fps)
+
+        efs = []
         for _, frac in enumerate(fracs):
             ef, thresh = enrichment_factor(scores=df[score_to_use], is_active=df["is_active"], frac=frac)
-            rows.append(
-                {
-                    "pocket": pocket_to_id[pocket_name],
-                    "ef": ef,
-                    "thresh": f"{frac * 100:.0f}",
-                    "score": score_to_use,
-                    "auroc": auroc,
-                    "p_value": p_value,
-                }
-            )
+            efs.append(ef)
 
             if curve_fill:
                 xy_tail = [(x, y) for x, y in zip(xx, yy) if x > thresh]
@@ -283,6 +352,19 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
 
             offset += 0.05
 
+        for frac, ef in zip(fracs, efs):
+            rows.append(
+                {
+                    "pocket": pocket_to_id[pocket_name],
+                    f"EF@{frac * 100:.0f}%": ef,
+                    "thresh": f"{frac * 100:.0f}",
+                    "score": score_to_use,
+                    "AuROC": auroc,
+                    "p_value": p_value,
+                    "Diversity": diversity,
+                }
+            )
+
         ax.fill_between(decoy_xx, 0, decoy_yy, color="lightgrey", alpha=0.8)
         # ax.plot(decoy_xx, decoy_yy, color='white', alpha=0.9)
         ef, thresh = enrichment_factor(scores=df[score_to_use], is_active=df["is_active"], frac=default_frac)
@@ -296,6 +378,7 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
         ax.set_title(f"{pocket_name} AuROC: {auroc:.2f} \n p={p_value:.2e}")
         g.legend().remove()
         xticks = ax.get_xticks()
+        plt.yticks([])
         # ax.set_xticks(xticks)
         # ax.set_xticklabels(np.linspace(80, 100, len(xticks)))
         sns.despine()
@@ -322,18 +405,16 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
 
 
 def make_table(df):
-    df = df.rename(columns={"ef": "Enrichment Factor", "thresh": "cutoff (%)"})
-    df = df.replace("rnamigos_42", "RNAmigos2")
     df = df.replace("native_42", "Compat")
     df = df.replace("dock_42", "Aff")
     df = df.replace("rdock", "rDock")
-    df = df.replace("maxmerge_42", "RNAmigos-merge")
-    df = df.replace("combined_42_raw", "RNAmigos++")
+    df = df.replace("maxmerge_42", "RNAmigos2")
+    df = df.replace("combined_42", "RNAmigos++")
+    print(df)
 
     table = pd.pivot_table(
         df,
-        values=["Enrichment Factor"],
-        columns=["cutoff (%)"],
+        values=["AuROC", "EF@1%", "EF@2%", "EF@5%", "Diversity"],
         index=["pocket", "score"],
     )
     print(table.to_latex(float_format="{:.2f}".format))
@@ -348,14 +429,32 @@ def make_table_auroc(df):
     df = df.replace("native_42", "Compat")
     df = df.replace("dock_42", "Aff")
     df = df.replace("rdock", "rDock")
-    df = df.replace("maxmerge_42", "RNAmigos-merge")
+    df = df.replace("maxmerge_42", "RNAmigos2")
     df = df.replace("combined_42", "RNAmigos++")
     table = pd.pivot_table(
         df,
-        values=["AuROC"],
+        values=["AuROC", "diversity"],
         index=["pocket", "score"],
     )
     print(table.to_latex(float_format="{:.2f}".format))
+
+    filtered_df = df[df["score"] == "rnamigos_42"][["pocket", "ef thresh", "auroc", "diversity"]]
+
+    # Pivot the table
+    pivoted_df = filtered_df.pivot_table(
+        index=["pocket", "auroc"], columns="ef thresh", values="diversity", aggfunc="first"
+    ).reset_index()
+
+    # Rename columns for clarity
+    pivoted_df.columns.name = None
+    pivoted_df.rename(columns={1: "Diversity (ef 1)", 2: "Diversity (ef 2)", 5: "Diversity (ef 5)"}, inplace=True)
+
+    # Reorder columns
+    final_df = pivoted_df[["pocket", "auroc", "Diversity (ef 1)", "Diversity (ef 2)", "Diversity (ef 5)"]]
+
+    # Convert to LaTeX
+    latex_table = final_df.to_latex(index=False, float_format="%.6f")
+
     pass
 
 
@@ -372,8 +471,10 @@ if __name__ == "__main__":
     big_df["scaled_native"] = big_df.groupby("pocket_id")["native_42"].transform(maxmin)
     big_df["scaled_dock"] = big_df.groupby("pocket_id")["dock_42"].transform(maxmin)
 
+    big_df["docknat"] = (big_df["native_42"] + big_df["dock_42"]) / 2
     big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
     big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
+    big_df["combined_42"] = (big_df["maxmerge_42"] + big_df["rdock"]) / 2
 
     # big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
     # big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
@@ -397,7 +498,7 @@ if __name__ == "__main__":
 
     dfs = []
 
-    for score_to_use in ["rnamigos_42", "rdock", "native_42", "dock_42", "combined_42", "maxmerge_42"]:
+    for score_to_use in ["rdock", "native_42", "dock_42", "combined_42", "maxmerge_42", "docknat"]:
         dfs.append(make_fig(big_df, score_to_use, prefix=f"resubmit_{score_to_use}", normalize_migos=True))
     make_table(pd.concat(dfs))
-    make_table_auroc(pd.concat(dfs))
+    # make_table_auroc(pd.concat(dfs))

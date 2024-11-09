@@ -194,7 +194,7 @@ if __name__ == "__main__":
 
     pdb_mols = smiles_to_mol(pd.read_csv("data/csvs/fp_data.csv")["LIGAND_SMILES"].unique())
     print(f"PDB QED: {np.mean(all_QED(pdb_mols))}")
-    thresh = 0.95
+    thresh = 0.90
 
     pdb_fps = smiles_to_fp(pd.read_csv("data/csvs/fp_data.csv")["LIGAND_SMILES"].unique())
     pdb_div = internal_diversity(pdb_fps)
@@ -244,7 +244,11 @@ if __name__ == "__main__":
         for robin in robins
     ]
     merge_actives = [
-        smiles_to_fp(big_df.loc[(big_df["pocket_id"] == robin) & (big_df["maxmerge_42"] > thresh)]["smiles"])
+        smiles_to_fp(
+            big_df.loc[(big_df["pocket_id"] == robin) & (big_df["maxmerge_42"] > thresh) & (big_df["is_active"] == 1)][
+                "smiles"
+            ]
+        )
         for robin in robins
     ]
 
@@ -257,11 +261,16 @@ if __name__ == "__main__":
         for robin in robins
     ]
     rdock_actives = [
-        smiles_to_fp(big_df.loc[(big_df["pocket_id"] == robin) & (big_df["rank_rdock"] > thresh)]["smiles"])
+        smiles_to_fp(
+            big_df.loc[(big_df["pocket_id"] == robin) & (big_df["rank_rdock"] > thresh) & (big_df["is_active"] == 1)][
+                "smiles"
+            ]
+        )
         for robin in robins
     ]
 
     # SPREADS
+    """
     for i, rob in enumerate(robins):
         print(f"diversity rnamigos {rob}: {internal_diversity(rnamigos_actives[i]):.2f}")
         print(f"diversity merge {rob}: {internal_diversity(merge_actives[i]):.2f}")
@@ -269,12 +278,13 @@ if __name__ == "__main__":
         print(f"diversity native {rob}: {internal_diversity(native_actives[i]):.2f}")
         print(f"diversity rDock {rob}: {internal_diversity(rdock_actives[i]):.2f}")
 
+    """
     # OTs
 
-    cost_matrix(robin_actives_GT, robin_actives_GT, square=True, xticklabels=robins, yticklabels=robins)
+    # cost_matrix(robin_actives_GT, robin_actives_GT, square=True, xticklabels=robins, yticklabels=robins)
     """
     cost_matrix(rnamigos_actives, [chembl_fps] * len(robins))
     cost_matrix(robin_actives_GT, [chembl_fps] * len(robins))
     cost_matrix(rdock_actives, [chembl_fps] * len(robins))
     """
-    cost_matrix(rnamigos_actives, rdock_actives, xticklabels=robins, yticklabels=robins)
+    cost_matrix(merge_actives, rdock_actives, xticklabels=robins, yticklabels=robins)

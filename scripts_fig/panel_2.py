@@ -141,8 +141,8 @@ def train_sim_perf_plot(grouped=True):
     get_groups()
     rmscores = get_rmscores()
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", "rb"))
-    mixed_res = pd.read_csv(f"outputs/pockets/docknat_42.csv")
-    mixed_res = mixed_res.loc[mixed_res["decoys"] == "chembl"]
+    big_df = pd.read_csv(f"outputs/pockets/big_df_grouped_42.csv")
+    big_df = big_df.loc[big_df["decoys"] == "chembl"]
 
     fig, ax1 = plt.subplots()
 
@@ -203,8 +203,7 @@ def get_predictions_pocket(pocket, scores, ref_ligs=None, percentile=0.01):
 
 
 def compute_pred_distances(
-        big_df_raw, out_name="outputs/pred_mixed_overlap_vincent.csv", percentile=0.01, recompute=False,
-        plot_facet=False
+    big_df_raw, out_name="outputs/pred_mixed_overlap_vincent.csv", percentile=0.01, recompute=False, plot_facet=False
 ):
     """
     Compute the pairwise distance between all pockets
@@ -295,7 +294,7 @@ def sims(grouped=True):
     # plt.rcParams['figure.figsize'] = (10, 5)
 
     # Get raw values
-    big_df_raw = pd.read_csv(f'outputs/pockets/big_df_42_raw.csv')
+    big_df_raw = pd.read_csv(f"outputs/pockets/big_df_42_raw.csv")
     big_df_raw = big_df_raw[["pocket_id", "smiles", "is_active", "docknat"]]
     big_df_raw = big_df_raw.sort_values(by=["pocket_id", "smiles", "is_active"])
 

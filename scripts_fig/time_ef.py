@@ -417,7 +417,7 @@ if __name__ == "__main__":
 
     out_csv_robin = "scripts_fig/time_auroc_robin.csv"
     # recompute = False
-    recompute = True
+    recompute = False
     build_auroc_df_robin(out_csv=out_csv_robin, recompute=recompute)
 
     # Then make plots
@@ -428,7 +428,7 @@ if __name__ == "__main__":
     # mixed_model = 'dock'
     # line_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)
     line_plot_per_pocket(df, mixed_model=mixed_model, robin=True)
-    # vax_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)
+    vax_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)
 
     # df = pd.read_csv(out_csv_robin, index_col=0)
     # mixed_model = 'dock_rnafm_3'

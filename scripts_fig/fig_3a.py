@@ -19,7 +19,7 @@ paths = {
 
 score_to_use = {
     "RNAmigos1": "raw_score",
-    "RNAmigos2": "docknat",
+    "RNAmigos2": "maxmerge_42",
     "RLDOCK": "Total_Energy",
     "AnnapuRNA": "score_RNA-Ligand",
     "AutoDock-Vina": "score",
@@ -36,9 +36,17 @@ def merge_raw_dfs():
     cols = ["raw_score", "pocket_id", "smiles", "is_active", "normed_score"]
     for method, path in paths.items():
         df = pd.read_csv(path)
+
+        if method == "RNAmigos2":
+            df["rank_native"] = df.groupby(["pocket_id", "decoys"])["native"].rank(ascending=True, pct=True)
+            df["rank_dock"] = df.groupby(["pocket_id", "decoys"])["dock"].rank(ascending=True, pct=True)
+            df["maxmerge_42"] = df[["rank_native", "rank_dock"]].max(axis=1)
+            df["maxmerge_42"] = df.groupby(["pocket_id", "decoys"])["maxmerge_42"].rank(ascending=True, pct=True)
+
         if method in ["RNAmigos1", "RNAmigos2", "rDock"]:
-            df = df.loc[df["decoys"] == "chembl"]
+            df = df.loc[df["decoys"] == "pdb_chembl"]
         if method == "RLDOCK":
+            print(df.columns, "RL")
             df["raw_score"] = df["Total_Energy"] - (df["Self_energy_of_ligand"] + df["Self_energy_of_receptor"])
             df.loc[df["raw_score"] > 0, "raw_score"] = 0
         else:
@@ -51,6 +59,7 @@ def merge_raw_dfs():
 
         df = df.loc[:, cols]
         df["method"] = method
+        df["decoys"] = "pdb_chembl"
         dfs.append(df)
 
     big_df = pd.concat(dfs)
@@ -73,8 +82,8 @@ def plot(df):
     order = [
         "RLDOCK",
         "AutoDock-Vina",
-        "dock6",
         "AnnapuRNA",
+        "dock6",
         "rDock",
         "RNAmigos1",
         "RNAmigos2",
@@ -99,6 +108,15 @@ def plot(df):
     )
     sns.despine()
     plt.xticks(rotation=45)
+
+    """
+    for i, method in enumerate(order):
+        mean = df.loc[df["method"] == method]["normed_score"].mean()
+        g.text(
+            i, mean + 0.03, f"{mean:.2f}", ha="center", va="bottom", color="red"  # Value of the mean with formatting
+       )
+
+    """
     plt.tight_layout()
     plt.savefig("figs/fig3a.pdf", format="pdf")
     plt.show()
