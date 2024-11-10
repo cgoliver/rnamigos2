@@ -34,9 +34,9 @@ def dock_correlation(mode="pockets"):
     Docking vs rnamigos score correlation
     """
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", "rb"))
-    # big_df = pd.read_csv("outputs/pockets/big_df_grouped_42_raw.csv")
-    df_path = "outputs/robin/big_df_raw.csv" if mode == "robin" else "outputs/pockets/big_df_grouped_42_raw.csv"
-    big_df = pd.read_csv(df_path)
+    big_df = pd.read_csv("outputs/pockets/big_df_42_raw.csv")
+    # df_path = "outputs/robin/big_df_raw.csv" if mode == "robin" else "outputs/pockets/big_df_grouped_42_raw.csv"
+    # big_df = pd.read_csv(df_path)
     big_df = big_df.loc[big_df["decoys"] == "chembl"]
 
     dock_to_use = "dock_pocket_norm"  # raw_score_y
@@ -45,9 +45,8 @@ def dock_correlation(mode="pockets"):
         migos_scores = ["dock_42", "rnamigos_42", "native_42"]
         score_to_name = {"rnamigos_42": "RNAmigos2.0", "native_42": "COMPAT", "dock_42": "AFF"}
     else:
-        migos_scores = ["dock", "docknat", "native"]
+        migos_scores = ["dock", "docknat"]
         score_to_name = {"docknat": "RNAmigos2.0", "native": "COMPAT", "dock": "AFF"}
-        big_df = big_df.loc[big_df["decoys"] == "pdb_chembl"]
 
     for migos in migos_scores:
         # keep only test pockets outputs
@@ -134,6 +133,30 @@ def dock_correlation(mode="pockets"):
         pass
 
 
+def active_decoy_dist():
+    df = pd.read_csv("outputs/pockets/big_df_42_raw.csv")
+    df = df.loc[df["decoys"] == "chembl"]
+    methods = ["rdock", "dock", "native", "docknat", "rdocknat", "combined", "rdockdock"]
+    for method in methods:
+        df[method] = df.groupby("pocket_id")[method].rank(ascending=True, pct=True)
+    sns.kdeplot(data=df, x="docknat", hue="is_active")
+    decoys = df.loc[df["is_active"] == 0]
+    decoys = decoys.groupby("pocket_id").sample(n=100)
+    df = pd.concat([df, decoys])
+    sns.kdeplot(data=df, x="docknat", hue="is_active", common_norm=False)
+    plt.show()
+    # Initialize the FacetGrid object
+    """
+    df_melted = df.melt(
+        id_vars=["pocket_id", "decoys", "smiles", "is_active"],
+        value_vars=methods,
+        var_name="method",
+        value_name="score",
+    )
+    df = df_melted.groupby(["pocket_id", "is_active"]).sample(n=100, random_state=42)
+    """
+
+
 def train_sim_perf_plot(grouped=True):
     """
     Make the scatter plot of performance as a function of similarity to train set
@@ -141,8 +164,8 @@ def train_sim_perf_plot(grouped=True):
     get_groups()
     rmscores = get_rmscores()
     names_train, names_test, grouped_train, grouped_test = pickle.load(open("data/train_test_75.p", "rb"))
-    big_df = pd.read_csv(f"outputs/pockets/big_df_grouped_42.csv")
-    big_df = big_df.loc[big_df["decoys"] == "chembl"]
+    mixed_res = pd.read_csv(f"outputs/pockets/docknat_42.csv")
+    mixed_res = mixed_res.loc[(mixed_res["decoys"] == "chembl") & (mixed_res["pocket_id"].isin(grouped_test))]
 
     fig, ax1 = plt.subplots()
 
@@ -625,6 +648,7 @@ def tsne(grouped=True):
 
 if __name__ == "__main__":
     # dock_correlation(mode="pockets")
-    sims()
+    # active_decoy_dist()
+    # sims()
     # tsne()
-    # train_sim_perf_plot()
+    train_sim_perf_plot()

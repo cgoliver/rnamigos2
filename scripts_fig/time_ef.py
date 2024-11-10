@@ -93,6 +93,10 @@ def build_auroc_df_robin(out_csv="fig_script/time_auroc_robin.csv", recompute=Fa
 
     big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
     big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
+    big_df["rank_rdock"] = big_df.groupby("pocket_id")["rdock"].rank(ascending=True, pct=True)
+    big_df["rank_rnamigos"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
+    big_df["combined_42_max"] = big_df[["rank_rnamigos", "rank_rdock"]].max(axis=1)
+    big_df["combined_42_max"] = big_df.groupby("pocket_id")["combined_42_max"].rank(ascending=True, pct=True)
 
     # Now iterate
     pockets = big_df["pocket_id"].unique()
@@ -113,7 +117,7 @@ def build_auroc_df_robin(out_csv="fig_script/time_auroc_robin.csv", recompute=Fa
                 df_auroc_rows.append(res)
 
         # Presort
-        for sort_col in ["rnamigos_42", "dock_42", "native_42", "maxmerge_42"]:
+        for sort_col in ["rnamigos_42", "dock_42", "native_42", "maxmerge_42", "combined_42_max"]:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
                 auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="rdock")
@@ -417,13 +421,14 @@ if __name__ == "__main__":
 
     out_csv_robin = "scripts_fig/time_auroc_robin.csv"
     # recompute = False
-    recompute = False
+    recompute = True
     build_auroc_df_robin(out_csv=out_csv_robin, recompute=recompute)
 
     # Then make plots
     df = pd.read_csv(out_csv_robin, index_col=0)
     # mixed_model = "rnamigos_42"
-    mixed_model = "maxmerge_42"
+    # mixed_model = "maxmerge_42"
+    mixed_model = "combined_42_max"
     # mixed_model = 'docknat'
     # mixed_model = 'dock'
     # line_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)

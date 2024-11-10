@@ -342,7 +342,7 @@ def main_chembl():
     #            compute_overlap=True,
     #            metric=metric)
 
-    use_cached_pockets = False
+    use_cached_pockets = True
     recompute = False
 
     get_random, get_hard, get_soft, get_rognan_like, get_rognan_true = instantiate_functions(

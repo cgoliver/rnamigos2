@@ -11,6 +11,7 @@ import pandas as pd
 import random
 import seaborn as sns
 from sklearn import metrics
+from sklearn.metrics import roc_curve, auc
 
 from rdkit import Chem, DataStructs
 from rdkit.Chem import QED
@@ -236,6 +237,42 @@ def get_dfs_migos_(pocket_name, swap=False, swap_on="merged", normalize=False):
     return df
 
 
+def make_fig_rocs(data, scores_to_use):
+    print(big_df)
+    pocket_ids = data["pocket_id"].unique()  # Get unique pocket_ids
+
+    # Create subplots, one for each pocket_id
+    fig, axes = plt.subplots(ncols=len(pocket_ids), figsize=(6 * len(pocket_ids), 6))
+
+    for ax, pocket_id in zip(axes, pocket_ids):
+        # Filter data for the current pocket_id
+        pocket_data = data[data["pocket_id"] == pocket_id]
+
+        for score_col in scores_to_use:
+            # Compute ROC curve for each score column
+            fpr, tpr, _ = roc_curve(pocket_data["is_active"], pocket_data[score_col])
+            roc_auc = auc(fpr, tpr)
+
+            # Plot ROC curve
+            ax.plot(fpr, tpr, label=f"{score_col} (AUC = {roc_auc:.2f})")
+
+        # Customize the plot
+        ax.plot([0, 1], [0, 1], "k--")  # Diagonal line (random classifier)
+        ax.set_xlim([0.0, 1.0])
+        ax.set_ylim([0.0, 1.05])
+        ax.set_xlabel("False Positive Rate")
+        ax.set_ylabel("True Positive Rate")
+        ax.set_title(f"{pocket_id}")
+        ax.legend(loc="lower right")
+        ax.set_aspect("equal")
+
+    plt.tight_layout()
+    plt.savefig("figs/robin_rocs.pdf", format="pdf")
+    plt.show()
+
+    pass
+
+
 def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="robin_fig"):
     # fig, axs = plt.subplots(1, 4, figsize=(18, 5))
     # plt.gca().set_yscale('custom')
@@ -285,22 +322,22 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
         #             palette={'actives': colors[i], 'inactives': 'lightgrey'}, common_norm=False, ax=ax, log_scale=False)
         df = df.sort_values(by="is_active")
         g = sns.kdeplot(
-            data=df,
+            data=df.loc[df["is_active"] == 1],
             x=score_to_use,
-            hue="is_active",
+            # hue="is_active",
             ax=ax,
             # palette={'actives': colors[i], 'inactives': 'lightgrey'},
-            # fill=True,
+            fill=False,
             # alpha=0.9,
             linewidth=0,
             common_norm=False,
         )
         xx, yy = g.lines[0].get_data()
-        decoy_xx, decoy_yy = g.lines[1].get_data()
-        # ax.fill_between(xx, 0, yy, color=colors[i], alpha=0.1)
+        # decoy_xx, decoy_yy = g.lines[1].get_data()
+        ax.fill_between(xx, 0, yy, color=colors[i], alpha=0.1)
         ax.plot(xx, yy, color=colors[i], alpha=1, linewidth=1.5)
         thresh = df[score_to_use].quantile(0.8)
-        ax.set_xlim([thresh, 1])
+        ax.set_xlim([0, 1.2])
 
         fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df[score_to_use])
         auroc = metrics.auc(fpr, tpr)
@@ -365,7 +402,7 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
                 }
             )
 
-        ax.fill_between(decoy_xx, 0, decoy_yy, color="lightgrey", alpha=0.8)
+        # ax.fill_between(decoy_xx, 0, decoy_yy, color="lightgrey", alpha=0.8)
         # ax.plot(decoy_xx, decoy_yy, color='white', alpha=0.9)
         ef, thresh = enrichment_factor(scores=df[score_to_use], is_active=df["is_active"], frac=default_frac)
         all_efs.append(ef)
@@ -376,7 +413,7 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
         all_aurocs.append(auroc)
 
         ax.set_title(f"{pocket_name} AuROC: {auroc:.2f} \n p={p_value:.2e}")
-        g.legend().remove()
+        # g.legend().remove()
         xticks = ax.get_xticks()
         plt.yticks([])
         # ax.set_xticks(xticks)
@@ -405,11 +442,18 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
 
 
 def make_table(df):
+
+    rows_with_nan = df[df.isna().any(axis=1)]
+    print(rows_with_nan)
+    print(rows_with_nan["score"].unique())
+
     df = df.replace("native_42", "Compat")
     df = df.replace("dock_42", "Aff")
     df = df.replace("rdock", "rDock")
     df = df.replace("maxmerge_42", "RNAmigos2")
     df = df.replace("combined_42", "RNAmigos++")
+    df = df.replace("combined_42_max", "RNAmigos++max")
+    df = df.replace("combined_42_mean", "RNAmigos++mean")
     print(df)
 
     table = pd.pivot_table(
@@ -417,7 +461,20 @@ def make_table(df):
         values=["AuROC", "EF@1%", "EF@2%", "EF@5%", "Diversity"],
         index=["pocket", "score"],
     )
-    print(table.to_latex(float_format="{:.2f}".format))
+    print(table.to_latex(float_format="{:.2f}".format, escape=True))
+
+    def make_max_bold(group):
+        # For each column, find the maximum and apply \textbf
+        for col in group.columns:
+            max_val = group[col].max()
+            group[col] = group[col].apply(lambda x: f"\\textbf{{{x:.2f}}}" if x == max_val else f"{x:.2f}")
+        return group
+
+    # Apply the bold formatting to the table
+    table_bold = table.groupby(["pocket"]).apply(make_max_bold)
+
+    # Print the LaTeX output
+    print(table_bold.to_latex(float_format="{:.2f}".format, escape=False))
 
     pass
 
@@ -431,6 +488,8 @@ def make_table_auroc(df):
     df = df.replace("rdock", "rDock")
     df = df.replace("maxmerge_42", "RNAmigos2")
     df = df.replace("combined_42", "RNAmigos++")
+    df = df.replace("combined_42_max", "RNAmigos++max")
+    df = df.replace("combined_42_mean", "RNAmigos++mean")
     table = pd.pivot_table(
         df,
         values=["AuROC", "diversity"],
@@ -462,8 +521,10 @@ if __name__ == "__main__":
 
     # add merging score
     big_df = pd.read_csv("outputs/robin/big_df_raw.csv")
+
     big_df["rank_native"] = big_df.groupby("pocket_id")["native_42"].rank(ascending=True, pct=True)
     big_df["rank_dock"] = big_df.groupby("pocket_id")["dock_42"].rank(ascending=True, pct=True)
+    big_df["rank_rdock"] = big_df.groupby("pocket_id")["rdock"].rank(ascending=True, pct=True)
 
     def maxmin(column):
         return (column - column.min()) / (column.max() - column.min())
@@ -471,10 +532,12 @@ if __name__ == "__main__":
     big_df["scaled_native"] = big_df.groupby("pocket_id")["native_42"].transform(maxmin)
     big_df["scaled_dock"] = big_df.groupby("pocket_id")["dock_42"].transform(maxmin)
 
-    big_df["docknat"] = (big_df["native_42"] + big_df["dock_42"]) / 2
     big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
     big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
-    big_df["combined_42"] = (big_df["maxmerge_42"] + big_df["rdock"]) / 2
+    big_df["rank_rnamigos"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
+    big_df["combined_42_max"] = big_df[["rank_rnamigos", "rank_rdock"]].max(axis=1)
+    big_df["combined_42_max"] = big_df.groupby("pocket_id")["combined_42_max"].rank(ascending=True, pct=True)
+    big_df["combined_42_mean"] = (big_df["maxmerge_42"] + big_df["rdock"]) / 2
 
     # big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
     # big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
@@ -495,10 +558,26 @@ if __name__ == "__main__":
         plt.show()
     big_df.to_csv("big_df_merge.csv")
     """
+    scores = [
+        "rdock",
+        "native_42",
+        "dock_42",
+        "combined_42",
+        "maxmerge_42",
+        "combined_42_max",
+        "combined_42_mean",
+    ]
 
+    scores_roc = [
+        "rdock",
+        "maxmerge_42",
+        "combined_42_max",
+    ]
+
+    make_fig_rocs(big_df, scores_roc)
     dfs = []
 
-    for score_to_use in ["rdock", "native_42", "dock_42", "combined_42", "maxmerge_42", "docknat"]:
+    for score_to_use in scores:
         dfs.append(make_fig(big_df, score_to_use, prefix=f"resubmit_{score_to_use}", normalize_migos=True))
-    make_table(pd.concat(dfs))
+    # make_table(pd.concat(dfs))
     # make_table_auroc(pd.concat(dfs))
