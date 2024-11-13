@@ -310,9 +310,9 @@ if __name__ == "__main__":
     # GET ALL CSVs for the models and plot them
     get_all_csvs(recompute=False, swap=SWAP)
     get_dfs_docking(swap=SWAP)
-    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=False)
+    mix_all(res_dir=res_dir, pairs=PAIRS, recompute=True, use_max=True)
     get_merged_df(recompute=True, swap=SWAP)
-    print_results(swap=SWAP)
+    # print_results(swap=SWAP)
 
     # COMPUTE PERTURBED VERSIONS
     for swap in range(1, 4):

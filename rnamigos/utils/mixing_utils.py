@@ -105,7 +105,7 @@ def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mi
     return all_aurocs, mixed_df_aurocs, mixed_df_raw
 
 
-def mix_all(res_dir, pairs, recompute=False, score="raw_score"):
+def mix_all(res_dir, pairs, recompute=False, score="raw_score", use_max=False):
     """
     Used to go from raw dfs to mixed raw_dfs
     :param res_dir:
@@ -124,7 +124,7 @@ def mix_all(res_dir, pairs, recompute=False, score="raw_score"):
         df1 = pd.read_csv(path1)
         df2 = pd.read_csv(path2)
 
-        _, _, robin_raw_dfs = mix_two_dfs(df1, df2, score_1=score)
+        _, _, robin_raw_dfs = mix_two_dfs(df1, df2, score_1=score, use_max=use_max)
         robin_raw_dfs = robin_raw_dfs[["pocket_id", "smiles", "is_active", "mixed"]]
         robin_raw_dfs = robin_raw_dfs.rename(columns={"mixed": "raw_score"})
         robin_raw_dfs.to_csv(outpath_raw, index=False)

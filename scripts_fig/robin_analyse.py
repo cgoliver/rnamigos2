@@ -171,6 +171,80 @@ def plot_distributions(score_to_use="native_validation", in_csv="outputs/robin/b
     plt.show()
 
 
+def compute_hopkins():
+    import numpy as np
+    import pandas as pd
+    from rdkit import Chem
+    from rdkit.Chem import MACCSkeys
+    from sklearn.neighbors import NearestNeighbors
+
+    def hopkins_statistic(X, sample_size=0.1):
+        n, d = X.shape
+
+        # Determine the number of samples
+        if isinstance(sample_size, float):
+            n_samples = int(sample_size * n)
+        else:
+            n_samples = sample_size
+
+        # Randomly sample `n_samples` points from X
+        indices = np.random.choice(n, n_samples, replace=False)
+        X_sample = X[indices]
+
+        # Generate uniform samples within the feature space bounds of X
+        X_min, X_max = np.min(X, axis=0), np.max(X, axis=0)
+        # uniform_samples = np.random.uniform(X_min, X_max, (n_samples, d))
+        uniform_samples = np.random.randint(X_min, X_max + 1, size=(n_samples, d))
+
+        # Initialize nearest neighbor model
+        nn = NearestNeighbors(n_neighbors=2)
+        nn.fit(X)
+
+        # Distance from each point in the real sample to its nearest neighbor in X
+        u_distances, _ = nn.kneighbors(X_sample, return_distance=True)
+        u_distances = u_distances[:, 1]
+
+        # Distance from each uniform sample point to its nearest neighbor in X
+        w_distances, _ = nn.kneighbors(uniform_samples, return_distance=True)
+        w_distances = w_distances[:, 0]
+
+        # Compute the Hopkins statistic
+        hopkins_stat = np.sum(w_distances) / (np.sum(w_distances) + np.sum(u_distances))
+        return f"{hopkins_stat:.3f}"
+
+    def retain_top_x_percent(df, column, x=10):
+        subset_df = df[['pocket_id', 'smiles', 'is_active', column]]
+        all_tops = []
+        for p in subset_df['pocket_id'].unique():
+            df = subset_df[subset_df['pocket_id'] == p]
+            n = int(len(df) * (x / 100))
+            top_x_percent_df = df.nlargest(n, column)
+            all_tops.append(top_x_percent_df)
+        return all_tops
+
+    def get_active_fps(df):
+        active = df.loc[df['is_active'] == 1]
+        smiles_list = active["smiles"].unique().tolist()
+        mols = [Chem.MolFromSmiles(s) for s in smiles_list]
+        fps = np.asarray([MACCSkeys.GenMACCSKeys(m) for m in mols])
+        return fps
+
+    def print_hopkins(df, column):
+        top = retain_top_x_percent(df.copy(), column)
+        fps = [get_active_fps(top_pocket) for top_pocket in top]
+        hopkins_stat = [hopkins_statistic(fps, sample_size=1.0) for fps in fps]
+        print(f"Hopkins Statistic {column} :", hopkins_stat)
+
+    in_csv = "outputs/robin/big_df_raw.csv"
+    in_df = pd.read_csv(in_csv)
+    # print(in_df.columns)
+    print("2GDI_Y_TPP_100,  5BTP_A_AMZ_106, 2QWY_B_SAM_300, 3FU2_A_PRF_101")
+    print_hopkins(in_df, "dock_42")
+    print_hopkins(in_df, "native_42")
+    print_hopkins(in_df, "rnamigos_42")
+    print_hopkins(in_df, "rdock")
+
+
 if __name__ == "__main__":
     SWAP = 0
     RES_DIR = "outputs/robin/" if SWAP == 0 else f"outputs/robin_swap_{SWAP}"
