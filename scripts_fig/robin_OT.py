@@ -156,7 +156,7 @@ def spread(fps):
     return np.mean(costs)
 
 
-def cost_matrix(fps_1, fps_2, square=False, xticklabels=None, yticklabels=None):
+def cost_matrix(fps_1, fps_2, square=False, xticklabels=None, yticklabels=None, save=None):
 
     if xticklabels is None:
         xticklabels = range(len(fps_1))
@@ -177,7 +177,8 @@ def cost_matrix(fps_1, fps_2, square=False, xticklabels=None, yticklabels=None):
     sns.heatmap(costs, annot=True, cmap="coolwarm", square=True, xticklabels=xticklabels, yticklabels=yticklabels)
 
     plt.tight_layout()
-    plt.savefig("hmp_preds.pdf", format="pdf")
+    if not save is None:
+        plt.savefig(save, format="pdf")
     plt.show()
     pass
 
@@ -194,7 +195,7 @@ if __name__ == "__main__":
 
     pdb_mols = smiles_to_mol(pd.read_csv("data/csvs/fp_data.csv")["LIGAND_SMILES"].unique())
     print(f"PDB QED: {np.mean(all_QED(pdb_mols))}")
-    thresh = 0.90
+    thresh = 0.95
 
     pdb_fps = smiles_to_fp(pd.read_csv("data/csvs/fp_data.csv")["LIGAND_SMILES"].unique())
     pdb_div = internal_diversity(pdb_fps)
@@ -287,4 +288,10 @@ if __name__ == "__main__":
     cost_matrix(robin_actives_GT, [chembl_fps] * len(robins))
     cost_matrix(rdock_actives, [chembl_fps] * len(robins))
     """
-    cost_matrix(merge_actives, rdock_actives, xticklabels=robins, yticklabels=robins)
+    cost_matrix(
+        native_actives,
+        dock_actives,
+        xticklabels=robins,
+        yticklabels=robins,
+        save="figs/native_dock_ot.pdf",
+    )

@@ -44,7 +44,7 @@ def merge_raw_dfs():
             df["maxmerge_42"] = df.groupby(["pocket_id", "decoys"])["maxmerge_42"].rank(ascending=True, pct=True)
 
         if method in ["RNAmigos1", "RNAmigos2", "rDock"]:
-            df = df.loc[df["decoys"] == "pdb_chembl"]
+            df = df.loc[df["decoys"] == "chembl"]
         if method == "RLDOCK":
             print(df.columns, "RL")
             df["raw_score"] = df["Total_Energy"] - (df["Self_energy_of_ligand"] + df["Self_energy_of_receptor"])
@@ -59,7 +59,7 @@ def merge_raw_dfs():
 
         df = df.loc[:, cols]
         df["method"] = method
-        df["decoys"] = "pdb_chembl"
+        df["decoys"] = "chembl"
         dfs.append(df)
 
     big_df = pd.concat(dfs)
@@ -69,7 +69,7 @@ def merge_raw_dfs():
 def plot(df):
     df = df.loc[df["pocket_id"].isin(grouped_test)]
     df = df.loc[df["is_active"] > 0]
-    df = df.loc[df["decoys"] == "pdb_chembl"]
+    df = df.loc[df["decoys"] == "chembl"]
 
     custom_palette_bar = {
         method: "#e9e9f8" if method.startswith("RNAmigos") else "#d3d3d3" for method in df["method"].unique()
@@ -104,19 +104,29 @@ def plot(df):
         y="normed_score",
         ax=g,
         order=order,
+        alpha=0.6,
         palette=custom_palette_point,
     )
     sns.despine()
     plt.xticks(rotation=45)
 
-    """
+    for patch in g.patches:
+        # Get the x and y position of the top of the bar
+        x = patch.get_x() + patch.get_width() / 2
+        y = patch.get_height()
+
+        # Plot a black dot on top of the bar
+        plt.plot(x, y, "ko", color="black", markersize=5, markeredgewidth=1, zorder=3)
+
     for i, method in enumerate(order):
         mean = df.loc[df["method"] == method]["normed_score"].mean()
+        std = df.loc[df["method"] == method]["normed_score"].std()
         g.text(
-            i, mean + 0.03, f"{mean:.2f}", ha="center", va="bottom", color="red"  # Value of the mean with formatting
-       )
+            i, 1.05, f"{mean:.2f}$\pm${std:.2f}", fontsize=8, ha="center", va="bottom", color="black"
+        )  # Value of the mean with formatting
 
-    """
+    plt.gca().set_xlabel("")
+    plt.gca().set_ylabel("")
     plt.tight_layout()
     plt.savefig("figs/fig3a.pdf", format="pdf")
     plt.show()

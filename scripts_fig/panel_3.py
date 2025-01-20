@@ -227,6 +227,7 @@ if __name__ == "__main__":
         return (column - column.min()) / (column.max() - column.min())
 
     big_df["maxmerge_42"] = big_df[["rank_native", "rank_dock"]].max(axis=1)
+    big_df["maxmerge_42"] = big_df.groupby("pocket_id")["maxmerge_42"].rank(ascending=True, pct=True)
 
     dead_color = "whitesmoke"
     inactive_color = "lightgrey"
@@ -274,7 +275,8 @@ if __name__ == "__main__":
     colnames = ["robin", "color", "pos_x", "pos_y", "selected", "active", "idx"]
     df = pd.DataFrame(to_plot, columns=colnames)
 
-    # sns.kdeplot(data=df, x="pos_x", y="pos_y", color="grey", fill=False, bw_adjust=0.5, alpha=0.25)
+    """
+    sns.kdeplot(data=df, x="pos_x", y="pos_y", color="grey", fill=False, bw_adjust=0.5, alpha=0.25)
 
     fig, ax = plt.subplots(1, 4, figsize=(12, 4))
     for i, robin in enumerate(robins):
@@ -324,6 +326,8 @@ if __name__ == "__main__":
     plt.show()
 
     fig, ax = plt.subplots()
+    """
+    sns.kdeplot(data=df, x="pos_x", y="pos_y", color="grey", fill=False, bw_adjust=0.5, alpha=0.25)
 
     if not mols_only:
         # inactives unselected: grey dot
@@ -384,7 +388,6 @@ if __name__ == "__main__":
         sys.exit()
 
     plt.axis("off")
-    plt.savefig("figs/robin_tsne_bkg.png", dpi=600, format="png")
 
     # draw some mols
     if do_draw_mols:
@@ -393,8 +396,8 @@ if __name__ == "__main__":
         not_selected_actives = list(df.loc[(df["selected"] == False) & (df["active"] == True)]["idx"])
         not_selected_inactives = list(df.loc[(df["selected"] == False) & (df["active"] == False)]["idx"])
 
-        not_selected_actives_right = list(
-            df.loc[(df["selected"] == False) & (df["active"] == True) & (df["pos_x"] > 0)]["idx"]
+        selected_actives_right = list(
+            df.loc[(df["selected"] == True) & (df["active"] == True) & (df["pos_x"] < 0)]["idx"]
         )
 
         """
@@ -404,13 +407,14 @@ if __name__ == "__main__":
         """
         local_random = random.Random(sys.argv[1])
         pos_iter = iter(positions)
-        for idx in local_random.sample(not_selected_actives_right, 3):
+        for idx in local_random.sample(selected_actives_right, 3):
             print(idx)
             MolImage(idx, next(pos_iter)).draw(ax)
-        for idx in local_random.sample(not_selected_actives_right, 3):
+        for idx in local_random.sample(not_selected_actives, 3):
             print(idx)
             MolImage(idx, next(pos_iter)).draw(ax)
 
     plt.axis("off")
-    # plt.savefig("figs/robin_tsne_mols.pdf", format="pdf")
+    plt.savefig("figs/robin_tsne_mols_k.pdf", format="pdf")
+    # plt.savefig("figs/robin_tsne_bkg.pdf", dpi=600, format="pdf")
     plt.show()

@@ -38,15 +38,16 @@ def dock_correlation(mode="pockets"):
     # df_path = "outputs/robin/big_df_raw.csv" if mode == "robin" else "outputs/pockets/big_df_grouped_42_raw.csv"
     # big_df = pd.read_csv(df_path)
     big_df = big_df.loc[big_df["decoys"] == "chembl"]
+    big_df["docknat"] = (big_df["native"] + big_df["dock"]) / 2
 
     dock_to_use = "dock_pocket_norm"  # raw_score_y
 
     if mode == "robin":
-        migos_scores = ["dock_42", "rnamigos_42", "native_42"]
-        score_to_name = {"rnamigos_42": "RNAmigos2.0", "native_42": "COMPAT", "dock_42": "AFF"}
+        migos_scores = ["dock", "docknat", "native"]
+        score_to_name = {"docknat": "RNAmigos2.0", "native": "COMPAT", "dock": "AFF"}
     else:
         migos_scores = ["dock", "docknat"]
-        score_to_name = {"docknat": "RNAmigos2.0", "native": "COMPAT", "dock": "AFF"}
+        score_to_name = {"docknat": "AFF+COMPAT", "native": "COMPAT", "dock": "AFF"}
 
     for migos in migos_scores:
         # keep only test pockets outputs
@@ -647,7 +648,7 @@ def tsne(grouped=True):
 
 
 if __name__ == "__main__":
-    # dock_correlation(mode="pockets")
+    dock_correlation(mode="pockets")
     # active_decoy_dist()
     # sims()
     # tsne()

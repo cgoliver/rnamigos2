@@ -117,7 +117,7 @@ def build_auroc_df_robin(out_csv="fig_script/time_auroc_robin.csv", recompute=Fa
                 df_auroc_rows.append(res)
 
         # Presort
-        for sort_col in ["rnamigos_42", "dock_42", "native_42", "maxmerge_42", "combined_42_max"]:
+        for sort_col in ["rnamigos_42", "dock_42", "native_42"]:
             pocket_df = pocket_df.sort_values(by=sort_col, ascending=False)
             for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
                 auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="rdock")
@@ -127,8 +127,8 @@ def build_auroc_df_robin(out_csv="fig_script/time_auroc_robin.csv", recompute=Fa
         # docknat+rdocknat
         pocket_df = pocket_df.sort_values(by="maxmerge_42", ascending=False)
         for i, sort_up_to in enumerate(np.linspace(0, len(pocket_df), nsteps).astype(int)):
-            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="combined_42")
-            res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": "combined", "seed": 0}
+            auroc = partial_virtual_screen(pocket_df, sort_up_to, score_column="combined_42_max")
+            res = {"sort_up_to": i, "pocket": pocket, "auroc": auroc, "model": "combined_42_max", "seed": 0}
             df_auroc_rows.append(res)
 
         """
@@ -429,7 +429,7 @@ if __name__ == "__main__":
     # mixed_model = "rnamigos_42"
     # mixed_model = "maxmerge_42"
     mixed_model = "combined_42_max"
-    # mixed_model = 'docknat'
+    # mixed_model = "combined"
     # mixed_model = 'dock'
     # line_plot(df, mixed_model=mixed_model, decoy_mode=decoy_mode)
     line_plot_per_pocket(df, mixed_model=mixed_model, robin=True)

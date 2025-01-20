@@ -237,6 +237,30 @@ def get_dfs_migos_(pocket_name, swap=False, swap_on="merged", normalize=False):
     return df
 
 
+def make_violins(df):
+    df = df.drop(columns=["dock_42", "native_42", "rnamigos_42", "rdocknat_42", "combined_42"], axis=1)
+    df = df.melt(
+        id_vars=["pocket_id", "smiles", "is_active"],
+        value_vars=["maxmerge_42", "combined_42_max", "rank_rdock"],
+        var_name="method",
+        value_name="score",
+    )
+    df = df.loc[df["is_active"] == 1]
+    print(df)
+    print(df.columns)
+
+    # Create a FacetGrid with one subplot for each pocket
+    g = sns.FacetGrid(df, col="pocket_id", height=5, aspect=1.5)
+
+    # Map the histplot to the grid
+    g.map(sns.histplot, "score", data=df, hue="method", multiple="dodge", legend=True)
+
+    plt.legend()
+    plt.show()
+
+    pass
+
+
 def make_fig_rocs(data, scores_to_use):
     print(big_df)
     pocket_ids = data["pocket_id"].unique()  # Get unique pocket_ids
@@ -288,24 +312,9 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
         # ax.set_xscale('custom')
         df = big_df.loc[big_df["pocket_id"] == pocket_name]
 
-        # FOR DOCKING
-        # merged_rdock = get_dfs_docking(ligand_name=ligand_name)
-        # score_to_use = 'docking_score'
-
-        # FOR MIGOS
-        # merged_migos["dock_nat"] = (normalize(merged_migos["is_active"]) + normalize(merged_migos["dock"])) / 2
-        # print(merged_rdock)
-
-        # merged = pd.merge(merged_migos, merged_rdock, on=["smiles", "is_active"], how="outer")
-
-        # merged = merged.fillna(0)
-        # merged["RNAmigos2++"] = (merged["dock_nat"] + merged["rDock"]) / 2
-
-        # scores = merged["score"]
-
         # GET EFS
         # fracs = [0.01, 0.05]
-        fracs = [0.01, 0.02, 0.05]
+        fracs = [0.01, 0.02, 0.05, 0.1]
         linecolors = ["black", "grey", "lightgrey"]
 
         colors = sns.color_palette("Paired", 4)
@@ -330,18 +339,24 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
             fill=False,
             # alpha=0.9,
             linewidth=0,
+            bw_adjust=0.5,
             common_norm=False,
         )
         xx, yy = g.lines[0].get_data()
         # decoy_xx, decoy_yy = g.lines[1].get_data()
-        ax.fill_between(xx, 0, yy, color=colors[i], alpha=0.1)
-        ax.plot(xx, yy, color=colors[i], alpha=1, linewidth=1.5)
-        thresh = df[score_to_use].quantile(0.8)
-        ax.set_xlim([0, 1.2])
+        # ax.fill_between(xx, 0, yy, color=colors[i], alpha=0.1)
+
+        # ax.plot(xx, yy, color=colors[i], alpha=1, linewidth=1.5)
+        # thresh = df[score_to_use].quantile(0.8)
+        sns.histplot(
+            data=df.loc[df["is_active"] == 1], stat="density", x=score_to_use, ax=ax, alpha=0.2, color=colors[i]
+        )
+
+        ax.set_xlim([0, 1])
 
         fpr, tpr, thresholds = metrics.roc_curve(df["is_active"], df[score_to_use])
         auroc = metrics.auc(fpr, tpr)
-        t_stat, p_value = stats.ttest_ind(
+        t_stat, p_value = stats.mannwhitneyu(
             df[df["is_active"] == 1][score_to_use], df[df["is_active"] == 0][score_to_use]
         )
         print(p_value)
@@ -355,6 +370,7 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
             ef, thresh = enrichment_factor(scores=df[score_to_use], is_active=df["is_active"], frac=frac)
             efs.append(ef)
 
+            """
             if curve_fill:
                 xy_tail = [(x, y) for x, y in zip(xx, yy) if x > thresh]
                 x_tail = [x for x, y in xy_tail]
@@ -388,6 +404,7 @@ def make_fig(big_df, score_to_use, swap=False, normalize_migos=True, prefix="rob
             )
 
             offset += 0.05
+            """
 
         for frac, ef in zip(fracs, efs):
             rows.append(
@@ -566,6 +583,7 @@ if __name__ == "__main__":
         "maxmerge_42",
         "combined_42_max",
         "combined_42_mean",
+        "rank_rdock",
     ]
 
     scores_roc = [
@@ -574,10 +592,11 @@ if __name__ == "__main__":
         "combined_42_max",
     ]
 
+    make_violins(big_df)
     make_fig_rocs(big_df, scores_roc)
     dfs = []
 
     for score_to_use in scores:
         dfs.append(make_fig(big_df, score_to_use, prefix=f"resubmit_{score_to_use}", normalize_migos=True))
-    # make_table(pd.concat(dfs))
+    make_table(pd.concat(dfs))
     # make_table_auroc(pd.concat(dfs))
