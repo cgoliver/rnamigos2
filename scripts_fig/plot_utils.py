@@ -9,9 +9,38 @@ import pickle
 import random
 import seaborn as sns
 from sklearn.manifold import TSNE, MDS
+from seaborn.palettes import dark_palette, light_palette, blend_palette
 
 random.seed(42)
 np.random.seed(42)
+
+
+def patch_violinplot(palette):
+    """
+    Correct the border to have it in the same color as whisker plot
+    """
+    from matplotlib.collections import PolyCollection
+
+    ax = plt.gca()
+    violins = [art for art in ax.get_children() if isinstance(art, PolyCollection)]
+    for i in range(len(violins)):
+        violins[i].set_edgecolor(palette[i])
+
+
+def custom_diverging_palette(
+    h_neg, h_pos, s_neg=75, s_pos=75, l_neg=50, l_pos=50, sep=1, n=6, center="light", as_cmap=False  # noqa
+):
+    """
+    Make a diverging palette between two HUSL colors.I added the possibility of asymetry in endpoints saturation
+    """
+    palfunc = dict(dark=dark_palette, light=light_palette)[center]
+    n_half = int(128 - (sep // 2))
+    neg = palfunc((h_neg, s_neg, l_neg), n_half, reverse=True, input="husl")
+    pos = palfunc((h_pos, s_pos, l_pos), n_half, input="husl")
+    midpoint = dict(light=[(0.95, 0.95, 0.95)], dark=[(0.133, 0.133, 0.133)])[center]
+    mid = midpoint * sep
+    pal = blend_palette(np.concatenate([neg, mid, pos]), n, as_cmap=as_cmap)
+    return pal
 
 
 def get_groups():
@@ -124,8 +153,8 @@ class CustomScale(mscale.ScaleBase):
     name = "custom"
 
     # def __init__(self, axis, offset=.05, sup_lim=1, divider=1): # for violins
-    def __init__(self, axis, offset=.02, sup_lim=1, divider=1): # for time_ef chembl
-    # def __init__(self, axis, offset=0.03, sup_lim=0.94, divider=1): # for time_ef pdb_chembl
+    def __init__(self, axis, offset=0.02, sup_lim=1, divider=1):  # for time_ef chembl
+        # def __init__(self, axis, offset=0.03, sup_lim=0.94, divider=1): # for time_ef pdb_chembl
         mscale.ScaleBase.__init__(self, axis=axis)
         self.offset = offset
         self.divider = divider
