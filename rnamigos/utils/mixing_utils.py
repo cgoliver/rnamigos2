@@ -21,7 +21,7 @@ def normalize(scores):
     return out_scores
 
 
-def add_mixed_score(df, score1='dock', score2='native', out_col='mixed', use_max=False):
+def add_mixed_score(df, score1='dock', score2='native', out_col='mixed', use_max=True):
     scores_1 = df[score1].values
     scores_2 = df[score2].values
     if use_max:
@@ -29,7 +29,7 @@ def add_mixed_score(df, score1='dock', score2='native', out_col='mixed', use_max
         ranks_1 = scipy.stats.rankdata(scores_1, method='max')
         ranks_2 = scipy.stats.rankdata(scores_2, method='max')
         out_ranks = np.maximum(ranks_1, ranks_2)
-        df[out_col] = out_ranks
+        df[out_col] = out_ranks / np.max(out_ranks)
     else:
         normalized_scores_1 = normalize(scores_1)
         normalized_scores_2 = normalize(scores_2)
@@ -38,7 +38,7 @@ def add_mixed_score(df, score1='dock', score2='native', out_col='mixed', use_max
 
 
 def mix_two_scores(df, score1='dock', score2='native', outname=None, outname_col='mixed', add_decoy=True,
-                   use_max=False):
+                   use_max=True):
     """
     Mix two scores, and return raw, aurocs and mean aurocs. Optionally dump the dataframes.
     """
@@ -85,7 +85,7 @@ def get_mix_score(df, score1='dock', score2='native'):
     return np.mean(all_aurocs)
 
 
-def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mixed', use_max=False):
+def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mixed', use_max=True):
     """
     Instead of mixing one df on two scores, we have two dfs with one score...
     """
@@ -105,7 +105,7 @@ def mix_two_dfs(df_1, df_2, score_1, score_2=None, outname=None, outname_col='mi
     return all_aurocs, mixed_df_aurocs, mixed_df_raw
 
 
-def mix_all(res_dir, pairs, recompute=False, score="raw_score", use_max=False):
+def mix_all(res_dir, pairs, recompute=False, score="raw_score", use_max=True):
     """
     Used to go from raw dfs to mixed raw_dfs
     :param res_dir:

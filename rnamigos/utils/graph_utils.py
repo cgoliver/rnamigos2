@@ -8,6 +8,8 @@ import networkx as nx
 import numpy as np
 
 import rnaglib
+from rnaglib.algorithms import multigraph_to_simple
+from rnaglib.transforms import RNAFMTransform
 from rnaglib.prepare_data import fr3d_to_graph
 from rnaglib.utils import graph_io
 from rnaglib.config import NODE_FEATURE_MAP
@@ -32,62 +34,18 @@ def to_undirected(edge_map):
     return undirected_edge_map
 
 
-def add_rnafm(pocket_nx, rna_path, cache_path="data/pocket_embeddings"):
-    embs = np.load(Path("data/pocket_embeddings") / Path(Path(rna_path).stem + ".npz"))
-    # Now if some nodes are still missing and complement those with the mean embedding
-    nx.set_node_attributes(pocket_nx, embs, "rnafm")
-    existing_rnafm_embs_dict = nx.get_node_attributes(pocket_nx, "rnafm")
-    if len(existing_rnafm_embs_dict) > 0:
-        existing_nodes, existing_embs = list(zip(*existing_rnafm_embs_dict.items()))
-    else:
-        existing_nodes, existing_embs = [], []
-    missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
-    n = len(pocket_nx.nodes())
-    # If only a fraction is missing, just skip and compute mean embedding
-    if n * 0.15 > len(missing_nodes) > 0:
-        if isinstance(existing_embs[0], np.ndarray):
-            existing_embs = [torch.from_numpy(x) for x in existing_embs]
-        mean_emb = torch.mean(torch.stack(existing_embs), dim=0)
-        missing_embs = {node: mean_emb for node in missing_nodes}
-        nx.set_node_attributes(pocket_nx, name="rnafm", values=missing_embs)
-
-    # Otherwise load the whole graphs embeddings. This step is useful for pocket perturbation.
-    elif len(missing_nodes) >= n * 0.15:
-        pdb_id = list(missing_nodes)[0].split(".")[0].upper()
-        # pdb_id = Path(rna_path).stem.split("_")[0]
-        large_embs = np.load(f"data/pocket_chain_embeddings/{pdb_id}.npz")
-        nx.set_node_attributes(pocket_nx, large_embs, "rnafm")
-
-        # Just triple check
-        existing_nodes, existing_embs = list(zip(*nx.get_node_attributes(pocket_nx, "rnafm").items()))
-        missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
-        if len(missing_nodes) > 0:
-            raise Exception
-
-    rnafm_embs = nx.get_node_attributes(pocket_nx, name="rnafm")
-    pre_feats = nx.get_node_attributes(pocket_nx, name="nt_features")
-    combined = {}
-    for node, pre_feat in pre_feats.items():
-        rna_emb = rnafm_embs[node]
-        if isinstance(rna_emb, np.ndarray):
-            rna_emb = torch.from_numpy(rna_emb)
-        combined[node] = torch.cat((pre_feat, rna_emb))
-    nx.set_node_attributes(pocket_nx, name="nt_features", values=combined)
-
-
-def load_rna_graph(rna_path,
+def prepare_pocket(rna_path,
                    edge_map=EDGE_MAP_RGLIB,
-                   undirected=False,
-                   use_rings=False,
-                   use_rnafm=False,
-                   ):
+                   undirected=False):
     """
-    NetworkX Graph or path to a json => DGL graph
+    NetworkX Graph or path to a json => Networkx graph with the right fields
     """
     if isinstance(rna_path, (str, Path)):
         pocket_graph = graph_io.load_json(rna_path)
     if isinstance(rna_path, nx.Graph):
         pocket_graph = rna_path
+        # Useful to keep a string for RNA-FM computations
+        rna_path = pocket_graph.name
     # possibly undirected, just update the edge map to keep a DiGraph
     edge_map = to_undirected(edge_map) if undirected else edge_map
     edge_map = {key.upper(): value for key, value in edge_map.items()}
@@ -118,13 +76,56 @@ def load_rna_graph(rna_path,
     # By default, or if some nodes were missing, set them to True
     pocket_nodes = {node: True if node not in pocket_nodes else pocket_nodes[node] for node in pocket_graph.nodes()}
     nx.set_node_attributes(pocket_graph, name="in_pocket", values=pocket_nodes)
+    return pocket_graph
 
-    # Optionally add rna_fm embs
-    if use_rnafm:
-        add_rnafm(pocket_graph, rna_path)
-    # a = list(pocket_graph.nodes(data=True))
-    # b = pocket_graph_dgl.ndata['rnafm']
 
+def add_rnafm(pocket_nx,
+              rna_path,
+              pocket_cache_path="data/pocket_embeddings",
+              cache_path="data/pocket_chain_embeddings"):
+    cached_pocket_embs_path = os.path.join(pocket_cache_path, f"{Path(rna_path).stem}.npz")
+    embs = np.load(cached_pocket_embs_path)
+    # Now if some nodes are still missing and complement those with the mean embedding
+    nx.set_node_attributes(pocket_nx, embs, "rnafm")
+    existing_rnafm_embs_dict = nx.get_node_attributes(pocket_nx, "rnafm")
+    if len(existing_rnafm_embs_dict) > 0:
+        existing_nodes, existing_embs = list(zip(*existing_rnafm_embs_dict.items()))
+    else:
+        existing_nodes, existing_embs = [], []
+    missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
+    n = len(pocket_nx.nodes())
+    # If only a fraction is missing, just skip and compute mean embedding
+    if n * 0.15 > len(missing_nodes) > 0:
+        if isinstance(existing_embs[0], np.ndarray):
+            existing_embs = [torch.from_numpy(x) for x in existing_embs]
+        mean_emb = torch.mean(torch.stack(existing_embs), dim=0)
+        missing_embs = {node: mean_emb for node in missing_nodes}
+        nx.set_node_attributes(pocket_nx, name="rnafm", values=missing_embs)
+
+    # Otherwise load the whole graphs embeddings. This step is useful for pocket perturbation.
+    elif len(missing_nodes) >= n * 0.15:
+        pdb_id = list(missing_nodes)[0].split(".")[0].upper()
+        large_embs = np.load(os.path.join(cache_path, f"{pdb_id}.npz"))
+        nx.set_node_attributes(pocket_nx, large_embs, "rnafm")
+
+        # Just triple check
+        existing_nodes, existing_embs = list(zip(*nx.get_node_attributes(pocket_nx, "rnafm").items()))
+        missing_nodes = set(pocket_nx.nodes()) - set(existing_nodes)
+        if len(missing_nodes) > 0:
+            raise Exception
+
+    rnafm_embs = nx.get_node_attributes(pocket_nx, name="rnafm")
+    pre_feats = nx.get_node_attributes(pocket_nx, name="nt_features")
+    combined = {}
+    for node, pre_feat in pre_feats.items():
+        rna_emb = rnafm_embs[node]
+        if isinstance(rna_emb, np.ndarray):
+            rna_emb = torch.from_numpy(rna_emb)
+        combined[node] = torch.cat((pre_feat, rna_emb))
+    nx.set_node_attributes(pocket_nx, name="nt_features", values=combined)
+
+
+def nx_to_dgl(pocket_graph, use_rings=False):
     pocket_graph_dgl = dgl.from_networkx(
         nx_graph=pocket_graph,
         edge_attrs=["edge_type"],
@@ -138,6 +139,24 @@ def load_rna_graph(rna_path,
     return pocket_graph_dgl, rings
 
 
+def load_rna_graph(rna_path,
+                   edge_map=EDGE_MAP_RGLIB,
+                   undirected=False,
+                   use_rings=False,
+                   use_rnafm=False,
+                   ):
+    """
+    NetworkX Graph or path to a json => DGL graph
+    """
+    pocket_graph = prepare_pocket(rna_path=rna_path, edge_map=edge_map, undirected=undirected)
+    # Optionally add rna_fm embs
+    if use_rnafm:
+        add_rnafm(pocket_graph, rna_path)
+    # a = list(pocket_graph.nodes(data=True))
+    # b = pocket_graph_dgl.ndata['rnafm']
+    return nx_to_dgl(pocket_graph=pocket_graph, use_rings=use_rings)
+
+
 def get_dgl_graph(cif_path, residue_list, undirected=False, use_rnafm=False):
     """
     :param cif_path: toto/tata/1cqr.cif
@@ -146,7 +165,8 @@ def get_dgl_graph(cif_path, residue_list, undirected=False, use_rnafm=False):
     """
     ### DATA PREP
     # convert cif to graph and keep only relevant keys
-    nx_graph = fr3d_to_graph(cif_path)
+    multi_nx_graph = fr3d_to_graph(cif_path)
+    nx_graph = multigraph_to_simple(multi_nx_graph)
 
     buggy_nodes = []
     for node in nx_graph.nodes():
@@ -154,21 +174,21 @@ def get_dgl_graph(cif_path, residue_list, undirected=False, use_rnafm=False):
             nx_graph.nodes[node]["nt"]
         except KeyError:
             buggy_nodes.append(node)
-
     nx_graph.remove_nodes_from(buggy_nodes)
-
     logger.warning(
-        f"Conversion of mmCIF to graph by fr3d-python created {len(buggy_nodes)} residues with missing residue IDs. Removing {buggy_nodes} from the graph."
+        f"Conversion of mmCIF to graph by fr3d-python created {len(buggy_nodes)} residues with missing residue IDs. "
+        f"Removing {buggy_nodes} from the graph."
     )
+
+    if use_rnafm:
+        nx_graph = RNAFMTransform()({"rna": nx_graph})['rna']
 
     # This is the pdbid used by fr3d
     pdbid = Path(cif_path).stem.lower()
     if residue_list is not None:
         # subset cif with given reslist
         reslist = [f"{pdbid}.{res}" for res in residue_list]
-        expanded_reslist = rnaglib.utils.graph_utils.bfs(
-            nx_graph, reslist, depth=4, label="LW"
-        )
+        expanded_reslist = rnaglib.algorithms.bfs(nx_graph, reslist, depth=4, label="LW")
         in_pocket = {node: node in reslist for node in expanded_reslist}
         expanded_graph = nx_graph.subgraph(expanded_reslist)
         nx.set_node_attributes(expanded_graph, name="in_pocket", values=in_pocket)
@@ -176,9 +196,20 @@ def get_dgl_graph(cif_path, residue_list, undirected=False, use_rnafm=False):
         expanded_graph = nx_graph
         in_pocket = {node: True for node in nx_graph.nodes}
         nx.set_node_attributes(expanded_graph, name="in_pocket", values=in_pocket)
-    dgl_graph, _ = load_rna_graph(
-        expanded_graph, undirected=undirected, use_rnafm=use_rnafm
-    )
+
+    # Here, we don't use load_graph because default add_rna expects rnafm embs to be in cache,
+    # while we just computed them
+    pocket_graph = prepare_pocket(expanded_graph, undirected=undirected)
+    if use_rnafm:
+        rnafm_embs = nx.get_node_attributes(pocket_graph, name="rnafm")
+        pre_feats = nx.get_node_attributes(pocket_graph, name="nt_features")
+        combined = {}
+        for node, pre_feat in pre_feats.items():
+            rna_emb = torch.from_numpy(np.asarray(rnafm_embs[node]))
+            combined[node] = torch.cat((pre_feat, rna_emb))
+        nx.set_node_attributes(pocket_graph, name="nt_features", values=combined)
+
+    dgl_graph, _ = nx_to_dgl(pocket_graph=pocket_graph)
     return dgl_graph
 
 

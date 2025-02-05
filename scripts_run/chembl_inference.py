@@ -131,12 +131,12 @@ def get_perf_model(models, res_dir, decoy_modes=("pdb", "chembl", "pdb_chembl"),
         print(f"{model_name}, {decoy}: AuROC {test_auroc:.3f} Rognan {test_auroc_rognan:.3f} GapScore {gap_score:.3f}")
 
 
-def mix_all_chembl(pairs, res_dir, recompute=False):
+def mix_all_chembl(pairs, res_dir, recompute=False, use_max=True):
     new_pairs = {}
     for (model1, model2), outname in pairs.items():
         new_pairs[(f"{model1}_rognan", f"{model2}_rognan")] = f"{outname}_rognan"
     new_pairs.update(pairs)
-    mix_all(pairs=new_pairs, res_dir=res_dir, recompute=recompute)
+    mix_all(pairs=new_pairs, res_dir=res_dir, recompute=recompute, use_max=use_max)
     for outname in pairs.values():
         raw_result = pd.read_csv(os.path.join(res_dir, f"{outname}_raw.csv"))
         raw_result_rognan = pd.read_csv(os.path.join(res_dir, f"{outname}_rognan_raw.csv"))
