@@ -91,7 +91,8 @@ class MolGraphEncoder:
     """
 
     def __init__(self, cache=True, cache_path='data/ligands/lig_graphs.p'):
-        with open(os.path.join(f'data/map_files/edges_and_nodes_map.pickle'), "rb") as f:
+        script_dir = os.path.dirname(__file__)
+        with open(os.path.join(script_dir, f'../../data/map_files/edges_and_nodes_map.pickle'), "rb") as f:
             self.edge_map = pickle.load(f)
             self.at_map = pickle.load(f)
             self.chi_map = pickle.load(f)
