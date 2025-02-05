@@ -68,7 +68,7 @@ You will need to provide the following:
 * A list of binding site residue identifiers
 
 Now you can just run the inference script to get a score for each ligand in your SMILES .txt file.
-Taking example structure and ligand file from `/sample_files`, selecting residues `16-20` of chain `A` as the binding
+Taking example structure and ligand file from `sample_files/`, selecting residues `16-20` of chain `A` as the binding
 site, the corresponding command is :
 
 ```
@@ -91,8 +91,9 @@ CN1[C@H]2CC[C@@H]1CC(OC(=O)[C@H](CO)c1ccccc1)C2 0.47674891352653503
 
 The scores are between 0 and 1 with a higher score representing a better likelihood of binding.
 
-**NOTE:** inference on user-provided structures has not been validated as it uses fr3d-python as a structure annotation
-backend which was not used in training. The models provided were trained on structures annotated by x3dna-dssr.
+**NOTE:** inference on user-provided structures uses fr3d-python as a structure annotation backend while the models 
+provided were trained on structures annotated by x3dna-dssr. 
+This could cause small discrepancies in the results, in cases where those two annotations do not match.
 
 ## Reproducting results and figures
 

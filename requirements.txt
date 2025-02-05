@@ -4,11 +4,12 @@ dgl==1.1.0
 biopython
 hydra-core
 loguru
+optuna
 seaborn
 scikit-learn
 tensorboard
 rdkit
-optuna
+rna-fm
 
 rnaglib==2.0.4
 git+https://github.com/cgoliver/fr3d-python.git
