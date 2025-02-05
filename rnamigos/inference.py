@@ -75,8 +75,8 @@ def get_models(models_path=None, model=None):
 
     if models_path is None:
         models_path = {
-            "is_native": "results/trained_models/is_native/native_pretrain_new_pdbchembl_rnafm",
-            "dock": "results/trained_models/dock/dock_new_pdbchembl_rnafm",
+            "is_native": "results/trained_models/is_native/native_42",
+            "dock": "results/trained_models/dock/dock_42",
         }
         models_path = {model_name: os.path.join(script_dir, "..", model_path)
                        for model_name, model_path in models_path.items()}
@@ -98,11 +98,17 @@ def do_inference(cif_path,
     """
     Run inference from files
     """
+    models = get_models(models_path=models_path, model=model)
+
+    # Do we need to have rna-fm embeddings with the required models ?
+    # Assert the answer is the same for all queried models
+    need_rna_fm = [model.encoder.in_dim == 644 for model in models.values()]
+    assert len(set(need_rna_fm)) == 1
+
     # Get dgl graph with node expansion BFS, load smiles and models
-    dgl_graph = get_dgl_graph(cif_path, residue_list)
+    dgl_graph = get_dgl_graph(cif_path, residue_list, use_rnafm=need_rna_fm[0])
     print("Successfully built the graph")
     smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
-    models = get_models(models_path=models_path, model=model)
 
     # Get raw results df
     results_df = inference_raw(
@@ -114,7 +120,7 @@ def do_inference(cif_path,
 
     if do_mixing:
         names = list(models.keys())
-        results_df = add_mixed_score(df=results_df, score1=names[0], score2=names[1])
+        results_df = add_mixed_score(df=results_df, score1=names[0], score2=names[1], use_max=True)
         if not dump_all:
             results_df = results_df[['smiles', 'mixed']]
     if out_path is not None:

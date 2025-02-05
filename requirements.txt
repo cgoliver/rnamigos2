@@ -11,5 +11,5 @@ tensorboard
 rdkit
 rna-fm
 
-rnaglib==2.0.4
+rnaglib==3.1.0
 git+https://github.com/cgoliver/fr3d-python.git
