@@ -12,9 +12,10 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from rnamigos.learning.dataset import InferenceDataset
-from rnamigos.utils.graph_utils import get_dgl_graph
+from rnamigos.utils.graph_utils import get_dgl_graph, cif_to_nx
 from rnamigos.learning.models import get_model_from_dirpath
 from rnamigos.utils.mixing_utils import add_mixed_score
+from rnaglib.utils import graph_io
 
 
 def inference_raw(
@@ -85,7 +86,7 @@ def get_models(models_path=None, model=None):
     return models
 
 
-def do_inference(cif_path,
+def do_inference(rna_path,
                  residue_list,
                  ligands_path,
                  out_path,
@@ -94,7 +95,8 @@ def do_inference(cif_path,
                  ligand_cache=None,
                  use_ligand_cache=False,
                  do_mixing=True,
-                 dump_all=False):
+                 dump_all=False,
+                 input_type="cif"):
     """
     Run inference from files
     """
@@ -106,7 +108,15 @@ def do_inference(cif_path,
     assert len(set(need_rna_fm)) == 1
 
     # Get dgl graph with node expansion BFS, load smiles and models
-    dgl_graph = get_dgl_graph(cif_path, residue_list, use_rnafm=need_rna_fm[0])
+    if input_type == "cif":
+        nx_graph, pdbid = cif_to_nx(rna_path)
+    elif input_type == "nx":
+        nx_graph = graph_io.load_json(rna_path)
+    else:
+        raise ValueError("Invalid input type.")
+        pass
+ 
+    dgl_graph = get_dgl_graph(nx_graph, residue_list, use_rnafm=need_rna_fm[0])
     print("Successfully built the graph")
     smiles_list = [s.lstrip().rstrip() for s in list(open(ligands_path).readlines())]
 
@@ -133,10 +143,11 @@ def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
     print("Done importing")
     do_inference(
-        cif_path=cfg.cif_path,
+        rna_path=cfg.cif_path,
         residue_list=cfg.residue_list,
         ligands_path=cfg.ligands_path,
         out_path=cfg.out_path,
+        input_type=cfg.input_type
     )
 
 

@@ -157,17 +157,21 @@ def load_rna_graph(rna_path,
     return nx_to_dgl(pocket_graph=pocket_graph, use_rings=use_rings)
 
 
-def get_dgl_graph(cif_path, residue_list, undirected=False, use_rnafm=False):
+def cif_to_nx(cif_path):
+### DATA PREP
+    # convert cif to graph and keep only relevant keys
+    multi_nx_graph = fr3d_to_graph(cif_path)
+    nx_graph = multigraph_to_simple(multi_nx_graph)
+    pdbid = Path(cif_path).stem.lower()
+    return nx_graph, pdbid
+
+def get_dgl_graph(nx_graph, residue_list, pdbid=None, undirected=False, use_rnafm=False):
     """
     :param cif_path: toto/tata/1cqr.cif
     :param residue_list: list of strings "A.2","A.3",... ,"A.85" (missing pdb, useful for inference)
     :return:
     """
-    ### DATA PREP
-    # convert cif to graph and keep only relevant keys
-    multi_nx_graph = fr3d_to_graph(cif_path)
-    nx_graph = multigraph_to_simple(multi_nx_graph)
-
+    
     buggy_nodes = []
     for node in nx_graph.nodes():
         try:
@@ -184,7 +188,6 @@ def get_dgl_graph(cif_path, residue_list, undirected=False, use_rnafm=False):
         nx_graph = RNAFMTransform()({"rna": nx_graph})['rna']
 
     # This is the pdbid used by fr3d
-    pdbid = Path(cif_path).stem.lower()
     if residue_list is not None:
         # subset cif with given reslist
         reslist = [f"{pdbid}.{res}" for res in residue_list]
