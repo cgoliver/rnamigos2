@@ -56,7 +56,7 @@ First, create a conda environment:
 ```bash
 git clone https://github.com/cgoliver/rnamigos2.git
 cd rnamigos2/
-conda create -n rnamigos2
+conda create -n rnamigos2 python=3.10
 conda activate rnamigos2
 pip install numpy==1.26
 pip install torch==2.2.2+cpu torchaudio==2.2.2 torchdata==0.7.1 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cpu
