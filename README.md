@@ -18,19 +18,21 @@ ranks the compounds so that better ranked compounds have a higher chance to bind
 It is based on a machine learning model using the PyTorch framework and was trained leveraging unsupervised and
 synthetic data.
 It was shown to display similar enrichment factors to docking while running in a fraction of the time.
-A detailed description of the tool is available
-on [BioRxiv](https://www.biorxiv.org/content/10.1101/2023.11.23.568394v2).
+A detailed description of the tool is available in our [article](https://www.nature.com/articles/s41467-025-57852-0),
+published in Nature Communication.
 
 If you find this tool useful, please cite
 
 ```bib
-@article{carvajal2023rnamigos2,
-  title={RNAmigos2: Fast and accurate structure-based RNA virtual screening with semi-supervised graph learning and large-scale docking data},
-  author={Carvajal-Patino, Juan G and Mallet, Vincent and Becerra, David and Ni{\~n}o Vasquez, Luis Fernando and Oliver, Carlos and Waldisp{\"u}hl, J{\'e}r{\^o}me},
-  journal={bioRxiv},
-  pages={2023--11},
-  year={2023},
-  publisher={Cold Spring Harbor Laboratory}
+@article{carvajal2025rnamigos2,
+  title={RNAmigos2: accelerated structure-based RNA virtual screening with deep graph learning},
+  author={Carvajal-Pati{\~n}o, Juan G and Mallet, Vincent and Becerra, David and Ni{\~n}o Vasquez, Luis Fernando and Oliver, Carlos and Waldisp{\"u}hl, J{\'e}r{\^o}me},
+  journal={Nature Communications},
+  volume={16},
+  number={1},
+  pages={2799},
+  year={2025},
+  publisher={Nature Publishing Group UK London}
 }
 ```
 

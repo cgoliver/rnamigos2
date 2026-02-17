@@ -24,17 +24,35 @@ and skip to the model training section.
 
 ### Getting initial pocket data
 
+You can directly download pocket graphs [here](https://drive.proton.me/urls/SC9AQCF2SC#JYQ3K9yNUJ4U)
+
 Initially, we download all pdb containing RNA + small molecule, filter them and save resulting pockets as node ids +
 ligands...
 
 [//]: # (TODO : include steps to get the original pockets.)
 
+### Get docking scores
 
-Download pocket graphs [here](https://drive.proton.me/urls/SC9AQCF2SC#JYQ3K9yNUJ4U)
+The docking scores can be obtained [here](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
+
+[//]: # (We can now proceed to docking all relevant pairs.)
+[//]: # (The docking experiment can be launched using :)
+[//]: # (TODO : upload docking scripts_prepare)
+
+
+To split these raw results into csvs adapted for each of our training scenarios, one can run
+
+```bash
+python scripts_prepare/build_csvs.py
+```
+
+This should take about 3 minutes, and result in data/csvs/{docking_data,fp_data,binary_data}.csv
 
 ### Generate actives and decoys list
 
-Once equiped with this initial data, we select the decoys corresponding to our actives.
+You can directly download the decoys [here](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR) and get to the next step.
+
+To reproduce these, we select the decoys corresponding to our actives.
 This is done by running :
 
 ```
@@ -50,34 +68,12 @@ download [here](https://drive.proton.me/urls/CQMXCX5MW4#YQeEEa7VHVcu)
 
 We now have pockets, native ligands and different sets of decoys.
 
-These decoys can be downloaded [here](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR)
-
-### Get docking scores
-
-We can now proceed to docking all relevant pairs.
-The docking experiment can be launched using :
-
-[//]: # (TODO : upload docking scripts_prepare)
-
-and the corresponding docking scores can be obtained [here](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
-
-[//]: # (TODO : check that the data is ok)
-
-To split this initial data into csvs adapted for each of our training scenarios, one can run
-
-```bash
-python scripts_prepare/build_csvs.py
-```
-
-This should take about 3 minutes.
-
 ### Pockets as 2.5d graphs, ligands as graphs and fingerprints
 
 We now want to prepare our pockets and ligands for learning our tool.
-This can be obtained using our scripts.
+This can be obtained using our scripts, and requires downloading all RNA as 2.5D graphs, using _rnaglib_ download tool.
 
 [//]: # (TODO : RIGHT NOW, we need to have json_pockets/ because the node ids are broken...)
-
 [//]: # (TODO : This requires having rnaglib_all data, maybe we should mention how to get that)
 
 ```bash
@@ -86,12 +82,16 @@ python scripts_prepare/get_pocket_graphs.py
 
 ### Splitting the data
 
-We first need to compute RMScores and then to split the data according to the RMscores.
+The splits are directly available through our git repo as pickle files, in data/train_{val,test}_75.p
+
+To reproduce these splits, we first need to compute RMScores between all pockets.
+The RMScores can be found [here](https://drive.proton.me/urls/1XPQBADXJM#vthnxiPgcyJU).
 
 [//]: # (TODO : Add RMscores computations)
 
-Now that we have the file data/rmscore_normalized_by_average_length_complete_dataset.csv, we can obtain our
-final splits. Simply run:
+Now that we have the file data/rmscore_normalized_by_average_length_complete_dataset.csv, 
+we can split the data according to the RMscores.
+Simply run:
 
 ```bash
 python scripts_prepare/split.py

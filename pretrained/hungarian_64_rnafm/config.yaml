@@ -1,0 +1,76 @@
+data:
+  pocket_graphs: data/json_pockets_expanded
+  pretrain_graphs: data/pretrain_data/nr-graphs_annotated
+  ligand_db: data/ligand_db
+  rnamigos1_test: false
+  rnamigos1_only: false
+  undirected: false
+  rnafm_cache: data/pocket_embeddings
+  rnafm_cache_pretrain: data/pretrain_data/whole_embeddings
+tokens:
+  edge_types:
+  - B53
+  - B35
+  - CWW
+  - CWH
+  - CWS
+  - CHW
+  - CHH
+  - CHS
+  - CSW
+  - CSH
+  - CSS
+  - TWW
+  - TWH
+  - TWS
+  - THW
+  - THH
+  - THS
+  - TSW
+  - TSH
+  - TSS
+  nuc_types:
+  - A
+  - U
+  - C
+  - G
+paths:
+  model_path: models/
+  pretrain_save: pretrained/
+model:
+  encoder:
+    in_dim: 4
+    hidden_dim: 64
+    num_layers: 3
+    num_bases: -1
+    subset_pocket_nodes: true
+  lig_encoder:
+    in_dim: 166
+    hidden_dim: 32
+    num_layers: 3
+  graphlig_encoder:
+    use_pretrained: false
+    features_dim: 22
+    gcn_hdim: 32
+    gcn_layers: 3
+    l_size: 32
+  decoder:
+    in_dim: 64
+    out_dim: 1
+    hidden_dim: 32
+    num_layers: 3
+    activation: sigmoid
+  pool: att
+  dropout: 0.3
+  batch_norm: true
+  use_pretrained: false
+  pretrained_path: pretrained/R_1_16/model.pth
+  use_graphligs: false
+  use_rnafm: true
+name: hungarian_64_rnafm
+seed: 42
+epochs: 100
+simfunc: hungarian
+depth: 2
+device: cpu
+num_workers: 0
