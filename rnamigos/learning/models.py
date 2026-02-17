@@ -387,7 +387,7 @@ class Embedder(nn.Module):
         )
 
     def forward(self, g):
-        h = g.ndata["nt_features"]
+        h = g.ndata["nt_features"].float()
         for i, layer in enumerate(self.layers):
             h = layer(g, h, g.edata["edge_type"])
             if self.batch_norm:

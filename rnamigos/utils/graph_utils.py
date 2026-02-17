@@ -121,7 +121,7 @@ def add_rnafm(pocket_nx,
         rna_emb = rnafm_embs[node]
         if isinstance(rna_emb, np.ndarray):
             rna_emb = torch.from_numpy(rna_emb)
-        combined[node] = torch.cat((pre_feat, rna_emb))
+        combined[node] = torch.cat((pre_feat, rna_emb)).float()
     nx.set_node_attributes(pocket_nx, name="nt_features", values=combined)
 
 
