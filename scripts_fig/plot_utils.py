@@ -7,8 +7,7 @@ import os
 import pandas as pd
 import pickle
 import random
-import seaborn as sns
-from sklearn.manifold import TSNE, MDS
+from sklearn.manifold import TSNE
 from seaborn.palettes import dark_palette, light_palette, blend_palette
 
 random.seed(42)
@@ -41,21 +40,6 @@ def custom_diverging_palette(
     mid = midpoint * sep
     pal = blend_palette(np.concatenate([neg, mid, pos]), n, as_cmap=as_cmap)
     return pal
-
-
-def get_groups():
-    script_dir = os.path.dirname(__file__)
-    splits_file = os.path.join(script_dir, "../data/train_test_75.p")
-    _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, "rb"))
-    train_group_reps = [random.choice(names) for key, names in train_names_grouped.items()]
-    test_group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
-    group_reps_path = os.path.join(script_dir, "../data/group_reps_75.p")
-    pickle.dump((train_group_reps, test_group_reps), open(group_reps_path, "wb"))
-
-
-if __name__ == "__main__":
-    get_groups()
-
 
 def group_df(df):
     """

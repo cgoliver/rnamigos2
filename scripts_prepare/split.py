@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pickle
+import random
 from sklearn.cluster import AgglomerativeClustering
 
 from rnaglib.utils import graph_io
@@ -103,6 +104,23 @@ train_names = set(chain.from_iterable([[name for name in group] for group in tra
 val_names = set(chain.from_iterable([[name for name in group] for group in val_groups.values()]))
 print("Number of examples", len(train_names), len(val_names))
 pickle.dump((train_names, val_names, train_groups, val_groups), open("data/train_val_75.p", 'wb'))
+
+# RESET for coherence after refactor
+random.seed(42)
+np.random.seed(42)
+
+
+def get_groups():
+    script_dir = os.path.dirname(__file__)
+    splits_file = os.path.join(script_dir, "../data/train_test_75.p")
+    _, _, train_names_grouped, test_names_grouped = pickle.load(open(splits_file, "rb"))
+    train_group_reps = [random.choice(names) for key, names in train_names_grouped.items()]
+    test_group_reps = [random.choice(names) for key, names in test_names_grouped.items()]
+    group_reps_path = os.path.join(script_dir, "../data/group_reps_75.p")
+    pickle.dump((train_group_reps, test_group_reps), open(group_reps_path, "wb"))
+
+
+get_groups()
 
 
 def assess_copies():
