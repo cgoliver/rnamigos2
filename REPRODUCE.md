@@ -1,5 +1,9 @@
 # Reproducing the results
 
+All the initial and processed files are directly available for download on [Zenodo](https://doi.org/10.5281/zenodo.14803961).
+
+Below are the steps necessary to reproduce most of these files from publicly available databases, training models and using inference and plotting scripts.
+
 ## Setting up the environment
 
 If you want to reproduce the results from scratch, first you need to set up the environment,
@@ -13,6 +17,8 @@ Make sure to setup the repo:
 pip install .
 ```
 
+## Gathering the data
+
 If you want already pre-processed data files just run:
 
 ```
@@ -20,7 +26,7 @@ cd data
 tar -xzvf rnamigos2_data.tar.gz
 ```
 
-and skip to the model training section.
+and skip to the _Generate actives and decoys list_ section (ligands stored in our format are a bit heavy).
 
 ### Getting initial pocket data
 
@@ -39,7 +45,6 @@ The docking scores can be obtained [here](https://drive.proton.me/urls/TZJ7R8T8T
 [//]: # (The docking experiment can be launched using :)
 [//]: # (TODO : upload docking scripts_prepare)
 
-
 To split these raw results into csvs adapted for each of our training scenarios, one can run
 
 ```bash
@@ -47,26 +52,6 @@ python scripts_prepare/build_csvs.py
 ```
 
 This should take about 3 minutes, and result in data/csvs/{docking_data,fp_data,binary_data}.csv
-
-### Generate actives and decoys list
-
-You can directly download the decoys [here](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR) and get to the next step.
-
-To reproduce these, we select the decoys corresponding to our actives.
-This is done by running :
-
-```
-python scripts_prepare/build_screen_data.py --pdb --decoyfinder
-```
-
-We save them in `data/ligand_db/`
-
-NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation.
-The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
-DecoyFinder samples ligands from a given library. In this case we use ZINC in-vio bioactive compounds which you can
-download [here](https://drive.proton.me/urls/CQMXCX5MW4#YQeEEa7VHVcu)
-
-We now have pockets, native ligands and different sets of decoys.
 
 ### Pockets as 2.5d graphs, ligands as graphs and fingerprints
 
@@ -96,6 +81,25 @@ Simply run:
 ```bash
 python scripts_prepare/split.py
 ```
+### Generate actives and decoys list
+
+You can directly download the decoys [here](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR) and get to the next step.
+
+To reproduce these, we select the decoys corresponding to our actives.
+This is done by running :
+
+```
+python scripts_prepare/build_screen_data.py --pdb --decoyfinder
+```
+
+We save them in `data/ligand_db/`
+
+NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation.
+The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
+DecoyFinder samples ligands from a given library. In this case we use ZINC in-vio bioactive compounds which you can
+download [here](https://drive.proton.me/urls/CQMXCX5MW4#YQeEEa7VHVcu)
+
+We now have pockets, native ligands and different sets of decoys.
 
 ## Model training and inference
 
