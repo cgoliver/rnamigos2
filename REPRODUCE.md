@@ -89,10 +89,12 @@ To reproduce these, we select the decoys corresponding to our actives.
 This is done by running :
 
 ```
-python scripts_prepare/build_screen_data.py --pdb --decoyfinder
+python scripts_prepare/build_screen_data.py --robin
+python scripts_prepare/build_screen_data.py --pdb 
+python scripts_prepare/build_screen_data.py --decoyfinder
 ```
 
-We save them in `data/ligand_db/`
+We save them in `data/ligand_db/`.
 
 NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation.
 The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.

@@ -1,13 +1,16 @@
+import os
+import sys
+
 import argparse
-from pathlib import Path
-import tempfile
-
-from tqdm import tqdm
-import pandas as pd
 from loguru import logger
+import pandas as pd
+from pathlib import Path
 from rdkit import Chem
+import tempfile
+from tqdm import tqdm
 
-from scripts_prepare.decoy_finder import find_decoys
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 pocket_names = [
     "2GDI_Y_TPP_100",
@@ -26,11 +29,14 @@ ROBIN_POCKETS = dict(zip(ligand_names, pocket_names))
 
 
 def get_decoyfinder_decoys(smiles, decoy_db="data/decoy_libraries/in-vitro.csv"):
+    from scripts_prepare.decoy_finder import find_decoys
+
     logger.info(f"Getting decoys for {smiles}")
     with tempfile.TemporaryDirectory() as tdir:
         with open(Path(tdir, "input.txt"), 'w') as inp:
             inp.write(smiles)
         out_path = Path(tdir, 'decoys.sdf')
+
         for _ in find_decoys(query_files=[(Path(tdir, 'input.txt'))], db_files=[decoy_db], outputfile=str(out_path)):
             pass
         # parse output SDF.
@@ -47,7 +53,7 @@ def build_actives_decoys(
         pdb=False,
         decoyfinder=False,
         pdb_data_path='data/rnamigos2_dataset_consolidated.csv',
-        save_path='data/ligand_db_preprint',
+        save_path='data/ligand_db',
 ):
     """ Build active and decoy lists for every pocket in master dataset `rnamigos2_dataset_consolidated.csv`
 
@@ -61,13 +67,7 @@ def build_actives_decoys(
     if not decoyfinder and not pdb:
         return
 
-    if decoyfinder:
-        from decoy_finder import find_decoys
-
     pdb_df = pd.read_csv(pdb_data_path)
-
-    pockets = pdb_df['PDB_ID_POCKET'].unique()
-
     pdb_ligands = set(pdb_df.loc[pdb_df['LIGAND_SOURCE'] == 'PDB']['LIGAND_SMILES'].unique())
     chembl_ligands = set(pdb_df.loc[pdb_df['LIGAND_SOURCE'] == 'CHEMBL']['LIGAND_SMILES'].unique())
 
@@ -83,8 +83,6 @@ def build_actives_decoys(
 
         if decoyfinder:
             decoyfinder_path.mkdir(parents=True, exist_ok=True)
-            decoyfinder_decoys = get_decoyfinder_decoys(pocket.LIGAND_SMILES)
-
             with open(decoyfinder_path / 'decoys.txt', 'w') as de:
                 de.write("\n".join(get_decoyfinder_decoys(pocket.LIGAND_SMILES)))
             with open(decoyfinder_path / 'actives.txt', 'w') as ac:
@@ -144,6 +142,7 @@ def cline():
 
 if __name__ == "__main__":
     args = cline()
-    build_actives_decoys(pdb=args.pdb, decoyfinder=args.decoyfinder)
+    if args.pdb or args.decoyfinder:
+        build_actives_decoys(pdb=args.pdb, decoyfinder=args.decoyfinder)
     if args.robin:
         build_actives_decoys_robin()
