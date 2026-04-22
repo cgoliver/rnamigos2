@@ -22,6 +22,7 @@ class MolFPEncoder:
         try:
             self.cached_fps = pickle.load(open(cached_path, 'rb'))
         except FileNotFoundError:
+            print(f"MolFPEncoder: cache {cached_path!r} not found. Starting with empty cache.")
             self.cached_fps = {}
 
     def smiles_to_fp_one(self, smiles):
@@ -36,7 +37,11 @@ class MolFPEncoder:
                 fp = list(map(int, MACCSkeys.GenMACCSKeys(mol).ToBitString()))[1:]
             else:
                 fp = list(map(int, AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024).ToBitString()))
-        except:
+        except Exception as e:
+            print(
+                f"smiles_to_fp_one ({self.fp_type}) failed on smiles={smiles!r}: "
+                f"{type(e).__name__}: {e}. Returning zero fingerprint."
+            )
             if self.fp_type == 'MACCS':
                 fp = [0] * 166
             else:
@@ -75,7 +80,11 @@ def smiles_to_nx(smiles):
         mol = Chem.MolFromSmiles(smiles)
         nx_graph = mol_to_nx(mol)
         return nx_graph
-    except:
+    except Exception as e:
+        print(
+            f"smiles_to_nx failed on smiles={smiles!r}: "
+            f"{type(e).__name__}: {e}. Returning None."
+        )
         return None
 
 

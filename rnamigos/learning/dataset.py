@@ -420,12 +420,17 @@ class VirtualScreenDataset(DockingDataset):
             group_pockets = self.groups[self.reverse_groups[pocket_name]]
             group_list = []
             for pocket in group_pockets:
+                actives_path = Path(self.ligands_path, pocket, self.decoy_mode, "actives.txt")
                 try:
-                    active = self.parse_smiles(Path(self.ligands_path, pocket, self.decoy_mode, "actives.txt"))[0]
+                    active = self.parse_smiles(actives_path)[0]
                     group_list.append(active)
                 except Exception as e:
-                    pass
-                    # print(e)
+                    if self.verbose:
+                        print(
+                            f"get_ligands: skipping group member {pocket} for "
+                            f"pocket {pocket_name} ({self.decoy_mode}): "
+                            f"{type(e).__name__}: {e} (path={actives_path})"
+                        )
             group_actives = set(group_list)
             decoys_smiles = [smile for smile in decoys_smiles if smile not in group_actives]
             actives_smiles = list(group_actives)
@@ -470,7 +475,12 @@ class VirtualScreenDataset(DockingDataset):
             return pocket_name, pocket_graph, all_inputs, torch.tensor(is_active), all_smiles
         except FileNotFoundError as e:
             if self.verbose:
-                print(e)
+                pocket_name = self.all_pockets_names[idx] if idx < len(self.all_pockets_names) else f"idx={idx}"
+                print(
+                    f"VirtualScreenDataset skipping pocket {pocket_name} "
+                    f"(decoy_mode={self.decoy_mode}): missing file {e.filename!r} "
+                    f"({type(e).__name__}: {e})"
+                )
             return None, None, None, None, None
 
 
