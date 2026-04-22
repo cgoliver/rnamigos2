@@ -1,5 +1,6 @@
 import os
 import pickle
+import traceback
 
 import dgl
 import networkx as nx
@@ -166,7 +167,13 @@ class MolGraphEncoder:
             graph_dgl.ndata['node_features'] = torch.cat([graph_dgl.ndata[f].view(N, -1) for f in node_features], dim=1)
             return graph_dgl
         except Exception as e:
-            print(f"Failed with exception {e}")
+            n_nodes = graph_nx.number_of_nodes() if graph_nx is not None else 0
+            n_edges = graph_nx.number_of_edges() if graph_nx is not None else 0
+            print(
+                f"nx_mol_to_dgl failed: {type(e).__name__}: {e} "
+                f"(graph_nx nodes={n_nodes}, edges={n_edges})\n"
+                f"{traceback.format_exc()}"
+            )
             return dgl.graph(([], []))
 
     def smiles_to_graph_one(self, smiles):
