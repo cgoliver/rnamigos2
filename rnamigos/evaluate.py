@@ -50,20 +50,24 @@ def main(cfg: DictConfig):
     ef_dfs, raw_dfs = [], []
     for decoy_mode in decoys:
         dataloader = get_vs_loader(systems=test_systems, decoy_mode=decoy_mode, cfg=cfg_load, rognan=cfg.rognan)
+        # cfg_load, not cfg: 'name' and 'train.target' must come from the trained model's own
+        # config. The evaluate config has no 'name', and its train.target always defaults to
+        # 'dock', which would flip the score sign for an is_native model.
         decoy_efs, decoys_raw = get_results_dfs(model=model,
                                                 dataloader=dataloader,
                                                 decoy_mode=decoy_mode,
-                                                cfg=cfg,
+                                                cfg=cfg_load,
                                                 verbose=True)
-        ef_dfs += decoy_efs
-        raw_dfs += decoys_raw
+        ef_dfs.append(decoy_efs)
+        raw_dfs.append(decoys_raw)
 
     # Make it a df
     ef_df = pd.concat(ef_dfs)
-    df_raw = pd.DataFrame(raw_dfs)
+    df_raw = pd.concat(raw_dfs)
 
     # Dump csvs
-    d = Path(cfg.result_dir, parents=True, exist_ok=True)
+    d = Path(cfg.result_dir)
+    d.mkdir(parents=True, exist_ok=True)
     base_name = Path(cfg.csv_name).stem
     ef_df.to_csv(d / (base_name + '.csv'))
     df_raw.to_csv(d / (base_name + "_raw.csv"))
