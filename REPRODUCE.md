@@ -83,18 +83,29 @@ python scripts_prepare/split.py
 ```
 ### Generate actives and decoys list
 
-You can directly download the decoys [here](https://drive.proton.me/urls/6XCM553QBC#1NR2xU9W3CkR) and get to the next step.
+The decoy sets used for virtual screening are built from
+`data/rnamigos2_dataset_consolidated.csv`, which is included in the Zenodo archive, so there is
+nothing extra to download:
 
-To reproduce these, we select the decoys corresponding to our actives.
-This is done by running :
+```bash
+python scripts_prepare/build_ligand_db.py
+```
+
+This writes the `pdb`, `pdb_chembl` and `chembl` sets to `data/ligand_db/`. The results in the
+paper are reported on `chembl`.
+
+Note that the three sets are not nested the way the names suggest. `chembl` is the ~500 drug-like
+ChEMBL compounds docked against that individual pocket, while `pdb_chembl` mixes the PDB ligands
+with the full global ChEMBL pool, so `pdb_chembl` is not `pdb` + `chembl`.
+
+The ROBIN and DecoyFinder sets are separate:
 
 ```
 python scripts_prepare/build_screen_data.py --robin
-python scripts_prepare/build_screen_data.py --pdb 
 python scripts_prepare/build_screen_data.py --decoyfinder
 ```
 
-We save them in `data/ligand_db/`.
+We save them in `data/ligand_db/` as well.
 
 NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation.
 The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
