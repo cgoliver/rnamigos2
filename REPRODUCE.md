@@ -30,7 +30,7 @@ and skip to the _Generate actives and decoys list_ section (ligands stored in ou
 
 ### Getting initial pocket data
 
-You can directly download pocket graphs [here](https://drive.proton.me/urls/SC9AQCF2SC#JYQ3K9yNUJ4U)
+The pocket graphs are in the Zenodo archive, at `data/json_pockets_expanded`.
 
 Initially, we download all pdb containing RNA + small molecule, filter them and save resulting pockets as node ids +
 ligands...
@@ -39,7 +39,7 @@ ligands...
 
 ### Get docking scores
 
-The docking scores can be obtained [here](https://drive.proton.me/urls/TZJ7R8T8T0#RCd1LK8uu1MK)
+The docking scores are in the Zenodo archive, at `data/rnamigos2_dataset_consolidated.csv`.
 
 [//]: # (We can now proceed to docking all relevant pairs.)
 [//]: # (The docking experiment can be launched using :)
@@ -70,7 +70,7 @@ python scripts_prepare/get_pocket_graphs.py
 The splits are directly available through our git repo as pickle files, in data/train_{val,test}_75.p
 
 To reproduce these splits, we first need to compute RMScores between all pockets.
-The RMScores can be found [here](https://drive.proton.me/urls/1XPQBADXJM#vthnxiPgcyJU).
+The RMScores are in the Zenodo archive, at `data/rmscores/`.
 
 [//]: # (TODO : Add RMscores computations)
 
@@ -110,13 +110,15 @@ We save them in `data/ligand_db/` as well.
 NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation.
 The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
 DecoyFinder samples ligands from a given library. In this case we use ZINC in-vio bioactive compounds which you can
-download [here](https://drive.proton.me/urls/CQMXCX5MW4#YQeEEa7VHVcu)
+download [here](https://drive.proton.me/urls/CQMXCX5MW4#YQeEEa7VHVcu) (not part of the Zenodo archive).
 
 We now have pockets, native ligands and different sets of decoys.
 
 ## Model training and inference
 
-Fetch the whole RNAs for pretraining [here](https://drive.proton.me/urls/Y8TTCWKDVC#vs29rzJ1h9YN)
+Fetch the whole RNAs for pretraining [here](https://drive.proton.me/urls/Y8TTCWKDVC#vs29rzJ1h9YN) (not part of
+the Zenodo archive). This step is only needed to redo the pretraining itself; the pretrained weights used by the
+paper are already in `pretrained/`.
 
 Pretrain a model, by running :
 
