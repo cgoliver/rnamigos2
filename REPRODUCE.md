@@ -109,16 +109,27 @@ We save them in `data/ligand_db/` as well.
 
 NOTE: you will need to install pybel if you want DecoyFinder decoys. This depends on an OpenBabel installation.
 The easiest way is to install openbabel through conda or compile OpenBabel and then pip install openbabel.
-DecoyFinder samples ligands from a given library. In this case we use ZINC in-vio bioactive compounds which you can
-download [here](https://drive.proton.me/urls/CQMXCX5MW4#YQeEEa7VHVcu) (not part of the Zenodo archive).
+DecoyFinder samples ligands from a given library. In this case we use the ZINC in-vitro bioactive compounds from the
+[RNAmigos1 paper](https://academic.oup.com/nar/article/48/14/7690/5870337), whose data is on
+[Zenodo](https://zenodo.org/record/8338267). Take `rnamigos_1_data/data/decoys/in-vitro.csv` out of that archive and
+put it at `data/decoy_libraries/in-vitro.csv`.
 
 We now have pockets, native ligands and different sets of decoys.
 
 ## Model training and inference
 
-Fetch the whole RNAs for pretraining [here](https://drive.proton.me/urls/Y8TTCWKDVC#vs29rzJ1h9YN) (not part of
-the Zenodo archive). This step is only needed to redo the pretraining itself; the pretrained weights used by the
-paper are already in `pretrained/`.
+The pretrained weights used by the paper are already in `pretrained/`, so this section is only needed if you want to
+redo the pretraining yourself.
+
+The whole RNAs come from rnaglib, as the non-redundant annotated graph set:
+
+```bash
+rnaglib_download -r nr -a
+```
+
+This lands under `~/.rnaglib/datasets/` (e.g. `rnaglib-nr-1.0.0-annotated`). Point `data.pretrain_graphs` at it, or
+symlink it to `data/pretrain_data/nr-graphs_annotated`. The RNA-FM embeddings are computed on the fly by rnaglib's
+`RNAFMTransform` and cached at `data.rnafm_cache_pretrain`, so there is nothing else to fetch.
 
 Pretrain a model, by running :
 
