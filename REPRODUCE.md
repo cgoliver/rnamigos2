@@ -69,6 +69,12 @@ python scripts_prepare/get_pocket_graphs.py
 
 The splits are directly available through our git repo as pickle files, in data/train_{val,test}_75.p
 
+**These pickles are the split, not the `SPLIT` column of the csvs.** With `train.rnamigos1_split: -2`, which
+every shipped config uses, `get_systems` selects train and test pockets by membership in `data/train_test_75.p`
+and ignores the `SPLIT` column entirely. That column is a leftover from an older split based on PDB names
+(the `train.rnamigos1_split: -1` path), it labels rows rather than pockets, and it disagrees with the split
+actually used on most of the test set. Do not use it to check which pockets were held out.
+
 To reproduce these splits, we first need to compute RMScores between all pockets.
 The RMScores are in the Zenodo archive, at `data/rmscores/`.
 

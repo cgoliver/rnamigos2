@@ -11,6 +11,10 @@ interactions_csv_fp = 'data/csvs/fp_data.csv'
 interactions_csv_binary = 'data/csvs/binary_data.csv'
 
 systems = pd.read_csv(interactions_csv_original)
+# NOTE: this SPLIT column is the old PDB-name-based split, and it labels rows rather than
+# pockets, so a pocket can carry several values. It is only read when train.rnamigos1_split
+# is -1. Every shipped config uses -2, which splits on data/train_test_75.p instead and
+# ignores this column, so it is not the way to tell which pockets were held out.
 systems = systems.rename({'TYPE': 'SPLIT'}, axis='columns')
 
 # FP : Get PDB, SMILES

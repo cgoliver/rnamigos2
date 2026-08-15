@@ -459,9 +459,9 @@ class VirtualScreenDataset(DockingDataset):
             pocket_name = self.all_pockets_names[idx]
             actives_smiles, decoys_smiles = self.get_ligands(pocket_name)
 
-            # Remove empty cases
+            # Remove empty cases. Return the name so the caller can say which pocket it dropped.
             if len(actives_smiles) == 0 or len(decoys_smiles) == 0:
-                return None, None, None, None, None
+                return pocket_name, None, None, None, None
 
             all_smiles = actives_smiles + decoys_smiles
             is_active = np.zeros(len(all_smiles))
@@ -474,14 +474,14 @@ class VirtualScreenDataset(DockingDataset):
                 all_inputs = torch.tensor(all_inputs)
             return pocket_name, pocket_graph, all_inputs, torch.tensor(is_active), all_smiles
         except FileNotFoundError as e:
+            pocket_name = self.all_pockets_names[idx] if idx < len(self.all_pockets_names) else f"idx={idx}"
             if self.verbose:
-                pocket_name = self.all_pockets_names[idx] if idx < len(self.all_pockets_names) else f"idx={idx}"
                 print(
                     f"VirtualScreenDataset skipping pocket {pocket_name} "
                     f"(decoy_mode={self.decoy_mode}): missing file {e.filename!r} "
                     f"({type(e).__name__}: {e})"
                 )
-            return None, None, None, None, None
+            return pocket_name, None, None, None, None
 
 
 class InferenceDataset(Dataset):

@@ -33,14 +33,12 @@ def run_virtual_screen(model, dataloader, metric=get_auroc, lower_is_better=Fals
     """
     aurocs, all_scores, status, all_smiles, pocket_names = [], [], [], [], []
     logger.debug(f"Doing VS on {len(dataloader)} pockets.")
-    failed_set = set()
-    failed = 0
+    # Skipped pockets silently shrink the denominator of the mean, so keep track of
+    # which ones went and why rather than only counting them.
+    skipped = {"no actives or decoys": [], "fewer than 10 ligands": []}
     for i, (pocket_name, pocket_graph, ligands, is_active, smiles) in enumerate(dataloader):
         if pocket_graph is None:
-            failed_set.add(pocket_graph)
-            logger.trace(pocket_graph)
-            logger.debug(f"VS fail")
-            failed += 1
+            skipped["no actives or decoys"].append(pocket_name)
             continue
         if not i % 20:
             if verbose:
@@ -48,7 +46,7 @@ def run_virtual_screen(model, dataloader, metric=get_auroc, lower_is_better=Fals
         if (isinstance(ligands, torch.Tensor) and len(ligands) < 10) or (
             isinstance(ligands, DGLGraph) and ligands.batch_size < 10
         ):
-            logger.warning(f"Skipping pocket{i}, not enough decoys")
+            skipped["fewer than 10 ligands"].append(pocket_name)
             continue
         scores = model.predict_ligands(pocket_graph, ligands)[:, 0].numpy()
         if lower_is_better:
@@ -59,7 +57,10 @@ def run_virtual_screen(model, dataloader, metric=get_auroc, lower_is_better=Fals
         status.append(list(is_active))
         pocket_names.append(pocket_name)
         all_smiles.append(smiles)
-    logger.debug(f"VS failed on {failed_set}")
+    n_skipped = sum(len(names) for names in skipped.values())
+    if n_skipped:
+        reasons = "; ".join(f"{reason}: {names}" for reason, names in skipped.items() if names)
+        logger.warning(f"VS scored {len(aurocs)}/{len(dataloader)} pockets, skipped {n_skipped} -- {reasons}")
     return aurocs, all_scores, status, pocket_names, all_smiles
 
 
